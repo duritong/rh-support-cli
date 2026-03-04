@@ -121,6 +121,7 @@ Creates a new support case. If options are omitted, the tool will interactively 
 - `--severity`: Case severity (Low, Normal, High, Urgent)
 - `--type`: Case type (Standard, Bug)
 - `--attachment`: Path to a file to attach. Can be used multiple times.
+- `--no-default-template`: Ignore default create template from config.
 
 **Examples:**
 
@@ -188,6 +189,7 @@ You can define bookmarks (presets of filters) in a YAML configuration file.
 **Example `config.yaml`:**
 ```yaml
 default_bookmark: "my_team"
+default_create_template: "base_openshift"
 
 bookmarks:
   my_team:

@@ -11,10 +11,20 @@ from rh_support_lib.utils import select_from_list, prompt_text, strip_header_com
 from rh_support_lib.templates import TemplateEngine
 
 
-def cmd_create(args, token):
+def cmd_create(args, token, config):
     # Process Templates
     defaults = {}
+
+    templates_to_process = []
+    if not getattr(args, "no_default_template", False) and config.get(
+        "default_create_template"
+    ):
+        templates_to_process.append(config.get("default_create_template"))
+
     if args.template:
+        templates_to_process.extend(args.template)
+
+    if templates_to_process:
         template_vars = {}
         if args.template_var:
             for tv in args.template_var:
@@ -27,7 +37,7 @@ def cmd_create(args, token):
 
         templates_dir = os.path.expanduser("~/.config/rh-support-cli/templates")
         engine = TemplateEngine(templates_dir)
-        defaults = engine.process(args.template, template_vars)
+        defaults = engine.process(templates_to_process, template_vars)
 
     # 1. Gather Data (Flags or Interactive)
 

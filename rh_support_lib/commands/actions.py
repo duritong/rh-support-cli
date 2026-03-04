@@ -21,7 +21,9 @@ def cmd_attach(args, token):
         # Check size (1GB limit warning)
         file_size = os.path.getsize(fpath)
         if file_size > 1073741824:
-            print(f"Warning: File '{os.path.basename(fpath)}' exceeds 1GB. API upload might fail. Consider SFTP.")
+            print(
+                f"Warning: File '{os.path.basename(fpath)}' exceeds 1GB. API upload might fail. Consider SFTP."
+            )
 
         print(f"Attaching '{os.path.basename(fpath)}' to Case #{args.case}...")
 
@@ -43,7 +45,9 @@ def cmd_attach(args, token):
             if response.status_code in [200, 201]:
                 print(f"Success: File '{os.path.basename(fpath)}' attached.")
             else:
-                print(f"Error: Upload failed for '{os.path.basename(fpath)}' (HTTP {response.status_code})")
+                print(
+                    f"Error: Upload failed for '{os.path.basename(fpath)}' (HTTP {response.status_code})"
+                )
                 print(response.text)
                 has_error = True
         except requests.exceptions.RequestException as e:
@@ -52,6 +56,7 @@ def cmd_attach(args, token):
 
     if has_error:
         import sys
+
         sys.exit(1)
 
 

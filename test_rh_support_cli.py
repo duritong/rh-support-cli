@@ -409,7 +409,9 @@ class TestRhSupportCli(unittest.TestCase):
                 print("STDERR:", result.stderr)
 
             self.assertEqual(result.returncode, 0)
-            self.assertIn("Success: File 'test_attachment.txt' attached.", result.stdout)
+            self.assertIn(
+                "Success: File 'test_attachment.txt' attached.", result.stdout
+            )
         finally:
             if os.path.exists("test_attachment.txt"):
                 os.remove("test_attachment.txt")
@@ -527,6 +529,103 @@ class TestRhSupportCli(unittest.TestCase):
             for f in ["desc.txt", "att1.txt", "att2.txt"]:
                 if os.path.exists(f):
                     os.remove(f)
+
+    def test_create_case_default_template(self):
+        """Test creating a case using default_create_template"""
+        import tempfile
+        import shutil
+
+        temp_home = tempfile.mkdtemp()
+        self.env["HOME"] = temp_home
+
+        config_dir = os.path.join(temp_home, ".config", "rh-support-cli")
+        template_dir = os.path.join(config_dir, "templates")
+        os.makedirs(template_dir, exist_ok=True)
+
+        config_path = os.path.join(config_dir, "config.yaml")
+        with open(config_path, "w") as f:
+            f.write("default_create_template: base_template\n")
+
+        template_path = os.path.join(template_dir, "base_template.yaml")
+        with open(template_path, "w") as f:
+            f.write(
+                "product: RHEL\nversion: 8.0\nsummary: Templated Summary\nseverity: Low\ncaseType: Standard\n"
+            )
+
+        with open("desc.txt", "w") as f:
+            f.write("My Issue Description")
+
+        try:
+            cmd = [
+                sys.executable,
+                self.cli_path,
+                "--config-file",
+                config_path,
+                "create",
+                "--description-file",
+                "desc.txt",
+            ]
+
+            result = subprocess.run(
+                cmd, env=self.env, capture_output=True, text=True, input="y\n"
+            )
+
+            if result.returncode != 0:
+                print("\nSTDOUT:", result.stdout)
+                print("STDERR:", result.stderr)
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Success: Case #20230001 created.", result.stdout)
+
+            cmd_no_tmpl = [
+                sys.executable,
+                self.cli_path,
+                "--config-file",
+                config_path,
+                "create",
+                "--description-file",
+                "desc.txt",
+                "--no-default-template",
+            ]
+
+            result_no_tmpl = subprocess.run(
+                cmd_no_tmpl, env=self.env, capture_output=True, text=True, input="EOF\n"
+            )
+            self.assertNotEqual(result_no_tmpl.returncode, 0)
+
+        finally:
+            if os.path.exists("desc.txt"):
+                os.remove("desc.txt")
+            shutil.rmtree(temp_home)
+
+    def test_template_circular_dependency(self):
+        """Test template engine circular dependency detection"""
+        from rh_support_lib.templates import TemplateEngine
+        from unittest.mock import patch
+        import tempfile
+        import shutil
+
+        temp_dir = tempfile.mkdtemp()
+        try:
+            with open(os.path.join(temp_dir, "tmpl_a.yaml"), "w") as f:
+                f.write("include_templates: [tmpl_b]\nkey_a: value_a\n")
+            with open(os.path.join(temp_dir, "tmpl_b.yaml"), "w") as f:
+                f.write("include_templates: [tmpl_c]\nkey_b: value_b\n")
+            with open(os.path.join(temp_dir, "tmpl_c.yaml"), "w") as f:
+                f.write("include_templates: [tmpl_a]\nkey_c: value_c\n")
+
+            engine = TemplateEngine(temp_dir)
+            with patch("builtins.print"):
+                result = engine.process(["tmpl_a"], {})
+
+            self.assertEqual(result.get("key_a"), "value_a")
+            self.assertEqual(result.get("key_b"), "value_b")
+            self.assertEqual(result.get("key_c"), "value_c")
+
+            # Check that processing didn't loop infinitely
+            self.assertIn("key_a", result)
+
+        finally:
+            shutil.rmtree(temp_dir)
 
     def test_list_cases(self):
         """Test listing cases"""

@@ -61,7 +61,18 @@ class TemplateEngine:
 
         return self._render_recursive(merged_data, context)
 
-    def _merge_recursive(self, base, template_name):
+    def _merge_recursive(self, base, template_name, seen=None):
+        if seen is None:
+            seen = set()
+
+        if template_name in seen:
+            print(
+                f"Warning: Circular dependency detected for template '{template_name}'. Skipping."
+            )
+            return base
+
+        seen.add(template_name)
+
         raw = self._load_raw_template(template_name)
         if not raw:
             print(f"Warning: Template '{template_name}' not found.")
@@ -72,7 +83,7 @@ class TemplateEngine:
             includes = [includes]
 
         for inc in includes:
-            base = self._merge_recursive(base, inc)
+            base = self._merge_recursive(base, inc, seen.copy())
 
         return self._merge_dicts(base, raw)
 

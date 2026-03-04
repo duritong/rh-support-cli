@@ -120,6 +120,11 @@ Authentication:
         help="Use a template (can be used multiple times)",
     )
     parser_create.add_argument(
+        "--no-default-template",
+        action="store_true",
+        help="Ignore default create template from config",
+    )
+    parser_create.add_argument(
         "--template-var", action="append", help="Variable for template (key=value)"
     )
 
@@ -171,7 +176,8 @@ Authentication:
     if args.command == "attach":
         cmd_attach(args, token)
     elif args.command == "create":
-        cmd_create(args, token)
+        config = load_config(args.config_file)
+        cmd_create(args, token, config)
     elif args.command == "comment":
         cmd_comment(args, token)
     elif args.command == "list":
