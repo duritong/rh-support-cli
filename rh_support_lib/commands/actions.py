@@ -7,33 +7,52 @@ from rh_support_lib.api import get_json
 
 
 def cmd_attach(args, token):
-    if not os.path.isfile(args.file):
-        sys.exit(f"Error: File '{args.file}' does not exist.")
+    if not isinstance(args.file, list):
+        args.file = [args.file]
 
-    # Check size (1GB limit warning)
-    file_size = os.path.getsize(args.file)
-    if file_size > 1073741824:
-        print("Warning: File exceeds 1GB. API upload might fail. Consider SFTP.")
+    has_error = False
 
-    print(f"Attaching '{os.path.basename(args.file)}' to Case #{args.case}...")
+    for fpath in args.file:
+        if not os.path.isfile(fpath):
+            print(f"Error: File '{fpath}' does not exist. Skipping.")
+            has_error = True
+            continue
 
-    endpoint = f"{API_URL}/cases/{args.case}/attachments"
-    headers = {"Authorization": f"Bearer {token}"}
+        # Check size (1GB limit warning)
+        file_size = os.path.getsize(fpath)
+        if file_size > 1073741824:
+            print(f"Warning: File '{os.path.basename(fpath)}' exceeds 1GB. API upload might fail. Consider SFTP.")
 
-    # Streaming upload
-    try:
-        with open(args.file, "rb") as f:
-            files = {"file": (os.path.basename(args.file), f)}
-            response = requests.post(endpoint, headers=headers, files=files, timeout=30)
+        print(f"Attaching '{os.path.basename(fpath)}' to Case #{args.case}...")
 
-        if response.status_code in [200, 201]:
-            print("Success: File attached.")
-        else:
-            print(f"Error: Upload failed (HTTP {response.status_code})")
-            print(response.text)
-            sys.exit(1)
-    except requests.exceptions.RequestException as e:
-        sys.exit(f"Network Error: {e}")
+        endpoint = f"{API_URL}/cases/{args.case}/attachments"
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Streaming upload
+        try:
+            from requests_toolbelt.multipart.encoder import MultipartEncoder
+
+            with open(fpath, "rb") as f:
+                m = MultipartEncoder(fields={"file": (os.path.basename(fpath), f)})
+                req_headers = headers.copy()
+                req_headers["Content-Type"] = m.content_type
+                response = requests.post(
+                    endpoint, headers=req_headers, data=m, timeout=(30, 3600)
+                )
+
+            if response.status_code in [200, 201]:
+                print(f"Success: File '{os.path.basename(fpath)}' attached.")
+            else:
+                print(f"Error: Upload failed for '{os.path.basename(fpath)}' (HTTP {response.status_code})")
+                print(response.text)
+                has_error = True
+        except requests.exceptions.RequestException as e:
+            print(f"Network Error while uploading '{os.path.basename(fpath)}': {e}")
+            has_error = True
+
+    if has_error:
+        import sys
+        sys.exit(1)
 
 
 def cmd_comment(args, token):

@@ -245,11 +245,15 @@ def cmd_create(args, token):
         for fpath in attachments:
             print(f"Attaching '{os.path.basename(fpath)}'...")
             try:
+                from requests_toolbelt.multipart.encoder import MultipartEncoder
+
                 with open(fpath, "rb") as f:
-                    files = {"file": (os.path.basename(fpath), f)}
+                    m = MultipartEncoder(fields={"file": (os.path.basename(fpath), f)})
                     ep = f"{API_URL}/cases/{case_number}/attachments"
+                    req_headers = headers.copy()
+                    req_headers["Content-Type"] = m.content_type
                     up_resp = requests.post(
-                        ep, headers=headers, files=files, timeout=30
+                        ep, headers=req_headers, data=m, timeout=(30, 3600)
                     )
                     if up_resp.status_code in [200, 201]:
                         print(f"  - {os.path.basename(fpath)}: Uploaded")

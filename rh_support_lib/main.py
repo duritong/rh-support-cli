@@ -92,7 +92,11 @@ Authentication:
     parser_attach = subparsers.add_parser("attach", help="Attach a file to a case")
     parser_attach.add_argument("-c", "--case", required=True, help="Case Number")
     parser_attach.add_argument(
-        "-f", "--file", required=True, help="File path to attach"
+        "-f",
+        "--file",
+        required=True,
+        action="append",
+        help="File path to attach (can be used multiple times)",
     )
 
     # Create Subcommand

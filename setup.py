@@ -7,7 +7,14 @@ setup(
     author="Your Name",
     author_email="your.email@example.com",
     packages=find_packages(),
-    install_requires=["requests", "pyyaml", "jinja2", "dateparser", "argcomplete"],
+    install_requires=[
+        "requests",
+        "requests-toolbelt",
+        "pyyaml",
+        "jinja2",
+        "dateparser",
+        "argcomplete",
+    ],
     entry_points={
         "console_scripts": [
             "rh-support-cli=rh_support_lib.main:main",

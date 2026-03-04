@@ -409,7 +409,7 @@ class TestRhSupportCli(unittest.TestCase):
                 print("STDERR:", result.stderr)
 
             self.assertEqual(result.returncode, 0)
-            self.assertIn("Success: File attached.", result.stdout)
+            self.assertIn("Success: File 'test_attachment.txt' attached.", result.stdout)
         finally:
             if os.path.exists("test_attachment.txt"):
                 os.remove("test_attachment.txt")
@@ -421,7 +421,7 @@ class TestRhSupportCli(unittest.TestCase):
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "Error: File 'nonexistent_file.txt' does not exist.", result.stderr
+            "Error: File 'nonexistent_file.txt' does not exist.", result.stdout
         )
 
     def test_comment_from_file(self):
