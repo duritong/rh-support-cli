@@ -29,7 +29,7 @@ The tool looks for the token in the following order of priority:
 
 1.  **CLI Argument:** Pass the path to a file containing the token using `--token-file`.
     ```bash
-    python3 rh-support-cli.py --token-file /path/to/token.txt list
+    rh-support-cli --token-file /path/to/token.txt list
     ```
 2.  **Environment Variable:** Set `REDHAT_SUPPORT_OFFLINE_TOKEN`.
     ```bash
@@ -52,7 +52,7 @@ rh-support-cli [global options] <subcommand> [options]
 
 Or running the script directly:
 ```bash
-python3 rh-support-cli.py [global options] <subcommand> [options]
+rh-support-cli [global options] <subcommand> [options]
 ```
 
 **Global Options:**
@@ -75,12 +75,12 @@ Lists support cases with options to filter by account, status, severity, and own
 
 *List all cases:*
 ```bash
-python3 rh-support-cli.py list
+rh-support-cli list
 ```
 
 *List high severity cases for a specific account:*
 ```bash
-python3 rh-support-cli.py list --account 12345 --status "Waiting on Red Hat" --severity High
+rh-support-cli list --account 12345 --status "Waiting on Red Hat" --severity High
 ```
 
 ### 2. Show Case Details (`show`)
@@ -93,7 +93,7 @@ Displays detailed information about a case, including description and comments. 
 
 **Example:**
 ```bash
-python3 rh-support-cli.py show -c 12345678
+rh-support-cli show -c 12345678
 ```
 
 ### 3. Get Case Link (`link`)
@@ -105,7 +105,7 @@ Generates the browser URL for a specific support case. This command does not req
 
 **Example:**
 ```bash
-python3 rh-support-cli.py link -c 12345678
+rh-support-cli link -c 12345678
 # Output: https://access.redhat.com/support/cases/12345678
 ```
 
@@ -126,12 +126,12 @@ Creates a new support case. If options are omitted, the tool will interactively 
 
 *Interactive Mode:*
 ```bash
-python3 rh-support-cli.py create
+rh-support-cli create
 ```
 
 *Non-Interactive Mode:*
 ```bash
-python3 rh-support-cli.py create \
+rh-support-cli create \
   --product "Red Hat Enterprise Linux" \
   --version "8.6" \
   --summary "Server crash on boot" \
@@ -152,7 +152,7 @@ Uploads a file to an existing support case.
 
 **Example:**
 ```bash
-python3 rh-support-cli.py attach -c 12345678 -f /tmp/sosreport.tar.xz
+rh-support-cli attach -c 12345678 -f /tmp/sosreport.tar.xz
 ```
 
 ### 6. Comment & Update Status (`comment`)
@@ -168,12 +168,12 @@ Adds a comment to a case and optionally updates its status.
 
 *Add comment from a file and set status to "Waiting on Red Hat":*
 ```bash
-python3 rh-support-cli.py comment -c 12345678 -f response.txt
+rh-support-cli comment -c 12345678 -f response.txt
 ```
 
 *Open editor to write comment and close the case:*
 ```bash
-python3 rh-support-cli.py comment -c 12345678 -s closed
+rh-support-cli comment -c 12345678 -s closed
 ```
 
 ## Configuration & Bookmarks
@@ -203,13 +203,13 @@ bookmarks:
 **Usage:**
 
 *   **Use Default:** If `default_bookmark` is set, it applies automatically to `list`.
-*   **Use Specific:** `python3 rh-support-cli.py list --bookmark my_cases`
-*   **Combine:** `python3 rh-support-cli.py list --bookmark my_team --bookmark my_cases` (Later bookmarks override earlier ones)
-*   **Disable Default:** `python3 rh-support-cli.py list --no-default-bookmark`
+*   **Use Specific:** `rh-support-cli list --bookmark my_cases`
+*   **Combine:** `rh-support-cli list --bookmark my_team --bookmark my_cases` (Later bookmarks override earlier ones)
+*   **Disable Default:** `rh-support-cli list --no-default-bookmark`
 *   **Override:** Explicit CLI flags override bookmarks.
     ```bash
     # Uses 'my_team' account but overrides status to 'Closed'
-    python3 rh-support-cli.py list --status Closed
+    rh-support-cli list --status Closed
     ```
 
 ## Templates
@@ -245,7 +245,7 @@ description: |
 
 **Usage:**
 ```bash
-python3 rh-support-cli.py create \
+rh-support-cli create \
   --template proactive \
   --template-var cluster_name=Prod1 \
   --template-var next_version=4.13 \

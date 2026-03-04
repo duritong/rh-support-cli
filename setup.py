@@ -7,7 +7,6 @@ setup(
     author="Your Name",
     author_email="your.email@example.com",
     packages=find_packages(),
-    scripts=["rh-support-cli.py"],
     install_requires=["requests", "pyyaml", "jinja2", "dateparser", "argcomplete"],
     entry_points={
         "console_scripts": [
