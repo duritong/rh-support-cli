@@ -36,11 +36,11 @@ def cmd_create(args, token):
     product_code = None
     if not product:
         print("Fetching products...")
-        products = get_json(f"{API_URL}/products", token)
+        products = get_json(f"{API_URL.replace('/v1', '/v2')}/products", token)
         selected = select_from_list("Select Product", products)
         if selected:
             product = selected.get("name")
-            product_code = selected.get("code")
+            product_code = product  # v2 uses the name for version lookup
         else:
             product = prompt_text("Product Name")
 
@@ -49,8 +49,14 @@ def cmd_create(args, token):
     if not version:
         versions = []
         if product_code:
+            import urllib.parse
+
             print("Fetching versions...")
-            versions = get_json(f"{API_URL}/products/{product_code}/versions", token)
+            encoded_product = urllib.parse.quote(product_code)
+            versions = get_json(
+                f"{API_URL.replace('/v1', '/v2')}/products/{encoded_product}/versions",
+                token,
+            )
 
         if versions:
             selected = select_from_list("Select Version", versions)
@@ -211,6 +217,10 @@ def cmd_create(args, token):
         if resp.status_code in [200, 201]:
             case_data = resp.json()
             case_number = case_data.get("caseNumber") or case_data.get("id")
+            if not case_number and "locations" in case_data and case_data["locations"]:
+                loc = case_data["locations"][0]
+                case_number = loc.rstrip("/").split("/")[-1]
+
             print(f"Success: Case #{case_number} created.")
 
             # Cleanup temp file on success
