@@ -55,7 +55,7 @@ Authentication:
     parser_list.add_argument(
         "--status",
         action="append",
-        help="Filter by status. Maps 'customer' -> 'Waiting on Customer', 'redhat' -> 'Waiting on Red Hat', 'closed' -> 'Closed', 'open' -> 'Open'. Default: 'Open'. (can be used multiple times)",
+        help="Filter by status. Maps 'customer' -> 'Waiting on Customer', 'redhat' -> 'Waiting on Red Hat', 'closed' -> 'Closed', 'open' -> 'Waiting on Red Hat & Customer'. (can be used multiple times)",
     )
     parser_list.add_argument(
         "--severity",

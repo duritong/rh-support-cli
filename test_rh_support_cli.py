@@ -121,8 +121,12 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                 filters_received.append(f"ACC={data['accountNumber']}")
             if "status" in data:
                 filters_received.append(f"STAT={data['status']}")
+            elif "statuses" in data:
+                filters_received.append(f"STAT={','.join(data['statuses'])}")
             if "severity" in data:
                 filters_received.append(f"SEV={data['severity']}")
+            elif "severities" in data:
+                filters_received.append(f"SEV={','.join(data['severities'])}")
             if "ownerSSOName" in data:
                 filters_received.append(f"OWN={data['ownerSSOName']}")
 
@@ -704,7 +708,7 @@ bookmarks:
     status: ["Waiting on Red Hat"]
   my_cases:
     owner: "jdoe"
-    status: ["Open"]
+    status: ["open"]
 """
         with open("test_config.yaml", "w") as f:
             f.write(config_content)
@@ -739,7 +743,7 @@ bookmarks:
             )
             self.assertEqual(result.returncode, 0)
             self.assertIn("OWN=jdoe", result.stdout)
-            self.assertIn("STAT=Open", result.stdout)
+            self.assertIn("STAT=Waiting on Red Hat,Waiting on Customer", result.stdout)
 
             # 4. Override (Default + Explicit Status)
             # Default sets account=12345, status="Waiting on Red Hat"

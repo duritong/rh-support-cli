@@ -60,8 +60,14 @@ def cmd_list(args, token, config=None):
 
         mapped_statuses = []
         for s in raw_status:
-            mapped_statuses.append(STATUS_FILTER_MAP.get(str(s).lower(), s))
-        payload["status"] = ",".join(mapped_statuses)
+            val = STATUS_FILTER_MAP.get(str(s).lower(), s)
+            for v in val.split(","):
+                mapped_statuses.append(v.strip())
+
+        if len(mapped_statuses) == 1:
+            payload["status"] = mapped_statuses[0]
+        else:
+            payload["statuses"] = mapped_statuses
 
         if any("closed" in s.lower() for s in mapped_statuses):
             payload["includeClosed"] = True
@@ -75,7 +81,11 @@ def cmd_list(args, token, config=None):
         mapped_sevs = []
         for s in raw_sev:
             mapped_sevs.append(SEVERITY_MAP.get(str(s).lower(), s))
-        payload["severity"] = ",".join(mapped_sevs)
+
+        if len(mapped_sevs) == 1:
+            payload["severity"] = mapped_sevs[0]
+        else:
+            payload["severities"] = mapped_sevs
 
     # Owner
     own = filters.get("owner") or filters.get("ownerSSOName")

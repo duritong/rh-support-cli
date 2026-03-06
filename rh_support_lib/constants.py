@@ -29,7 +29,7 @@ STATUS_FILTER_MAP = {
     "customer": "Waiting on Customer",
     "redhat": "Waiting on Red Hat",
     "closed": "Closed",
-    "open": "Open",
+    "open": "Waiting on Red Hat,Waiting on Customer",
 }
 
 

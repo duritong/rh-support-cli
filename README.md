@@ -194,12 +194,12 @@ default_create_template: "base_openshift"
 bookmarks:
   my_team:
     account: "12345678"
-    status: ["Waiting on Red Hat", "Open"]
+    status: ["redhat", "customer"]
     severity: ["High", "Urgent"]
   
   my_cases:
     owner: "jdoe"
-    status: ["Open"]
+    status: ["open"]
 ```
 
 **Usage:**
