@@ -137,9 +137,10 @@ def cmd_comment(args, token):
             if temp_file_path and os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
             sys.exit(0)
-            
+
         # Refresh token after the editor is closed, in case it expired while typing
         from rh_support_lib.api import get_access_token
+
         token = get_access_token(args.token_file)
     else:
         # Non-interactive mode (File only, no edit)

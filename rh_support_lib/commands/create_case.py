@@ -127,9 +127,10 @@ def cmd_create(args, token, config):
             with open(tf_path, "r") as f:
                 lines = f.readlines()
             description = strip_header_comments(lines).strip()
-            
+
             # Refresh token after the editor is closed, in case it expired while typing
             from rh_support_lib.api import get_access_token
+
             token = get_access_token(args.token_file)
         except Exception:
             if os.path.exists(tf_path):
