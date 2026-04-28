@@ -190,6 +190,7 @@ You can define bookmarks (presets of filters) in a YAML configuration file.
 ```yaml
 default_bookmark: "my_team"
 default_create_template: "base_openshift"
+debug_file: "/path/to/debug.log"  # Log all API requests/responses in background
 
 bookmarks:
   my_team:

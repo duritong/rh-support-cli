@@ -159,6 +159,8 @@ Authentication:
 
     args = parser.parse_args()
 
+    config = load_config(args.config_file)
+
     if args.command == "link":
         cmd_link(args)
         sys.exit(0)
@@ -166,8 +168,9 @@ Authentication:
         cmd_completion(args)
         sys.exit(0)
 
-    if args.debug or args.debug_file:
-        enable_debug_logging(log_file=args.debug_file)
+    debug_file = args.debug_file or config.get("debug_file")
+    if args.debug or debug_file:
+        enable_debug_logging(log_file=debug_file)
 
     # Authenticate before running commands
     print("Authenticating...")
@@ -176,12 +179,10 @@ Authentication:
     if args.command == "attach":
         cmd_attach(args, token)
     elif args.command == "create":
-        config = load_config(args.config_file)
         cmd_create(args, token, config)
     elif args.command == "comment":
         cmd_comment(args, token)
     elif args.command == "list":
-        config = load_config(args.config_file)
         cmd_list(args, token, config)
     elif args.command == "show":
         cmd_show(args, token)

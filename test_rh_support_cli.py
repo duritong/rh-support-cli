@@ -1355,6 +1355,39 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             if os.path.exists(log_file):
                 os.remove(log_file)
 
+    def test_debug_file_from_config(self):
+        """Test that debug_file from config enables background logging"""
+        log_file = os.path.abspath("config_debug_output.log")
+        config_file = "test_debug_config.yaml"
+        config = {"debug_file": log_file}
+
+        with open(config_file, "w") as f:
+            import yaml
+            yaml.dump(config, f)
+
+        try:
+            # Run without --debug or --debug-file, but with --config-file
+            result = self.run_cli(
+                ["--config-file", config_file, "show", "-c", "12345", "--no-pager"]
+            )
+            self.assertEqual(result.returncode, 0)
+
+            self.assertTrue(os.path.exists(log_file), "Log file was not created")
+
+            with open(log_file, "r") as f:
+                content = f.read()
+
+            self.assertIn("DEBUG: Request: get", content)
+            self.assertIn("DEBUG: Response Status: 200", content)
+            # Ensure it didn't print to stderr
+            self.assertNotIn("DEBUG: Request: get", result.stderr)
+
+        finally:
+            if os.path.exists(log_file):
+                os.remove(log_file)
+            if os.path.exists(config_file):
+                os.remove(config_file)
+
 
 if __name__ == "__main__":
     unittest.main()
