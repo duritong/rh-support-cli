@@ -1363,6 +1363,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
         with open(config_file, "w") as f:
             import yaml
+
             yaml.dump(config, f)
 
         try:
