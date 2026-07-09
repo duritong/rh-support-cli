@@ -38,6 +38,8 @@ def cmd_create(args, token, config):
         templates_dir = os.path.expanduser("~/.config/rh-support-cli/templates")
         engine = TemplateEngine(templates_dir)
         defaults = engine.process(templates_to_process, template_vars)
+        # Ignore fields starting with '_' across all actions
+        defaults = {k: v for k, v in defaults.items() if not k.startswith("_")}
 
     # 1. Gather Data (Flags or Interactive)
 

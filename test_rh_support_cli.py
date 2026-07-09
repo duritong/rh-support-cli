@@ -183,6 +183,19 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                 self.wfile.write(b"Missing body")
             return
 
+        # Notified Users Endpoint: /cases/{case}/notifiedusers
+        if "/notifiedusers" in self.path:
+            data = json.loads(body.decode())
+            if "user" in data and isinstance(data["user"], list):
+                self.send_response(201)
+                self.end_headers()
+                self.wfile.write(b"")
+            else:
+                self.send_response(400)
+                self.end_headers()
+                self.wfile.write(b"Missing user array")
+            return
+
         self.send_response(404)
         self.end_headers()
 
@@ -197,21 +210,22 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             return
 
-        # Status Endpoint: /cases/{case}
+        # Status/Case Update Endpoint: /cases/{case}
         # Note: simplistic matching, assuming valid API usage
         if (
             "/cases/" in self.path
             and "/comments" not in self.path
             and "/attachments" not in self.path
+            and "/notifiedusers" not in self.path
         ):
             data = json.loads(body.decode())
-            if "status" in data:
+            if data:
                 self.send_response(200)
                 self.end_headers()
             else:
                 self.send_response(400)
                 self.end_headers()
-                self.wfile.write(b"Missing status")
+                self.wfile.write(b"Empty update body")
             return
 
         self.send_response(404)
@@ -1388,6 +1402,320 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 os.remove(log_file)
             if os.path.exists(config_file):
                 os.remove(config_file)
+
+    def test_apply_template_dry_run(self):
+        """Test applying a template to a case in dry-run mode"""
+        import tempfile
+        import shutil
+
+        temp_home = tempfile.mkdtemp()
+        self.env["HOME"] = temp_home
+
+        config_dir = os.path.join(temp_home, ".config", "rh-support-cli")
+        template_dir = os.path.join(config_dir, "templates")
+        os.makedirs(template_dir, exist_ok=True)
+
+        template_path = os.path.join(template_dir, "test_template.yaml")
+        with open(template_path, "w") as f:
+            f.write(
+                "severity: Low\nstatus: Waiting on Customer\nwatchers:\n  - alice\n  - bob\n"
+            )
+
+        try:
+            result = self.run_cli(
+                [
+                    "--simple-output",
+                    "apply",
+                    "-c",
+                    "12345",
+                    "-t",
+                    "test_template",
+                    "--dry-run",
+                ]
+            )
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("[Dry-run] Would apply changes listed above.", result.stdout)
+            self.assertIn("severity: High -> Low", result.stdout)
+            self.assertIn(
+                "status: Waiting on Red Hat -> Waiting on Customer", result.stdout
+            )
+            self.assertIn("alice", result.stdout)
+            self.assertIn("bob", result.stdout)
+        finally:
+            shutil.rmtree(temp_home)
+
+    def test_apply_template_execution(self):
+        """Test executing applying a template to a case (real PUT/POST)"""
+        import tempfile
+        import shutil
+
+        temp_home = tempfile.mkdtemp()
+        self.env["HOME"] = temp_home
+
+        config_dir = os.path.join(temp_home, ".config", "rh-support-cli")
+        template_dir = os.path.join(config_dir, "templates")
+        os.makedirs(template_dir, exist_ok=True)
+
+        template_path = os.path.join(template_dir, "test_template.yaml")
+        with open(template_path, "w") as f:
+            f.write("severity: Low\nwatchers:\n  - alice\n")
+
+        try:
+            result = self.run_cli(["apply", "-c", "12345", "-t", "test_template"])
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Success: Case fields updated.", result.stdout)
+            self.assertIn("Success: Watchers added.", result.stdout)
+        finally:
+            shutil.rmtree(temp_home)
+
+    def test_apply_template_no_changes(self):
+        """Test applying a template when no changes are needed"""
+        import tempfile
+        import shutil
+
+        temp_home = tempfile.mkdtemp()
+        self.env["HOME"] = temp_home
+
+        config_dir = os.path.join(temp_home, ".config", "rh-support-cli")
+        template_dir = os.path.join(config_dir, "templates")
+        os.makedirs(template_dir, exist_ok=True)
+
+        template_path = os.path.join(template_dir, "test_template.yaml")
+        # Existing case has severity: High, status: Waiting on Red Hat, and let's not define watchers
+        with open(template_path, "w") as f:
+            f.write("severity: High\nstatus: Waiting on Red Hat\n")
+
+        try:
+            result = self.run_cli(["apply", "-c", "12345", "-t", "test_template"])
+            self.assertEqual(result.returncode, 0)
+            self.assertIn(
+                "Case #12345 already adheres to the template(s). No changes needed.",
+                result.stdout,
+            )
+        finally:
+            shutil.rmtree(temp_home)
+
+    def test_apply_template_vars(self):
+        """Test applying a template with template variables"""
+        import tempfile
+        import shutil
+
+        temp_home = tempfile.mkdtemp()
+        self.env["HOME"] = temp_home
+
+        config_dir = os.path.join(temp_home, ".config", "rh-support-cli")
+        template_dir = os.path.join(config_dir, "templates")
+        os.makedirs(template_dir, exist_ok=True)
+
+        template_path = os.path.join(template_dir, "test_template.yaml")
+        with open(template_path, "w") as f:
+            f.write(
+                'severity: "{{ target_severity }}"\nwatchers:\n  - "{{ watcher_name }}"\n'
+            )
+
+        try:
+            result = self.run_cli(
+                [
+                    "--simple-output",
+                    "apply",
+                    "-c",
+                    "12345",
+                    "-t",
+                    "test_template",
+                    "--template-var",
+                    "target_severity=Low",
+                    "--template-var",
+                    "watcher_name=alice",
+                    "--dry-run",
+                ]
+            )
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("severity: High -> Low", result.stdout)
+            self.assertIn("alice", result.stdout)
+        finally:
+            shutil.rmtree(temp_home)
+
+    def test_apply_case_not_found(self):
+        """Test applying a template to a non-existent case fails gracefully"""
+        import tempfile
+        import shutil
+
+        temp_home = tempfile.mkdtemp()
+        self.env["HOME"] = temp_home
+
+        config_dir = os.path.join(temp_home, ".config", "rh-support-cli")
+        template_dir = os.path.join(config_dir, "templates")
+        os.makedirs(template_dir, exist_ok=True)
+
+        template_path = os.path.join(template_dir, "test_template.yaml")
+        with open(template_path, "w") as f:
+            f.write("severity: Low\n")
+
+        try:
+            # Case id "abc" is not digit, so mock GET returns 404, leading to failure
+            result = self.run_cli(["apply", "-c", "abc", "-t", "test_template"])
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Error: Case abc not found", result.stderr)
+        finally:
+            shutil.rmtree(temp_home)
+
+    def test_list_templates(self):
+        """Test listing local templates and parsing their metadata"""
+        import tempfile
+        import shutil
+
+        temp_home = tempfile.mkdtemp()
+        self.env["HOME"] = temp_home
+
+        config_dir = os.path.join(temp_home, ".config", "rh-support-cli")
+        template_dir = os.path.join(config_dir, "templates")
+        os.makedirs(template_dir, exist_ok=True)
+
+        # Create template A
+        template_path_a = os.path.join(template_dir, "tmpl_a.yaml")
+        with open(template_path_a, "w") as f:
+            f.write(
+                "_template_description: Template A Description\nseverity: Low\nwatchers:\n  - alice\n_some_ignored_meta: metadata\n"
+            )
+
+        # Create template B
+        template_path_b = os.path.join(template_dir, "tmpl_b.yaml")
+        with open(template_path_b, "w") as f:
+            f.write(
+                "_desc: Template B Description\nproduct: RHEL\ninclude_templates: tmpl_a\n"
+            )
+
+        try:
+            result = self.run_cli(["--simple-output", "list-templates"])
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Found 2 template(s)", result.stdout)
+            self.assertIn("Template:    tmpl_a", result.stdout)
+            self.assertIn("Desc:      Template A Description", result.stdout)
+            self.assertIn("Fields:    severity: Low", result.stdout)
+            self.assertIn("Watchers:  alice", result.stdout)
+            self.assertNotIn("_some_ignored_meta", result.stdout)
+
+            self.assertIn("Template:    tmpl_b", result.stdout)
+            self.assertIn("Desc:      Template B Description", result.stdout)
+            self.assertIn("Fields:    product: RHEL", result.stdout)
+            self.assertIn("Includes:  tmpl_a", result.stdout)
+        finally:
+            shutil.rmtree(temp_home)
+
+    def test_list_templates_empty(self):
+        """Test listing when there are no templates"""
+        import tempfile
+        import shutil
+
+        temp_home = tempfile.mkdtemp()
+        self.env["HOME"] = temp_home
+
+        config_dir = os.path.join(temp_home, ".config", "rh-support-cli")
+        template_dir = os.path.join(config_dir, "templates")
+        os.makedirs(template_dir, exist_ok=True)
+
+        try:
+            result = self.run_cli(["list-templates"])
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("No templates found", result.stdout)
+        finally:
+            shutil.rmtree(temp_home)
+
+    def test_list_templates_no_directory(self):
+        """Test listing when the template directory does not exist"""
+        import tempfile
+        import shutil
+
+        temp_home = tempfile.mkdtemp()
+        self.env["HOME"] = temp_home
+
+        try:
+            result = self.run_cli(["list-templates"])
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Template directory does not exist", result.stdout)
+        finally:
+            shutil.rmtree(temp_home)
+
+    def test_template_fields_starting_with_underscore_ignored(self):
+        """Test that any template fields starting with an underscore are completely ignored in create and apply"""
+        import tempfile
+        import shutil
+
+        temp_home = tempfile.mkdtemp()
+        self.env["HOME"] = temp_home
+
+        config_dir = os.path.join(temp_home, ".config", "rh-support-cli")
+        template_dir = os.path.join(config_dir, "templates")
+        os.makedirs(template_dir, exist_ok=True)
+
+        template_path = os.path.join(template_dir, "test_underscore.yaml")
+        with open(template_path, "w") as f:
+            f.write(
+                "severity: Low\n_ignored_field: should_be_ignored\n_template_description: This is a test template\n"
+            )
+
+        try:
+            # 1. Run apply
+            result_apply = self.run_cli(
+                [
+                    "--simple-output",
+                    "apply",
+                    "-c",
+                    "12345",
+                    "-t",
+                    "test_underscore",
+                    "--dry-run",
+                ]
+            )
+            self.assertEqual(result_apply.returncode, 0)
+            # severity should change, but _ignored_field or _template_description should not be listed as changes
+            self.assertIn("severity: High -> Low", result_apply.stdout)
+            self.assertNotIn("_ignored_field", result_apply.stdout)
+            self.assertNotIn("_template_description", result_apply.stdout)
+
+            # 2. Run create
+            with open("desc.txt", "w") as f:
+                f.write("My Issue Description")
+
+            cmd = [
+                sys.executable,
+                self.cli_path,
+                "create",
+                "--product",
+                "RHEL",
+                "--version",
+                "8.0",
+                "--summary",
+                "My Summary",
+                "--type",
+                "Standard",
+                "--severity",
+                "Low",
+                "--description-file",
+                "desc.txt",
+                "--template",
+                "test_underscore",
+            ]
+            result_create = subprocess.run(
+                cmd, env=self.env, capture_output=True, text=True, input="y\n"
+            )
+            if result_create.returncode != 0:
+                print("\n--- CREATE STDOUT ---\n", result_create.stdout)
+                print("\n--- CREATE STDERR ---\n", result_create.stderr)
+            self.assertEqual(result_create.returncode, 0)
+
+            # Verify MockRedHatHandler.last_case_payload does not contain any key starting with '_'
+            self.assertIsNotNone(MockRedHatHandler.last_case_payload)
+            for k in MockRedHatHandler.last_case_payload.keys():
+                self.assertFalse(
+                    k.startswith("_"),
+                    f"Key starting with underscore found in payload: {k}",
+                )
+
+        finally:
+            if os.path.exists("desc.txt"):
+                os.remove("desc.txt")
+            shutil.rmtree(temp_home)
 
 
 if __name__ == "__main__":

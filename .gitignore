@@ -1,4 +1,5 @@
 G*.md
 api/
+logs/
 __pycache__
 rh_support_cli.egg-info

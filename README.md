@@ -177,6 +177,37 @@ rh-support-cli comment -c 12345678 -f response.txt
 rh-support-cli comment -c 12345678 -s closed
 ```
 
+### 7. Apply Template & Watchers (`apply`)
+
+Applies a local YAML template over an existing support case. It compares the template fields and watchers/notified users with the case's current values, and performs the minimal required API requests to bring the case to the target state.
+
+**Options:**
+- `-c`, `--case`: The Case Number (required)
+- `-t`, `--template`: Name of local template to apply (required, can be used multiple times)
+- `--template-var`: Variables to interpolate in the template (can be used multiple times)
+- `--dry-run`: Show what changes would be applied without actually making them
+
+**Examples:**
+
+*Verify template application without saving (Dry Run):*
+```bash
+rh-support-cli apply -c 12345678 -t default-watchers --dry-run
+```
+
+*Apply template and interpolate template variables:*
+```bash
+rh-support-cli apply -c 12345678 -t project-team --template-var team_lead=alice
+```
+
+### 8. List Local Templates (`list-templates` / `list-template`)
+
+Lists all local templates stored in `~/.config/rh-support-cli/templates/` along with details like their description, fields they configure, parent templates they include, and watchers they would add. **Note:** This command runs completely offline and bypasses authentication.
+
+**Example:**
+```bash
+rh-support-cli list-templates
+```
+
 ## Configuration & Bookmarks
 
 You can define bookmarks (presets of filters) in a YAML configuration file.
@@ -217,10 +248,11 @@ bookmarks:
 
 ## Templates
 
-You can use templates to pre-fill case details. Templates are YAML files stored in `~/.config/rh-support-cli/templates/`.
+You can use templates to pre-fill case details during creation, or post-creation to verify and bring cases into compliance with standard fields and watchers. Templates are YAML files stored in `~/.config/rh-support-cli/templates/`.
 
 **Structure:**
 - Templates can define any case field (product, version, summary, description, severity, etc.).
+- They can define lists of watchers / notified users to be added (using `watchers`, `notified_users`, or `notifiedUsers` keys).
 - `include_templates`: List of other templates to include (merged in order).
 - Values are **Jinja2** templates.
 - `currentDoc`: Available in Jinja context, representing the merged data so far.
@@ -244,11 +276,26 @@ summary: "[Proactive] {{ product }} {{ version }} update on {{ cluster_name }}"
 description: |
   Planning upgrade to {{ next_version }}.
   ClusterID: {{ cluster_id }}
+watchers:
+  - alice
+  - bob
 ```
 
 **Usage:**
+
+*For Case Creation (`create`):*
 ```bash
 rh-support-cli create \
+  --template proactive \
+  --template-var cluster_name=Prod1 \
+  --template-var next_version=4.13 \
+  --template-var cluster_id=12345
+```
+
+*For Post-Creation Compliance (`apply`):*
+```bash
+rh-support-cli apply \
+  -c 12345678 \
   --template proactive \
   --template-var cluster_name=Prod1 \
   --template-var next_version=4.13 \

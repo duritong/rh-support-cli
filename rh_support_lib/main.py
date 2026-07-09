@@ -5,6 +5,7 @@ from rh_support_lib.config import load_config
 from rh_support_lib.commands.list_cases import cmd_list
 from rh_support_lib.commands.show_case import cmd_show
 from rh_support_lib.commands.create_case import cmd_create
+from rh_support_lib.commands.apply_template import cmd_apply, cmd_list_templates
 from rh_support_lib.commands.actions import (
     cmd_attach,
     cmd_comment,
@@ -154,6 +155,35 @@ Authentication:
         help="Open editor to edit the content from --file before submitting",
     )
 
+    # Apply Subcommand
+    parser_apply = subparsers.add_parser(
+        "apply", help="Apply template values and watchers to a support case"
+    )
+    parser_apply.add_argument("-c", "--case", required=True, help="Case Number")
+    parser_apply.add_argument(
+        "-t",
+        "--template",
+        required=True,
+        action="append",
+        help="Use a template (can be used multiple times)",
+    )
+    parser_apply.add_argument(
+        "--template-var", action="append", help="Variable for template (key=value)"
+    )
+    parser_apply.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what changes would be applied without making them",
+    )
+
+    # List Templates Subcommand
+    subparsers.add_parser(
+        "list-templates", help="List all local templates and their details"
+    )
+    subparsers.add_parser(
+        "list-template", help="List all local templates and their details (alias)"
+    )
+
     if argcomplete:
         argcomplete.autocomplete(parser)
 
@@ -166,6 +196,9 @@ Authentication:
         sys.exit(0)
     elif args.command == "completion":
         cmd_completion(args)
+        sys.exit(0)
+    elif args.command in ["list-templates", "list-template"]:
+        cmd_list_templates(args, config)
         sys.exit(0)
 
     debug_file = args.debug_file or config.get("debug_file")
@@ -186,6 +219,8 @@ Authentication:
         cmd_list(args, token, config)
     elif args.command == "show":
         cmd_show(args, token)
+    elif args.command == "apply":
+        cmd_apply(args, token, config)
 
 
 if __name__ == "__main__":
