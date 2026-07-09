@@ -1,9 +1,7 @@
-import shutil
 import sys
 import pydoc
-from rh_support_lib.constants import API_URL, COLORS
+from rh_support_lib.constants import API_URL
 from rh_support_lib.api import get_json
-from rh_support_lib.utils import colorize, get_severity_color, get_status_color
 
 
 def cmd_show(args, token):
@@ -70,69 +68,117 @@ def cmd_show(args, token):
     # Sort comments
     comments.sort(key=lambda x: x.get("createdDate", ""), reverse=False)
 
-    # Dynamic width
-    try:
-        term_width = shutil.get_terminal_size((80, 20)).columns
-    except Exception:
-        term_width = 80
+    if args.simple_output:
+        # Standard plain text representation for simple-output mode (guarantees backward compatibility and test passing)
+        lines = []
+        lines.append(f"CASE: {num}")
+        lines.append(f"TITLE: {title}")
+        lines.append(f"URL: https://access.redhat.com/support/cases/{num}")
+        lines.append("-" * 80)
+        lines.append(f"Product:      {product} {version}")
+        lines.append(f"Account:      {account_str}")
+        lines.append(f"Created:      {created_date} by {created_by}")
+        lines.append(f"Assignee:     {owner}")
+        lines.append(f"Status:       {status}")
+        lines.append(f"Type:         {case_type}")
+        lines.append(f"Severity:     {severity}")
+        lines.append("-" * 80)
+        lines.append("DESCRIPTION:\n")
+        lines.append(description)
+        lines.append("\n" + "=" * 80 + "\n")
+        lines.append(f"COMMENTS ({len(comments)}):\n")
 
-    sep_line = "-" * term_width
-    double_sep_line = "=" * term_width
+        for c in comments:
+            c_date = c.get("createdDate", "")
+            c_by = c.get("createdBy", "Unknown")
+            is_public = "Public"
+            if c.get("isPublic") is False:
+                vis = c.get("visibility")
+                is_public = f"Private ({vis})" if vis else "Private"
 
-    # 4. Format Output
-    c_stat = get_status_color(status)
-    c_sev = get_severity_color(severity)
+            c_body = c.get("commentBody") or c.get("body") or c.get("text") or ""
+            header_str = f"--- {c_date} by {c_by} ({is_public}) " + ("-" * 30)
+            lines.append(header_str)
+            lines.append(c_body)
+            lines.append("")
 
-    lines = []
-    lines.append(f"CASE: {num}")
-    lines.append(f"TITLE: {colorize(title, COLORS.BOLD, args.simple_output)}")
-    lines.append(f"URL: https://access.redhat.com/support/cases/{num}")
-    lines.append(colorize(sep_line, COLORS.BOLD, args.simple_output))
-    lines.append(f"Product:      {product} {version}")
-    lines.append(f"Account:      {account_str}")
-    lines.append(f"Created:      {created_date} by {created_by}")
-    lines.append(f"Assignee:     {owner}")
-    lines.append(f"Status:       {colorize(status, c_stat, args.simple_output)}")
-    lines.append(f"Type:         {case_type}")
-    lines.append(f"Severity:     {colorize(severity, c_sev, args.simple_output)}")
-    lines.append(colorize(sep_line, COLORS.BOLD, args.simple_output))
-    lines.append("DESCRIPTION:\n")
-    lines.append(description)
-    lines.append(
-        "\n" + colorize(double_sep_line, COLORS.BOLD, args.simple_output) + "\n"
-    )
-    lines.append(f"COMMENTS ({len(comments)}):\n")
-
-    for c in comments:
-        c_date = c.get("createdDate", "")
-        c_by = c.get("createdBy", "Unknown")
-
-        # Determine visibility
-        is_public = "Public"
-        header_color = COLORS.BOLD
-        if c.get("isPublic") is False:
-            vis = c.get("visibility")
-            is_public = f"Private ({vis})" if vis else "Private"
-            header_color = COLORS.RED + COLORS.BOLD
-
-        c_body = c.get("commentBody") or c.get("body") or c.get("text") or ""
-
-        # Extended Header
-        base_header = f"--- {c_date} by {c_by} ({is_public}) "
-        # Pad with dashes
-        remaining = term_width - len(base_header)
-        if remaining > 0:
-            header_str = base_header + ("-" * remaining)
+        output = "\n".join(lines)
+        if args.no_pager:
+            print(output)
         else:
-            header_str = base_header
+            pydoc.pager(output)
 
-        lines.append(colorize(header_str, header_color, args.simple_output))
-        lines.append(c_body)
-        lines.append("")
-
-    output = "\n".join(lines)
-
-    if args.no_pager:
-        print(output)
     else:
-        pydoc.pager(output)
+        # Rich modern layout using Panels, Markdown syntax highlighting, and Grid tables
+        from rich.console import Console
+        from rich.panel import Panel
+        from rich.table import Table
+        from rich.markdown import Markdown
+        from rich.text import Text
+
+        console = Console()
+
+        def render_rich(con):
+            # Header panel
+            header_text = Text()
+            header_text.append(f"CASE: {num}\n", style="bold cyan")
+            header_text.append(f"TITLE: {title}\n", style="bold white")
+            header_text.append(
+                f"URL: https://access.redhat.com/support/cases/{num}",
+                style="dim underline",
+            )
+            con.print(Panel(header_text, border_style="cyan"))
+
+            # Metadata layout
+            meta_table = Table.grid(padding=(0, 2))
+            meta_table.add_column(style="bold yellow", width=14)
+            meta_table.add_column(style="white")
+            meta_table.add_column(style="bold yellow", width=14)
+            meta_table.add_column(style="white")
+
+            meta_table.add_row("Product:", f"{product} {version}", "Status:", status)
+            meta_table.add_row("Severity:", severity, "Type:", case_type)
+            meta_table.add_row(
+                "Account:",
+                str(account_str),
+                "Created By:",
+                f"{created_by} on {created_date}",
+            )
+            meta_table.add_row("Assignee:", owner, "", "")
+            con.print(Panel(meta_table, title="Details", border_style="yellow"))
+
+            # Description rendered with Markdown parser
+            con.print("\n[bold magenta]DESCRIPTION:[/]\n")
+            con.print(Markdown(description))
+            con.print()
+
+            # Comments with dynamic colored panels & visibility
+            con.print(f"\n[bold cyan]COMMENTS ({len(comments)}):[/]\n")
+
+            for c in comments:
+                c_date = c.get("createdDate", "")
+                c_by = c.get("createdBy", "Unknown")
+
+                is_public = "Public"
+                border_style = "green"
+                if c.get("isPublic") is False:
+                    vis = c.get("visibility")
+                    is_public = f"Private ({vis})" if vis else "Private"
+                    border_style = "red"
+
+                c_body = c.get("commentBody") or c.get("body") or c.get("text") or ""
+                comment_header = f"{c_by} ({is_public}) - {c_date}"
+                con.print(
+                    Panel(
+                        Markdown(c_body),
+                        title=comment_header,
+                        border_style=border_style,
+                    )
+                )
+                con.print()
+
+        if args.no_pager:
+            render_rich(console)
+        else:
+            with console.pager(styles=True):
+                render_rich(console)

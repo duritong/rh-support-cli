@@ -298,20 +298,56 @@ def cmd_list_templates(args, config):
         }
 
         # Colorize and print
-        c_name = colorize(name, COLORS.BOLD, args.simple_output)
-        print(f"Template:    {c_name}")
-        print(f"  File:      {f}")
-        print(f"  Desc:      {description}")
+        if args.simple_output:
+            c_name = colorize(name, COLORS.BOLD, args.simple_output)
+            print(f"Template:    {c_name}")
+            print(f"  File:      {f}")
+            print(f"  Desc:      {description}")
 
-        if fields:
-            fields_str = ", ".join(f"{k}: {v}" for k, v in fields.items())
-            print(f"  Fields:    {fields_str}")
-        if watchers:
-            watchers_str = ", ".join(
-                colorize(w, COLORS.GREEN, args.simple_output) for w in watchers
+            if fields:
+                fields_str = ", ".join(f"{k}: {v}" for k, v in fields.items())
+                print(f"  Fields:    {fields_str}")
+            if watchers:
+                watchers_str = ", ".join(
+                    colorize(w, COLORS.GREEN, args.simple_output) for w in watchers
+                )
+                print(f"  Watchers:  {watchers_str}")
+            if includes:
+                includes_str = ", ".join(includes)
+                print(f"  Includes:  {includes_str}")
+            print()
+        else:
+            from rich.console import Console
+            from rich.panel import Panel
+            from rich.text import Text
+
+            console = Console()
+
+            # Build body text
+            body_text = Text()
+            body_text.append("File:      ", style="bold yellow")
+            body_text.append(f"{f}\n")
+            body_text.append("Desc:      ", style="bold yellow")
+            body_text.append(f"{description}\n")
+
+            if fields:
+                fields_str = ", ".join(f"{k}: {v}" for k, v in fields.items())
+                body_text.append("Fields:    ", style="bold yellow")
+                body_text.append(f"{fields_str}\n")
+            if watchers:
+                watchers_str = ", ".join(watchers)
+                body_text.append("Watchers:  ", style="bold yellow")
+                body_text.append(f"{watchers_str}\n", style="green")
+            if includes:
+                includes_str = ", ".join(includes)
+                body_text.append("Includes:  ", style="bold yellow")
+                body_text.append(f"{includes_str}\n")
+
+            console.print(
+                Panel(
+                    body_text.strip(),
+                    title=f"Template: [bold cyan]{name}[/]",
+                    border_style="cyan",
+                )
             )
-            print(f"  Watchers:  {watchers_str}")
-        if includes:
-            includes_str = ", ".join(includes)
-            print(f"  Includes:  {includes_str}")
-        print()
+            console.print()

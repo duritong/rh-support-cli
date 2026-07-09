@@ -14,6 +14,7 @@ setup(
         "jinja2",
         "dateparser",
         "argcomplete",
+        "rich",
     ],
     entry_points={
         "console_scripts": [

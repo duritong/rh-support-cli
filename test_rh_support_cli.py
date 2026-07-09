@@ -366,6 +366,7 @@ class TestRhSupportCli(unittest.TestCase):
         self.env["RH_API_URL"] = self.base_url
         self.env["RH_SSO_URL"] = self.sso_url
         self.env["REDHAT_SUPPORT_OFFLINE_TOKEN"] = "mock_offline_token"
+        self.env["FORCE_COLOR"] = "1"
 
         # Ensure subprocess finds requests even if HOME is changed
         self.env["PYTHONPATH"] = os.pathsep.join(sys.path)

@@ -1,8 +1,10 @@
-import shutil
 import sys
 import requests
+from rich.console import Console
+from rich.table import Table
+from rich.text import Text
+from rich.box import ROUNDED
 from rh_support_lib.constants import API_URL, STATUS_FILTER_MAP, SEVERITY_MAP
-from rh_support_lib.utils import colorize, get_severity_color, get_status_color
 
 
 def cmd_list(args, token, config=None):
@@ -122,45 +124,28 @@ def cmd_list(args, token, config=None):
         print("No cases found.")
         return
 
-    # Dynamic Table Width
-    try:
-        term_width = shutil.get_terminal_size((140, 20)).columns
-    except Exception:
-        term_width = 140
+    console = Console(no_color=args.simple_output, highlight=not args.simple_output)
 
-    w_num = 12
-    w_owner = 19
-    w_mod = 19
-    w_sev = 10
-    w_status = 20
-    w_updated = 20
-    # 6 spaces for separation
-    fixed_used = w_num + w_owner + w_mod + w_sev + w_status + w_updated + 6
-
-    w_title = max(30, term_width - fixed_used)
-
-    # Table Headers
-    header_fmt = f"{{:<{w_num}}} {{:<{w_title}}} {{:<{w_owner}}} {{:<{w_mod}}} {{:<{w_sev}}} {{:<{w_status}}} {{:<{w_updated}}}"
-    print(
-        "\n"
-        + header_fmt.format(
-            "NUMBER",
-            "TITLE",
-            "OWNER",
-            "MODIFIED BY",
-            "SEVERITY",
-            "STATUS",
-            "LAST UPDATED",
-        )
+    # Re-calculate table styling
+    box_style = None if args.simple_output else ROUNDED
+    table = Table(
+        show_header=True,
+        header_style="bold magenta" if not args.simple_output else "",
+        box=box_style,
+        pad_edge=False,
     )
-    print("-" * (fixed_used + w_title))
+
+    table.add_column("NUMBER", width=12)
+    table.add_column("TITLE", ratio=1, min_width=30)
+    table.add_column("OWNER", width=19)
+    table.add_column("MODIFIED BY", width=19)
+    table.add_column("SEVERITY", width=10)
+    table.add_column("STATUS", width=20)
+    table.add_column("LAST UPDATED", width=20)
 
     for c in cases:
         num = str(c.get("caseNumber", "") or c.get("id", ""))
-
         title = c.get("summary", "")
-        if len(title) > (w_title - 3):
-            title = title[: (w_title - 3)] + "..."
 
         # Owner Extraction
         owner_obj = c.get("owner") or c.get("contact") or {}
@@ -183,9 +168,6 @@ def cmd_list(args, token, config=None):
                 or "Unknown"
             )
 
-        if len(owner) > 19:
-            owner = owner[:19]
-
         # Modified By Extraction
         mod_obj = c.get("lastModifiedBy") or c.get("modifiedBy")
         mod_by = ""
@@ -204,9 +186,6 @@ def cmd_list(args, token, config=None):
         if not mod_by:
             mod_by = c.get("lastModifiedById") or c.get("createdById") or ""
 
-        if len(mod_by) > 19:
-            mod_by = mod_by[:19]
-
         sev = c.get("severity", "")
         status = c.get("status", "")
 
@@ -215,33 +194,36 @@ def cmd_list(args, token, config=None):
         if len(last_updated) > 19:
             last_updated = last_updated[:19].replace("T", " ")
 
-        # Colorize
-        c_sev = get_severity_color(sev)
-        c_stat = get_status_color(status)
+        # Styles
+        sev_style = ""
+        if not args.simple_output:
+            if "Urgent" in sev or "1" in sev:
+                sev_style = "bold red"
+            elif "High" in sev or "2" in sev:
+                sev_style = "red"
+            elif "Normal" in sev or "medium" in sev or "3" in sev:
+                sev_style = "yellow"
+            elif "Low" in sev or "4" in sev:
+                sev_style = "green"
 
-        def p(t, w):
-            return f"{t:<{w}}"
+        status_style = ""
+        if not args.simple_output:
+            if "Red Hat" in status or "red hat" in status.lower():
+                status_style = "bold orange3"
+            elif "customer" in status.lower():
+                status_style = "bold green"
+            elif "closed" in status.lower():
+                status_style = "dim"
 
-        def pc(t, w, col):
-            ct = colorize(t, col, args.simple_output)
-            pad = w - len(t)
-            if pad < 0:
-                pad = 0
-            return ct + " " * pad
-
-        line = (
-            p(num, w_num)
-            + " "
-            + p(title, w_title)
-            + " "
-            + p(owner, w_owner)
-            + " "
-            + p(mod_by, w_mod)
-            + " "
-            + pc(sev, w_sev, c_sev)
-            + " "
-            + pc(status, w_status, c_stat)
-            + " "
-            + p(last_updated, w_updated)
+        table.add_row(
+            num,
+            title,
+            owner,
+            mod_by,
+            Text(sev, style=sev_style),
+            Text(status, style=status_style),
+            last_updated,
         )
-        print(line)
+
+    console.print()
+    console.print(table)
