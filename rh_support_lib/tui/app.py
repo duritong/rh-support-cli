@@ -219,6 +219,7 @@ class SupportApp(App):
         layout: grid;
         grid-size: 2;
         grid-columns: 2fr 3fr;
+        scrollbar-size: 1 1;
     }
     Header {
         background: $primary-darken-1;
