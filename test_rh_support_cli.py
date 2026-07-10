@@ -1736,6 +1736,21 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             cmd_tui(args, token, config)
             mock_run.assert_called_once()
 
+    def test_tui_app_headless(self):
+        """Programmatically launch the TUI app headlessly to verify CSS parsing and startup widgets"""
+        import asyncio
+        from rh_support_lib.tui.app import SupportApp
+
+        async def run_headless():
+            app = SupportApp(token="mock_token", config={})
+            async with app.run_test():
+                # If we get here, CSS parsed successfully and the app launched with zero crashes!
+                self.assertEqual(app.title, "Red Hat Support CLI")
+                self.assertIsNotNone(app.query_one("#case-table"))
+                self.assertIsNotNone(app.query_one("#case-details"))
+
+        asyncio.run(run_headless())
+
 
 if __name__ == "__main__":
     unittest.main()

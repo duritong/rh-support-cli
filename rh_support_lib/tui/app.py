@@ -151,7 +151,7 @@ class SupportApp(App):
     }
     #modal-title {
         text-align: center;
-        font-weight: bold;
+        text-style: bold;
         color: $text;
         margin-bottom: 1;
     }
@@ -192,7 +192,7 @@ class SupportApp(App):
         table = self.query_one("#case-table", DataTable)
         table.add_columns("NUMBER", "TITLE", "SEVERITY", "STATUS")
         table.cursor_type = "row"
-        self.run_worker(self.fetch_cases)
+        self.run_worker(self.fetch_cases, thread=True)
 
     def fetch_cases(self) -> None:
         """Fetches the list of cases in the background."""
@@ -270,7 +270,7 @@ class SupportApp(App):
     @on(DataTable.RowSelected)
     def on_row_selected(self, event: DataTable.RowSelected) -> None:
         self.selected_case_id = str(event.row_key.value)
-        self.run_worker(self.fetch_case_details, self.selected_case_id)
+        self.run_worker(self.fetch_case_details, self.selected_case_id, thread=True)
 
     def fetch_case_details(self, case_id: str) -> None:
         """Fetches the details and comments for the selected case."""
@@ -383,7 +383,7 @@ class SupportApp(App):
         details_view.update(container)
 
     def action_refresh_cases(self) -> None:
-        self.run_worker(self.fetch_cases)
+        self.run_worker(self.fetch_cases, thread=True)
 
     def action_add_comment(self) -> None:
         if not self.selected_case_id:
@@ -392,7 +392,7 @@ class SupportApp(App):
 
         def handle_comment(comment_body: str) -> None:
             if comment_body:
-                self.run_worker(self.submit_comment, comment_body)
+                self.run_worker(self.submit_comment, comment_body, thread=True)
 
         self.push_screen(CommentModal(self.selected_case_id), handle_comment)
 
@@ -426,7 +426,7 @@ class SupportApp(App):
 
         def handle_template(template_name: str) -> None:
             if template_name:
-                self.run_worker(self.execute_template, template_name)
+                self.run_worker(self.execute_template, template_name, thread=True)
 
         self.push_screen(TemplateModal(self.selected_case_id), handle_template)
 
