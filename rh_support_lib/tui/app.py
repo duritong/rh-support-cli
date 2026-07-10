@@ -2,6 +2,7 @@ import os
 import requests
 from textual import on
 from textual.app import App, ComposeResult
+from textual.binding import Binding
 from textual.containers import Grid, Container, Horizontal, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import (
@@ -175,12 +176,12 @@ class FocusableContainer(VerticalScroll):
 
     can_focus = True
     BINDINGS = [
-        ("up", "scroll_up", "Scroll Up"),
-        ("down", "scroll_down", "Scroll Down"),
-        ("pageup", "scroll_page_up", "Scroll Page Up"),
-        ("pagedown", "scroll_page_down", "Scroll Page Down"),
-        ("home", "scroll_home", "Scroll Home"),
-        ("end", "scroll_end", "Scroll End"),
+        Binding("up", "scroll_up", "Scroll Up"),
+        Binding("down", "scroll_down", "Scroll Down"),
+        Binding("pageup", "scroll_page_up", "Scroll Page Up", show=False),
+        Binding("pagedown", "scroll_page_down", "Scroll Page Down", show=False),
+        Binding("home", "scroll_home", "Scroll Home", show=False),
+        Binding("end", "scroll_end", "Scroll End", show=False),
     ]
 
     def action_scroll_up(self) -> None:
@@ -283,11 +284,16 @@ class SupportApp(App):
         margin: 0 1;
     }
     #tui-action-row {
-        height: 3;
+        height: 1;
+        margin-top: 1;
         margin-bottom: 1;
         align: center middle;
     }
     #tui-action-row Button {
+        height: 1;
+        min-width: 15;
+        border: none;
+        padding: 0 1;
         margin: 0 1;
     }
     """
