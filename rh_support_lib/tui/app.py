@@ -255,7 +255,7 @@ class SupportApp(App):
             id="case-list-container",
         )
         yield Container(
-            Static("Select a case to view details...", id="case-details"),
+            Static("Select a case to view details..."),
             id="case-detail-container",
         )
         yield Footer()
@@ -268,7 +268,14 @@ class SupportApp(App):
 
     def fetch_cases(self) -> None:
         """Fetches the list of cases in the background."""
-        self.query_one("#case-details", Static).update("Loading cases...")
+
+        def show_loading():
+            container = self.query_one("#case-detail-container")
+            container.query("*").remove()
+            container.mount(Static("Loading cases..."))
+
+        self.call_from_thread(show_loading)
+
         try:
             payload = build_filter_payload(self.config)
             headers = {
@@ -334,10 +341,14 @@ class SupportApp(App):
                 key=num,
             )
 
-        self.query_one("#case-details", Static).update("Select a case from the list.")
+        container = self.query_one("#case-detail-container")
+        container.query("*").remove()
+        container.mount(Static("Select a case from the list."))
 
     def show_error(self, msg: str) -> None:
-        self.query_one("#case-details", Static).update(f"[bold red]Error:[/] {msg}")
+        container = self.query_one("#case-detail-container")
+        container.query("*").remove()
+        container.mount(Static(f"[bold red]Error:[/] {msg}"))
 
     @on(DataTable.RowSelected)
     def on_row_selected(self, event: DataTable.RowSelected) -> None:
@@ -348,8 +359,13 @@ class SupportApp(App):
 
     def fetch_case_details(self, case_id: str) -> None:
         """Fetches the details and comments for the selected case."""
-        details_view = self.query_one("#case-details", Static)
-        details_view.update(f"Fetching details for Case #{case_id}...")
+
+        def show_loading():
+            container = self.query_one("#case-detail-container")
+            container.query("*").remove()
+            container.mount(Static(f"Fetching details for Case #{case_id}..."))
+
+        self.call_from_thread(show_loading)
 
         try:
             case = get_json(f"{API_URL}/cases/{case_id}", self.token)
@@ -369,7 +385,8 @@ class SupportApp(App):
             self.call_from_thread(self.show_error, f"Failed to fetch details: {e}")
 
     def render_case_details(self, case: dict, comments: list) -> None:
-        details_view = self.query_one("#case-details", Static)
+        detail_container = self.query_one("#case-detail-container")
+        detail_container.query("*").remove()
 
         # Build beautiful layout
         num = case.get("caseNumber") or case.get("id") or ""
@@ -390,7 +407,7 @@ class SupportApp(App):
             owner = owner_obj.get("name") or owner_obj.get("fullName") or ""
 
         # Construct Rich objects to print into details screen
-        container = Vertical()
+        widgets = []
 
         # Header panel
         header_text = Text()
@@ -400,7 +417,7 @@ class SupportApp(App):
             f"URL: https://access.redhat.com/support/cases/{num}",
             style="dim underline",
         )
-        container.mount(Static(Panel(header_text, border_style="cyan")))
+        widgets.append(Static(Panel(header_text, border_style="cyan")))
 
         # Metadata grid
         meta_table = Table.grid(padding=(0, 2))
@@ -418,16 +435,16 @@ class SupportApp(App):
             f"{created_by} on {created_date}",
         )
         meta_table.add_row("Assignee:", owner, "", "")
-        container.mount(
+        widgets.append(
             Static(Panel(meta_table, title="Details", border_style="yellow"))
         )
 
         # Description
-        container.mount(Static("\n[bold magenta]DESCRIPTION:[/]\n"))
-        container.mount(Static(Markdown(description)))
+        widgets.append(Static("\n[bold magenta]DESCRIPTION:[/]\n"))
+        widgets.append(Static(Markdown(description)))
 
         # Comments Header
-        container.mount(Static(f"\n[bold cyan]COMMENTS ({len(comments)}):[/]\n"))
+        widgets.append(Static(f"\n[bold cyan]COMMENTS ({len(comments)}):[/]\n"))
 
         # Comments panels
         for c in comments:
@@ -443,7 +460,7 @@ class SupportApp(App):
 
             c_body = c.get("commentBody") or c.get("body") or c.get("text") or ""
             comment_header = f"{c_by} ({is_public}) - {c_date}"
-            container.mount(
+            widgets.append(
                 Static(
                     Panel(
                         Markdown(c_body),
@@ -453,8 +470,8 @@ class SupportApp(App):
                 )
             )
 
-        # Update TUI Viewport
-        details_view.update(container)
+        # Update TUI Viewport with Vertical container having all compiled child widgets passed to constructor
+        detail_container.mount(Vertical(*widgets))
 
     def action_refresh_cases(self) -> None:
         self.run_worker(self.fetch_cases, thread=True)
@@ -471,7 +488,13 @@ class SupportApp(App):
         self.push_screen(CommentModal(self.selected_case_id), handle_comment)
 
     def submit_comment(self, body: str) -> None:
-        self.query_one("#case-details", Static).update("Posting comment...")
+        def show_posting():
+            container = self.query_one("#case-detail-container")
+            container.query("*").remove()
+            container.mount(Static("Posting comment..."))
+
+        self.call_from_thread(show_posting)
+
         try:
             payload = {"isPublic": True, "commentBody": body}
             headers = {
@@ -510,7 +533,13 @@ class SupportApp(App):
         )
 
     def execute_template(self, template_name: str) -> None:
-        self.query_one("#case-details", Static).update("Applying template...")
+        def show_applying():
+            container = self.query_one("#case-detail-container")
+            container.query("*").remove()
+            container.mount(Static("Applying template..."))
+
+        self.call_from_thread(show_applying)
+
         try:
             # We construct a mock args class to invoke apply_template logic
             from types import SimpleNamespace

@@ -1754,7 +1754,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 self.assertEqual(app.title, "Red Hat Support CLI")
                 table = app.query_one("#case-table", DataTable)
                 self.assertIsNotNone(table)
-                self.assertIsNotNone(app.query_one("#case-details"))
+                self.assertIsNotNone(app.query_one("#case-detail-container"))
 
                 # Directly call the row selection handler with a mock event to simulate selection
                 from unittest.mock import MagicMock
@@ -1768,6 +1768,16 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
                 # Verify that case was successfully selected
                 self.assertEqual(app.selected_case_id, "12345")
+
+                # Verify that the details panel loaded successfully without mounting/layout crashes
+                from textual.containers import Vertical
+
+                detail_container = app.query_one("#case-detail-container")
+                self.assertIsNotNone(detail_container)
+
+                # Ensure that Vertical is now mounted inside the container
+                vertical = detail_container.query_one(Vertical)
+                self.assertIsNotNone(vertical)
 
         try:
             asyncio.run(run_headless())
