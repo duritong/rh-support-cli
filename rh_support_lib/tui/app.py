@@ -215,6 +215,9 @@ class SupportApp(App):
     ]
 
     CSS = """
+    * {
+        scrollbar-size: 1 1;
+    }
     Screen {
         layout: grid;
         grid-size: 2;
