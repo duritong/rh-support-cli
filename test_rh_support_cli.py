@@ -1751,6 +1751,38 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
         asyncio.run(run_headless())
 
+    def test_tui_config_handling(self):
+        """Test that TUI correctly processes default_bookmark and default_create_template from config"""
+        from rh_support_lib.tui.app import build_filter_payload, TemplateModal
+        import tempfile
+        import shutil
+
+        config = {
+            "default_bookmark": "my_team",
+            "default_create_template": "my_default_template",
+            "bookmarks": {
+                "my_team": {
+                    "account": "999999",
+                    "status": ["Waiting on Red Hat"],
+                    "severity": ["High"],
+                }
+            },
+        }
+
+        # 1. Test build_filter_payload
+        payload = build_filter_payload(config)
+        self.assertEqual(payload.get("accountNumber"), "999999")
+        self.assertEqual(payload.get("status"), "Waiting on Red Hat")
+        self.assertEqual(payload.get("severity"), "2 (High)")
+
+        # 2. Test TemplateModal initial value
+        temp_home = tempfile.mkdtemp()
+        try:
+            modal = TemplateModal("12345", "my_default_template")
+            self.assertEqual(modal.default_template, "my_default_template")
+        finally:
+            shutil.rmtree(temp_home)
+
 
 if __name__ == "__main__":
     unittest.main()

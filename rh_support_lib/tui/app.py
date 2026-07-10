@@ -19,8 +19,68 @@ from rich.table import Table
 from rich.text import Text
 from rich.markdown import Markdown
 
-from rh_support_lib.constants import API_URL
+from rh_support_lib.constants import API_URL, STATUS_FILTER_MAP, SEVERITY_MAP
 from rh_support_lib.api import get_json
+
+
+def build_filter_payload(config: dict) -> dict:
+    """Constructs the filter payload based on config bookmarks."""
+    payload = {"maxResults": 50, "offset": 0}
+    if not config:
+        return payload
+
+    filters = {}
+    default_bk = config.get("default_bookmark")
+    if default_bk:
+        bks = default_bk if isinstance(default_bk, list) else [default_bk]
+        for bk_name in bks:
+            bk_data = config.get("bookmarks", {}).get(bk_name)
+            if bk_data:
+                filters.update(bk_data)
+
+    # Convert filters to payload
+    acc = filters.get("account") or filters.get("accountNumber")
+    if acc:
+        payload["accountNumber"] = str(acc)
+
+    raw_status = filters.get("status")
+    if raw_status:
+        if isinstance(raw_status, str):
+            raw_status = [raw_status]
+
+        mapped_statuses = []
+        for s in raw_status:
+            val = STATUS_FILTER_MAP.get(str(s).lower(), s)
+            for v in val.split(","):
+                mapped_statuses.append(v.strip())
+
+        if len(mapped_statuses) == 1:
+            payload["status"] = mapped_statuses[0]
+        else:
+            payload["statuses"] = mapped_statuses
+
+        if any("closed" in s.lower() for s in mapped_statuses):
+            payload["includeClosed"] = True
+
+    raw_sev = filters.get("severity")
+    if raw_sev:
+        if isinstance(raw_sev, str):
+            raw_sev = [raw_sev]
+
+        mapped_sevs = []
+        for s in raw_sev:
+            mapped_sevs.append(SEVERITY_MAP.get(str(s).lower(), s))
+
+        if len(mapped_sevs) == 1:
+            payload["severity"] = mapped_sevs[0]
+        else:
+            payload["severities"] = mapped_sevs
+
+    own = filters.get("owner") or filters.get("ownerSSOName")
+    if own:
+        payload["ownerSSOName"] = str(own)
+
+    return payload
 
 
 class CommentModal(ModalScreen[str]):
@@ -55,9 +115,10 @@ class CommentModal(ModalScreen[str]):
 class TemplateModal(ModalScreen[str]):
     """Modal screen for applying templates."""
 
-    def __init__(self, case_id: str):
+    def __init__(self, case_id: str, default_template: str = ""):
         super().__init__()
         self.case_id = case_id
+        self.default_template = default_template
 
     def compose(self) -> ComposeResult:
         # Load local templates
@@ -67,16 +128,27 @@ class TemplateModal(ModalScreen[str]):
             try:
                 for f in os.listdir(templates_dir):
                     if f.endswith(".yaml") or f.endswith(".yml"):
-                        choices.append((os.path.splitext(f)[0], f))
+                        choices.append((os.path.splitext(f)[0], os.path.splitext(f)[0]))
             except Exception:
                 pass
 
         if not choices:
             choices = [("No templates found", "none")]
 
+        initial_value = None
+        for name, _ in choices:
+            if name == self.default_template:
+                initial_value = name
+                break
+
         yield Grid(
             Label(f"Apply Template to Case #{self.case_id}", id="modal-title"),
-            Select(choices, prompt="Select a template", id="template-select"),
+            Select(
+                choices,
+                prompt="Select a template",
+                value=initial_value,
+                id="template-select",
+            ),
             Horizontal(
                 Button("Apply", variant="success", id="apply-btn"),
                 Button("Cancel", variant="error", id="cancel-btn"),
@@ -198,7 +270,7 @@ class SupportApp(App):
         """Fetches the list of cases in the background."""
         self.query_one("#case-details", Static).update("Loading cases...")
         try:
-            payload = {"maxResults": 50, "offset": 0}
+            payload = build_filter_payload(self.config)
             headers = {
                 "Authorization": f"Bearer {self.token}",
                 "Content-Type": "application/json",
@@ -428,7 +500,10 @@ class SupportApp(App):
             if template_name:
                 self.run_worker(self.execute_template, template_name, thread=True)
 
-        self.push_screen(TemplateModal(self.selected_case_id), handle_template)
+        default_tmpl = self.config.get("default_create_template") or ""
+        self.push_screen(
+            TemplateModal(self.selected_case_id, default_tmpl), handle_template
+        )
 
     def execute_template(self, template_name: str) -> None:
         self.query_one("#case-details", Static).update("Applying template...")
