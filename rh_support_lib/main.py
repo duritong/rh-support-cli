@@ -6,6 +6,7 @@ from rh_support_lib.commands.list_cases import cmd_list
 from rh_support_lib.commands.show_case import cmd_show
 from rh_support_lib.commands.create_case import cmd_create
 from rh_support_lib.commands.apply_template import cmd_apply, cmd_list_templates
+from rh_support_lib.tui.app import cmd_tui
 from rh_support_lib.commands.actions import (
     cmd_attach,
     cmd_comment,
@@ -184,6 +185,9 @@ Authentication:
         "list-template", help="List all local templates and their details (alias)"
     )
 
+    # TUI Subcommand
+    subparsers.add_parser("tui", help="Launch the interactive terminal user interface")
+
     if argcomplete:
         argcomplete.autocomplete(parser)
 
@@ -221,6 +225,8 @@ Authentication:
         cmd_show(args, token)
     elif args.command == "apply":
         cmd_apply(args, token, config)
+    elif args.command == "tui":
+        cmd_tui(args, token, config)
 
 
 if __name__ == "__main__":

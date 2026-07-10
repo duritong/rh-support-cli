@@ -15,6 +15,7 @@ setup(
         "dateparser",
         "argcomplete",
         "rich",
+        "textual",
     ],
     entry_points={
         "console_scripts": [

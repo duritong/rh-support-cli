@@ -1718,6 +1718,24 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 os.remove("desc.txt")
             shutil.rmtree(temp_home)
 
+    def test_tui_command_registration(self):
+        """Test that the TUI command is registered and help menu works"""
+        result = self.run_cli(["--help"])
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("tui", result.stdout)
+
+    def test_tui_activation(self):
+        """Test that running the tui subcommand initializes and launches the SupportApp"""
+        from unittest.mock import patch, MagicMock
+        from rh_support_lib.tui.app import cmd_tui
+
+        with patch("rh_support_lib.tui.app.SupportApp.run") as mock_run:
+            args = MagicMock()
+            token = "mock_token"
+            config = {}
+            cmd_tui(args, token, config)
+            mock_run.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

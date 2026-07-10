@@ -208,6 +208,24 @@ Lists all local templates stored in `~/.config/rh-support-cli/templates/` along 
 rh-support-cli list-templates
 ```
 
+### 9. Interactive Terminal User Interface (`tui`)
+
+Launches a beautiful, interactive Terminal User Interface (TUI) to browse and manage your Red Hat support cases directly inside your terminal session.
+
+**Features:**
+- **Split Dashboard Layout**: Scroll through the list of cases in the left pane while viewing details, description (fully parsed Markdown), and complete comment threads in the right pane.
+- **Asynchronous Background Processing**: Keeps the UI highly responsive by loading cases and updates asynchronously.
+- **Vim / Arrow Navigation**: Navigate intuitively with standard keyboard binds.
+- **Quick Modals**:
+  - Press **`c`** to write and submit a comment directly inside the terminal.
+  - Press **`t`** to select and apply a local template (e.g. standard watchers) to the active case.
+  - Press **`r`** to refresh the list of cases.
+
+**Example:**
+```bash
+rh-support-cli tui
+```
+
 ## Configuration & Bookmarks
 
 You can define bookmarks (presets of filters) in a YAML configuration file.
