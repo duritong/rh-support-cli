@@ -376,6 +376,8 @@ class SupportApp(App):
         for idx, c in enumerate(self.cases):
             num = str(c.get("caseNumber") or c.get("id") or "")
             title = c.get("summary") or ""
+            if len(title) > 35:
+                title = title[:32] + "..."
             sev = c.get("severity") or ""
             status = c.get("status") or ""
 
