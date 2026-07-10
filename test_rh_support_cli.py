@@ -1774,6 +1774,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
                 detail_container = app.query_one("#case-detail-container")
                 self.assertIsNotNone(detail_container)
+                self.assertTrue(detail_container.can_focus)
 
                 # Ensure that Vertical is now mounted inside the container
                 vertical = detail_container.query_one(Vertical)

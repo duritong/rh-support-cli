@@ -170,6 +170,12 @@ class TemplateModal(ModalScreen[str]):
         self.dismiss("")
 
 
+class FocusableContainer(Container):
+    """A Container that can receive keyboard focus for scrolling."""
+
+    can_focus = True
+
+
 class SupportApp(App):
     """Terminal User Interface (TUI) for Red Hat Support Case CLI."""
 
@@ -207,6 +213,10 @@ class SupportApp(App):
         padding: 1;
         height: 100%;
         overflow-y: scroll;
+    }
+    #case-detail-container:focus {
+        border: double yellow;
+        background: $surface;
     }
     #case-table {
         height: 100%;
@@ -254,7 +264,7 @@ class SupportApp(App):
             DataTable(id="case-table"),
             id="case-list-container",
         )
-        yield Container(
+        yield FocusableContainer(
             Static("Select a case to view details..."),
             id="case-detail-container",
         )
