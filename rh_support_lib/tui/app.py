@@ -251,6 +251,10 @@ class SupportApp(App):
     }
     #case-table {
         height: 100%;
+        scrollbar-size: 1 1;
+    }
+    #case-table ScrollBar {
+        scrollbar-size: 1 1;
     }
     CommentModal, TemplateModal {
         align: center middle;
