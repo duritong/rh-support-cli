@@ -2,7 +2,7 @@ import os
 import requests
 from textual import on
 from textual.app import App, ComposeResult
-from textual.containers import Grid, Container, Vertical, Horizontal
+from textual.containers import Grid, Container, Vertical, Horizontal, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import (
     Header,
@@ -170,8 +170,8 @@ class TemplateModal(ModalScreen[str]):
         self.dismiss("")
 
 
-class FocusableContainer(Container):
-    """A Container that can receive keyboard focus for scrolling."""
+class FocusableContainer(VerticalScroll):
+    """A scrollable container that can receive keyboard focus for scrolling."""
 
     can_focus = True
 
