@@ -1739,17 +1739,40 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
     def test_tui_app_headless(self):
         """Programmatically launch the TUI app headlessly to verify CSS parsing and startup widgets"""
         import asyncio
+        import rh_support_lib.tui.app
         from rh_support_lib.tui.app import SupportApp
+        from textual.widgets import DataTable
+
+        # Temporarily route API_URL in the parent process to our mock HTTP server
+        orig_tui_url = rh_support_lib.tui.app.API_URL
+        rh_support_lib.tui.app.API_URL = self.base_url
 
         async def run_headless():
-            app = SupportApp(token="mock_token", config={})
-            async with app.run_test():
+            app = SupportApp(token="mock_access_token_123", config={})
+            async with app.run_test() as pilot:
                 # If we get here, CSS parsed successfully and the app launched with zero crashes!
                 self.assertEqual(app.title, "Red Hat Support CLI")
-                self.assertIsNotNone(app.query_one("#case-table"))
+                table = app.query_one("#case-table", DataTable)
+                self.assertIsNotNone(table)
                 self.assertIsNotNone(app.query_one("#case-details"))
 
-        asyncio.run(run_headless())
+                # Directly call the row selection handler with a mock event to simulate selection
+                from unittest.mock import MagicMock
+
+                event = MagicMock()
+                event.row_key.value = "12345"
+                app.on_row_selected(event)
+
+                # Let the pilot process events and background workers run
+                await pilot.pause()
+
+                # Verify that case was successfully selected
+                self.assertEqual(app.selected_case_id, "12345")
+
+        try:
+            asyncio.run(run_headless())
+        finally:
+            rh_support_lib.tui.app.API_URL = orig_tui_url
 
     def test_tui_config_handling(self):
         """Test that TUI correctly processes default_bookmark and default_create_template from config"""

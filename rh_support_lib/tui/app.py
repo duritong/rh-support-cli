@@ -342,7 +342,9 @@ class SupportApp(App):
     @on(DataTable.RowSelected)
     def on_row_selected(self, event: DataTable.RowSelected) -> None:
         self.selected_case_id = str(event.row_key.value)
-        self.run_worker(self.fetch_case_details, self.selected_case_id, thread=True)
+        self.run_worker(
+            lambda: self.fetch_case_details(self.selected_case_id), thread=True
+        )
 
     def fetch_case_details(self, case_id: str) -> None:
         """Fetches the details and comments for the selected case."""
@@ -464,7 +466,7 @@ class SupportApp(App):
 
         def handle_comment(comment_body: str) -> None:
             if comment_body:
-                self.run_worker(self.submit_comment, comment_body, thread=True)
+                self.run_worker(lambda: self.submit_comment(comment_body), thread=True)
 
         self.push_screen(CommentModal(self.selected_case_id), handle_comment)
 
@@ -498,7 +500,9 @@ class SupportApp(App):
 
         def handle_template(template_name: str) -> None:
             if template_name:
-                self.run_worker(self.execute_template, template_name, thread=True)
+                self.run_worker(
+                    lambda: self.execute_template(template_name), thread=True
+                )
 
         default_tmpl = self.config.get("default_create_template") or ""
         self.push_screen(
