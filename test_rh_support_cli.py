@@ -1770,15 +1770,13 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 self.assertEqual(app.selected_case_id, "12345")
 
                 # Verify that the details panel loaded successfully without mounting/layout crashes
-                from textual.containers import Vertical
 
                 detail_container = app.query_one("#case-detail-container")
                 self.assertIsNotNone(detail_container)
                 self.assertTrue(detail_container.can_focus)
 
-                # Ensure that Vertical is now mounted inside the container
-                vertical = detail_container.query_one(Vertical)
-                self.assertIsNotNone(vertical)
+                # Ensure that compiled Static panels are now mounted directly inside the container
+                self.assertTrue(len(detail_container.children) > 0)
 
         try:
             asyncio.run(run_headless())

@@ -2,7 +2,7 @@ import os
 import requests
 from textual import on
 from textual.app import App, ComposeResult
-from textual.containers import Grid, Container, Vertical, Horizontal, VerticalScroll
+from textual.containers import Grid, Container, Horizontal, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import (
     Header,
@@ -171,9 +171,35 @@ class TemplateModal(ModalScreen[str]):
 
 
 class FocusableContainer(VerticalScroll):
-    """A scrollable container that can receive keyboard focus for scrolling."""
+    """A scrollable container that can receive keyboard focus and handles keyboard scrolling."""
 
     can_focus = True
+    BINDINGS = [
+        ("up", "scroll_up", "Scroll Up"),
+        ("down", "scroll_down", "Scroll Down"),
+        ("pageup", "scroll_page_up", "Scroll Page Up"),
+        ("pagedown", "scroll_page_down", "Scroll Page Down"),
+        ("home", "scroll_home", "Scroll Home"),
+        ("end", "scroll_end", "Scroll End"),
+    ]
+
+    def action_scroll_up(self) -> None:
+        self.scroll_up(animate=False)
+
+    def action_scroll_down(self) -> None:
+        self.scroll_down(animate=False)
+
+    def action_scroll_page_up(self) -> None:
+        self.scroll_page_up(animate=False)
+
+    def action_scroll_page_down(self) -> None:
+        self.scroll_page_down(animate=False)
+
+    def action_scroll_home(self) -> None:
+        self.scroll_home(animate=False)
+
+    def action_scroll_end(self) -> None:
+        self.scroll_end(animate=False)
 
 
 class SupportApp(App):
@@ -480,8 +506,8 @@ class SupportApp(App):
                 )
             )
 
-        # Update TUI Viewport with Vertical container having all compiled child widgets passed to constructor
-        detail_container.mount(Vertical(*widgets))
+        # Update TUI Viewport with compiled child widgets mounted directly into VerticalScroll
+        detail_container.mount(*widgets)
 
     def action_refresh_cases(self) -> None:
         self.run_worker(self.fetch_cases, thread=True)
