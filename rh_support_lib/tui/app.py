@@ -224,6 +224,13 @@ class SupportApp(App):
         grid-columns: 2fr 3fr;
         scrollbar-size: 1 1;
     }
+    ScrollBar {
+        background: transparent;
+        color: $primary-darken-2;
+    }
+    ScrollBar:hover {
+        color: $primary;
+    }
     Header {
         background: $primary-darken-1;
         color: $text;
@@ -252,9 +259,11 @@ class SupportApp(App):
     #case-table {
         height: 100%;
         scrollbar-size: 1 1;
+        overflow-x: hidden;
     }
     #case-table ScrollBar {
         scrollbar-size: 1 1;
+        background: transparent;
     }
     CommentModal, TemplateModal {
         align: center middle;
