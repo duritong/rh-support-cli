@@ -99,7 +99,7 @@ class CommentModal(ModalScreen[str]):
                 Button("Cancel", variant="error", id="cancel-btn"),
                 id="modal-buttons",
             ),
-            id="modal-grid",
+            id="comment-modal-grid",
         )
 
     @on(Button.Pressed, "#submit-btn")
@@ -154,7 +154,7 @@ class TemplateModal(ModalScreen[str]):
                 Button("Cancel", variant="error", id="cancel-btn"),
                 id="modal-buttons",
             ),
-            id="modal-grid",
+            id="template-modal-grid",
         )
 
     @on(Button.Pressed, "#apply-btn")
@@ -250,7 +250,14 @@ class SupportApp(App):
     CommentModal, TemplateModal {
         align: center middle;
     }
-    #modal-grid {
+    #comment-modal-grid {
+        padding: 1 2;
+        width: 80;
+        height: 26;
+        border: thick $primary 80%;
+        background: $surface;
+    }
+    #template-modal-grid {
         padding: 1 2;
         width: 65;
         height: 18;
@@ -264,7 +271,7 @@ class SupportApp(App):
         margin-bottom: 1;
     }
     #comment-body {
-        height: 8;
+        height: 14;
         border: solid $primary;
     }
     #modal-buttons {
@@ -273,6 +280,14 @@ class SupportApp(App):
         height: 3;
     }
     #modal-buttons Button {
+        margin: 0 1;
+    }
+    #tui-action-row {
+        height: 3;
+        margin-bottom: 1;
+        align: center middle;
+    }
+    #tui-action-row Button {
         margin: 0 1;
     }
     """
@@ -393,6 +408,18 @@ class SupportApp(App):
             lambda: self.fetch_case_details(self.selected_case_id), thread=True
         )
 
+    @on(Button.Pressed, "#tui-comment-btn")
+    def on_comment_click(self) -> None:
+        self.action_add_comment()
+
+    @on(Button.Pressed, "#tui-template-btn")
+    def on_template_click(self) -> None:
+        self.action_apply_template()
+
+    @on(Button.Pressed, "#tui-refresh-btn")
+    def on_refresh_click(self) -> None:
+        self.action_refresh_cases()
+
     def fetch_case_details(self, case_id: str) -> None:
         """Fetches the details and comments for the selected case."""
 
@@ -444,6 +471,18 @@ class SupportApp(App):
 
         # Construct Rich objects to print into details screen
         widgets = []
+
+        # Header Action Buttons
+        widgets.append(
+            Horizontal(
+                Button("💬 Add Comment (C)", id="tui-comment-btn", variant="success"),
+                Button(
+                    "📋 Apply Template (T)", id="tui-template-btn", variant="primary"
+                ),
+                Button("🔄 Refresh (R)", id="tui-refresh-btn", variant="default"),
+                id="tui-action-row",
+            )
+        )
 
         # Header panel
         header_text = Text()
