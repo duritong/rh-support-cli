@@ -830,7 +830,12 @@ class SupportApp(App):
         # Show the inline comment pane
         self.screen.add_class("commenting")
         self.compose_comment_pane()
-        self.query_one("#tui-comment-textarea", TextArea).focus()
+
+        # Focus on the newly mounted TextArea after the refresh cycle
+        def focus_textarea() -> None:
+            self.query_one("#tui-comment-textarea", TextArea).focus()
+
+        self.call_after_refresh(focus_textarea)
 
     def compose_comment_pane(self) -> None:
         container = self.query_one("#comment-pane-container")
@@ -868,7 +873,7 @@ class SupportApp(App):
                 ),
             )
         )
-        self.update_comment_status_dropdown()
+        self.call_after_refresh(self.update_comment_status_dropdown)
 
     def update_comment_status_dropdown(self) -> None:
         if not self.selected_case_id:

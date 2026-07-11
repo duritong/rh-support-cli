@@ -1792,6 +1792,10 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 # 4. Test contextual refresh layouts programmatically
                 app.action_refresh()
 
+                # 5. Test activating the inline comment pane
+                app.action_add_comment()
+                await pilot.pause()
+
         try:
             asyncio.run(run_headless())
         finally:
