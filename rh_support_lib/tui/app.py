@@ -850,6 +850,24 @@ class SupportApp(App):
             ("Reopened", "Reopened"),
         ]
 
+        # Resolve initial value before mounting to prevent child-widget race conditions inside SelectCurrent
+        target_status = "Waiting on Red Hat"
+        if self.selected_case_id:
+            case = next(
+                (
+                    c
+                    for c in self.cases
+                    if str(c.get("caseNumber") or c.get("id")) == self.selected_case_id
+                ),
+                None,
+            )
+            if case:
+                current_status = case.get("status") or "Waiting on Red Hat"
+                if current_status == "Waiting on Customer":
+                    target_status = "Waiting on Red Hat"
+                else:
+                    target_status = current_status
+
         container.mount(
             Vertical(
                 Horizontal(
@@ -859,6 +877,7 @@ class SupportApp(App):
                         status_choices,
                         id="tui-comment-status-select",
                         prompt="Select Status",
+                        value=target_status,
                     ),
                     id="comment-pane-header-row",
                 ),
@@ -873,7 +892,6 @@ class SupportApp(App):
                 ),
             )
         )
-        self.call_after_refresh(self.update_comment_status_dropdown)
 
     def update_comment_status_dropdown(self) -> None:
         if not self.selected_case_id:

@@ -1796,6 +1796,36 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 app.action_add_comment()
                 await pilot.pause()
 
+                # Verify that the comment pane is displayed
+                from textual.widgets import TextArea, Select
+
+                self.assertTrue(app.screen.has_class("commenting"))
+                textarea = app.query_one("#tui-comment-textarea", TextArea)
+                self.assertIsNotNone(textarea)
+                select_status = app.query_one("#tui-comment-status-select", Select)
+                self.assertIsNotNone(select_status)
+
+                # Type some draft comment text into the TextArea
+                textarea.text = "This is a draft comment to test unsaved changes"
+
+                # Trigger exit which will prompt the UnsavedChangesModal
+                app.action_exit_commenting()
+                await pilot.pause()
+
+                # Verify UnsavedChangesModal is now active on screen!
+                unsaved_modal = app.screen
+                self.assertIn("UnsavedChangesModal", str(unsaved_modal))
+                self.assertIsNotNone(unsaved_modal.query_one("#discard-btn"))
+                self.assertIsNotNone(unsaved_modal.query_one("#save-btn"))
+
+                # Dismiss the modal by selecting 'discard'
+                unsaved_modal.dismiss("discard")
+                await pilot.pause()
+
+                # Verify commenting pane is closed and text is cleared!
+                self.assertFalse(app.screen.has_class("commenting"))
+                self.assertEqual(textarea.text, "")
+
         try:
             asyncio.run(run_headless())
         finally:
