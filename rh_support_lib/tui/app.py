@@ -315,6 +315,7 @@ class SupportApp(App):
         ("b", "select_bookmark", "Select Bookmark"),
         ("f", "focus_pane", "Focus Pane"),
         Binding("escape", "escape_action", "Cancel/Unfocus", show=False),
+        Binding("ctrl+x", "exit_commenting", "Cancel Commenting", show=False),
     ]
 
     CSS = """
@@ -405,7 +406,7 @@ class SupportApp(App):
         border: double $primary;
     }
     #comment-pane-header-row {
-        height: 1;
+        height: 3;
         margin-top: 1;
         margin-bottom: 1;
         align: left middle;
@@ -414,9 +415,8 @@ class SupportApp(App):
         margin-right: 1;
     }
     #comment-pane-header-row Select {
-        width: 25;
-        height: 1;
-        border: none;
+        width: 30;
+        height: 3;
     }
     #tui-comment-textarea {
         height: 1fr;
@@ -907,7 +907,10 @@ class SupportApp(App):
             Vertical(
                 Horizontal(
                     Label("[bold cyan]Drafting Comment...[/]"),
-                    Label("  Apply Status: "),
+                    Label(
+                        f"  Apply Status (Detected: [bold yellow]{target_status}[/]): ",
+                        id="tui-comment-detected-label",
+                    ),
                     Select(
                         status_choices,
                         id="tui-comment-status-select",
@@ -951,6 +954,14 @@ class SupportApp(App):
 
         select = self.query_one("#tui-comment-status-select", Select)
         select.value = target_status
+
+        try:
+            label = self.query_one("#tui-comment-detected-label", Label)
+            label.update(
+                f"  Apply Status (Detected: [bold yellow]{target_status}[/]): "
+            )
+        except Exception:
+            pass
 
     def execute_comment_submission(self, comment_body: str, target_status: str) -> None:
         def show_posting():
