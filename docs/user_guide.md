@@ -215,10 +215,11 @@ Toggle focus between the case list and details pane using **`Tab`** or **`Shift+
 | **`j` / `k` / `Arrow Up/Down`** | Scroll or navigate row-by-row |
 | **`PageUp` / `PageDown`** | Scroll screen-by-screen |
 | **`Home` / `End`** | Jump to the very top or bottom of the viewport |
-| **`c`** | Post a new comment to the selected case (Comment Modal) |
+| **`c`** | Open/Focus the inline Comment Pane at the bottom of the case view |
+| **`a`** | Specify and upload local file attachments (Attach Modal) |
 | **`t`** | Select and apply a local template (Template Modal) |
 | **`b`** | Select and apply an active filter bookmark dynamically (Bookmark Modal) |
 | **`f`** | Zoom / Focus on the active pane into fullscreen mode |
 | **`x`** | Exit single-pane focus and restore standard dual-pane view |
-| **`r`** | Pull-to-refresh the active case list |
+| **`r`** | Trigger contextual refresh (refreshes case details if focused; refreshes case list if table is focused) |
 | **`q`** | Quit the TUI |

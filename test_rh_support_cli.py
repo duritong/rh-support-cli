@@ -1826,6 +1826,18 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 self.assertFalse(app.screen.has_class("commenting"))
                 self.assertEqual(textarea.text, "")
 
+                # 6. Test activating the file attachment modal
+                app.action_add_attachment()
+                await pilot.pause()
+
+                attach_modal = app.screen
+                self.assertIn("AttachModal", str(attach_modal))
+                self.assertIsNotNone(attach_modal.query_one("#attach-file-input"))
+
+                # Dismiss modal
+                attach_modal.dismiss("")
+                await pilot.pause()
+
         try:
             asyncio.run(run_headless())
         finally:

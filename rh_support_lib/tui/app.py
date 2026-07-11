@@ -16,6 +16,7 @@ from textual.widgets import (
     Label,
     TextArea,
     Select,
+    Input,
 )
 from rich.panel import Panel
 from rich.table import Table
@@ -239,6 +240,36 @@ class UnsavedChangesModal(ModalScreen[str]):
         self.dismiss("cancel")
 
 
+class AttachModal(ModalScreen[str]):
+    """Modal screen for specifying a file to attach to a case."""
+
+    def compose(self) -> ComposeResult:
+        yield Grid(
+            Label("Attach File to Case", id="modal-title"),
+            Label("Specify the local path of the file you want to upload:"),
+            Input(placeholder="/path/to/file.txt", id="attach-file-input"),
+            Horizontal(
+                Button("Attach", variant="success", id="attach-btn"),
+                Button("Cancel", variant="error", id="cancel-btn"),
+                id="modal-buttons",
+            ),
+            id="template-modal-grid",  # reuse template modal size!
+        )
+
+    @on(Button.Pressed, "#attach-btn")
+    def attach(self) -> None:
+        inp = self.query_one("#attach-file-input", Input)
+        val = inp.value.strip()
+        if val:
+            self.dismiss(val)
+        else:
+            self.dismiss("")
+
+    @on(Button.Pressed, "#cancel-btn")
+    def cancel_attach(self) -> None:
+        self.dismiss("")
+
+
 class FocusableContainer(VerticalScroll):
     """A scrollable container that can receive keyboard focus and handles keyboard scrolling."""
 
@@ -279,6 +310,7 @@ class SupportApp(App):
         ("q", "quit", "Quit"),
         ("r", "refresh", "Refresh"),
         ("c", "add_comment", "Add Comment"),
+        ("a", "add_attachment", "Attach File"),
         ("t", "apply_template", "Apply Template"),
         ("b", "select_bookmark", "Select Bookmark"),
         ("f", "focus_pane", "Focus Pane"),
@@ -407,7 +439,7 @@ class SupportApp(App):
         scrollbar-size: 1 1;
         background: transparent;
     }
-    TemplateModal, UnsavedChangesModal, BookmarkModal {
+    TemplateModal, UnsavedChangesModal, BookmarkModal, AttachModal {
         align: center middle;
     }
     #comment-modal-grid {
@@ -623,6 +655,10 @@ class SupportApp(App):
     def on_comment_click(self) -> None:
         self.action_add_comment()
 
+    @on(Button.Pressed, "#tui-attach-btn")
+    def on_attach_click(self) -> None:
+        self.action_add_attachment()
+
     @on(Button.Pressed, "#tui-template-btn")
     def on_template_click(self) -> None:
         self.action_apply_template()
@@ -727,6 +763,7 @@ class SupportApp(App):
         widgets.append(
             Horizontal(
                 Button("💬 Comment (C)", id="tui-comment-btn", variant="success"),
+                Button("📎 Attach (A)", id="tui-attach-btn", variant="info"),
                 Button("📋 Template (T)", id="tui-template-btn", variant="primary"),
                 Button("🔖 Bookmark (B)", id="tui-bookmark-btn", variant="warning"),
                 Button("🔄 Refresh (R)", id="tui-refresh-btn", variant="default"),
@@ -1044,6 +1081,52 @@ class SupportApp(App):
                 )
         except Exception as e:
             self.show_error(f"Failed to save draft to file: {e}")
+
+    def action_add_attachment(self) -> None:
+        if not self.selected_case_id:
+            self.show_error("Please select a case first.")
+            return
+
+        def handle_file(file_path: str) -> None:
+            if file_path:
+                if not os.path.isfile(file_path):
+                    self.show_error(f"Local file '{file_path}' does not exist.")
+                    return
+                self.run_worker(
+                    lambda: self.execute_attachment_upload(file_path),
+                    thread=True,
+                )
+
+        self.push_screen(AttachModal(), handle_file)
+
+    def execute_attachment_upload(self, file_path: str) -> None:
+        def show_uploading():
+            container = self.query_one("#case-detail-container")
+            container.query("*").remove()
+            container.mount(
+                Static(f"Uploading attachment '{os.path.basename(file_path)}'...")
+            )
+
+        self.call_from_thread(show_uploading)
+
+        try:
+            from types import SimpleNamespace
+            from rh_support_lib.commands.actions import cmd_attach
+
+            args = SimpleNamespace(
+                case=self.selected_case_id,
+                file=[file_path],
+            )
+            try:
+                cmd_attach(args, self.api_client)
+            except SystemExit as ex:
+                if ex.code != 0:
+                    self.call_from_thread(self.show_error, "Attachment upload failed.")
+                    return
+
+            self.fetch_case_details(self.selected_case_id)
+        except Exception as e:
+            self.call_from_thread(self.show_error, f"Error uploading attachment: {e}")
 
     def action_apply_template(self) -> None:
         if not self.selected_case_id:

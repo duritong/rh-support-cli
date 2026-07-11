@@ -224,10 +224,11 @@ Launches a beautiful, interactive Terminal User Interface (TUI) to browse and ma
   - Highlight either the case list on the left or case details on the right, and press **`f`** to "zoom" that panel into fullscreen mode (fully hiding the other pane to maximize reading space).
   - Press **`x`** to exit single-pane mode and instantly restore the standard dual-pane split dashboard layout!
 - **Quick Modals & Action Buttons**:
-  - Press **`c`** (or click `Comment (C)`) to write and submit a comment directly inside the terminal.
+  - Press **`c`** (or click `Comment (C)`) to open the inline **Comment Pane** at the bottom of your case view, allowing you to scroll through and read the case description and comment history while drafting. Includes status dropdown integration (pre-selecting `"Waiting on Red Hat"` if the case is `"Waiting on Customer"`) and "dirty-state" draft auto-saving under `~/.config/rh-support-cli/drafts/`.
+  - Press **`a`** (or click `Attach (A)`) to easily specify and upload local file attachments in the background.
   - Press **`t`** (or click `Template (T)`) to select and apply a local template (e.g. standard watchers) to the active case.
   - Press **`b`** (or click `Bookmark (B)`) to select and apply any filter bookmark dynamically to refresh the case list, or clear filters entirely.
-  - Press **`r`** (or click `Refresh (R)`) to refresh the list of cases.
+  - Press **`r`** (or click `Refresh (R)`) to trigger a contextual refresh (refreshes the active case view if the details panel is active; refreshes the case list if the table panel is active).
 
 **Examples:**
 
