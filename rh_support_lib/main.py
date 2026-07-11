@@ -220,7 +220,8 @@ Authentication:
         enable_debug_logging(log_file=debug_file)
 
     # Authenticate before running commands
-    print("Authenticating...")
+    if args.command != "tui":
+        print("Authenticating...")
     token = get_access_token(args.token_file)
 
     if args.command == "attach":
