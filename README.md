@@ -220,6 +220,9 @@ Launches a beautiful, interactive Terminal User Interface (TUI) to browse and ma
 - **Split Dashboard Layout**: Scroll through the list of cases in the left pane while viewing details, description (fully parsed Markdown), and complete comment threads in the right pane.
 - **Asynchronous Background Processing**: Keeps the UI highly responsive by loading cases and updates asynchronously.
 - **Vim / Arrow Navigation**: Navigate intuitively with standard keyboard binds.
+- **Single-Pane Focus / Zoom**:
+  - Highlight either the case list on the left or case details on the right, and press **`f`** to "zoom" that panel into fullscreen mode (fully hiding the other pane to maximize reading space).
+  - Press **`x`** to exit single-pane mode and instantly restore the standard dual-pane split dashboard layout!
 - **Quick Modals & Action Buttons**:
   - Press **`c`** (or click `Comment (C)`) to write and submit a comment directly inside the terminal.
   - Press **`t`** (or click `Template (T)`) to select and apply a local template (e.g. standard watchers) to the active case.

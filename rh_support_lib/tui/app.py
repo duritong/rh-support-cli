@@ -272,6 +272,8 @@ class SupportApp(App):
         ("c", "add_comment", "Add Comment"),
         ("t", "apply_template", "Apply Template"),
         ("b", "select_bookmark", "Select Bookmark"),
+        ("f", "focus_pane", "Focus Pane"),
+        ("x", "exit_focus", "Exit Focus"),
     ]
 
     CSS = """
@@ -283,6 +285,24 @@ class SupportApp(App):
         grid-size: 2;
         grid-columns: 2fr 3fr;
         scrollbar-size: 1 1;
+    }
+    .focused-left {
+        grid-columns: 1fr;
+    }
+    .focused-left #case-detail-container {
+        display: none;
+    }
+    .focused-left #case-list-container {
+        width: 100%;
+    }
+    .focused-right {
+        grid-columns: 1fr;
+    }
+    .focused-right #case-list-container {
+        display: none;
+    }
+    .focused-right #case-detail-container {
+        width: 100%;
     }
     ScrollBar {
         background: transparent;
@@ -748,6 +768,36 @@ class SupportApp(App):
         self.push_screen(
             BookmarkModal(self.config, self.active_bookmark), handle_bookmark
         )
+
+    def action_focus_pane(self) -> None:
+        """Zooms / focuses the currently highlighted pane into fullscreen."""
+        focused_widget = self.focused
+        if not focused_widget:
+            return
+
+        # Traverse up to find which parent container is focused
+        current = focused_widget
+        is_left = False
+        while current:
+            if current.id in ["case-table", "case-list-container"]:
+                is_left = True
+                break
+            if current.id == "case-detail-container":
+                is_left = False
+                break
+            current = current.parent
+
+        if is_left:
+            self.screen.remove_class("focused-right")
+            self.screen.add_class("focused-left")
+        else:
+            self.screen.remove_class("focused-left")
+            self.screen.add_class("focused-right")
+
+    def action_exit_focus(self) -> None:
+        """Restores the standard dual-pane split view layout."""
+        self.screen.remove_class("focused-left")
+        self.screen.remove_class("focused-right")
 
 
 def cmd_tui(args, token, config):

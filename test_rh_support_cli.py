@@ -1778,6 +1778,17 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 # Ensure that compiled Static panels are now mounted directly inside the container
                 self.assertTrue(len(detail_container.children) > 0)
 
+                # 3. Test focus/unfocus layouts programmatically
+                app.action_focus_pane()
+                self.assertTrue(
+                    app.screen.has_class("focused-left")
+                    or app.screen.has_class("focused-right")
+                )
+
+                app.action_exit_focus()
+                self.assertFalse(app.screen.has_class("focused-left"))
+                self.assertFalse(app.screen.has_class("focused-right"))
+
         try:
             asyncio.run(run_headless())
         finally:

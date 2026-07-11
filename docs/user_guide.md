@@ -218,5 +218,7 @@ Toggle focus between the case list and details pane using **`Tab`** or **`Shift+
 | **`c`** | Post a new comment to the selected case (Comment Modal) |
 | **`t`** | Select and apply a local template (Template Modal) |
 | **`b`** | Select and apply an active filter bookmark dynamically (Bookmark Modal) |
+| **`f`** | Zoom / Focus on the active pane into fullscreen mode |
+| **`x`** | Exit single-pane focus and restore standard dual-pane view |
 | **`r`** | Pull-to-refresh the active case list |
 | **`q`** | Quit the TUI |
