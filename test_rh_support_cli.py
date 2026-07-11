@@ -1785,7 +1785,11 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
     def test_tui_config_handling(self):
         """Test that TUI correctly processes default_bookmark and default_create_template from config"""
-        from rh_support_lib.tui.app import build_filter_payload, TemplateModal
+        from rh_support_lib.tui.app import (
+            build_filter_payload,
+            TemplateModal,
+            BookmarkModal,
+        )
         import tempfile
         import shutil
 
@@ -1801,17 +1805,29 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             },
         }
 
-        # 1. Test build_filter_payload
+        # 1. Test build_filter_payload with standard and override options
         payload = build_filter_payload(config)
         self.assertEqual(payload.get("accountNumber"), "999999")
         self.assertEqual(payload.get("status"), "Waiting on Red Hat")
         self.assertEqual(payload.get("severity"), "2 (High)")
 
-        # 2. Test TemplateModal initial value
+        payload_no_default = build_filter_payload(config, no_default_bookmark=True)
+        self.assertNotIn("accountNumber", payload_no_default)
+
+        payload_specific = build_filter_payload(config, bookmark="my_team")
+        self.assertEqual(payload_specific.get("accountNumber"), "999999")
+
+        payload_none = build_filter_payload(config, bookmark="none")
+        self.assertNotIn("accountNumber", payload_none)
+
+        # 2. Test Modal initial values
         temp_home = tempfile.mkdtemp()
         try:
             modal = TemplateModal("12345", "my_default_template")
             self.assertEqual(modal.default_template, "my_default_template")
+
+            modal_bk = BookmarkModal(config, "my_team")
+            self.assertEqual(modal_bk.active_bookmark, "my_team")
         finally:
             shutil.rmtree(temp_home)
 

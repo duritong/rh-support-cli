@@ -91,9 +91,13 @@ Launch a full split-pane interactive dashboard to manage your cases directly ins
 rh-support-cli tui
 ```
 
+### CLI Options:
+*   `-b <bookmark_name>` / `--bookmark <bookmark_name>`: Launch the TUI using a specific bookmark of filters on startup instead of the default bookmark.
+*   `--no-default-bookmark`: Launch the TUI completely unfiltered, loading all cases on startup.
+
 ### Core Features & Layout
 *   **Dual-Pane View**: Case table on the left, full rich case details, descriptions (fully rendered Markdown), and complete scrollable comments thread on the right.
-*   **Contextual Command Buttons**: Interactive action buttons (`Add Comment (C)`, `Apply Template (T)`, `Refresh (R)`) are rendered at the top of the details view for easy mouse-clicks or keyboard legends.
+*   **Contextual Command Buttons**: Interactive action buttons (`Comment (C)`, `Template (T)`, `Bookmark (B)`, `Refresh (R)`) are rendered at the top of the details view for easy mouse-clicks or keyboard legends.
 *   **Compact Scrollbars**: Universal stylesheet styles make all horizontal and vertical scrollbars a super-sleek 1-character-thin column with a transparent track background.
 
 ### Keyboard Navigation & Scrolling Controls
@@ -106,5 +110,6 @@ Toggle focus between the case list and details pane using **`Tab`** or **`Shift+
 | **`Home` / `End`** | Jump to the very top or bottom of the viewport |
 | **`c`** | Post a new comment to the selected case (Comment Modal) |
 | **`t`** | Select and apply a local template (Template Modal) |
+| **`b`** | Select and apply an active filter bookmark dynamically (Bookmark Modal) |
 | **`r`** | Pull-to-refresh the active case list |
 | **`q`** | Quit the TUI |

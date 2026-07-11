@@ -186,7 +186,17 @@ Authentication:
     )
 
     # TUI Subcommand
-    subparsers.add_parser("tui", help="Launch the interactive terminal user interface")
+    parser_tui = subparsers.add_parser(
+        "tui", help="Launch the interactive terminal user interface"
+    )
+    parser_tui.add_argument(
+        "-b", "--bookmark", help="Use a preset bookmark of filters on startup"
+    )
+    parser_tui.add_argument(
+        "--no-default-bookmark",
+        action="store_true",
+        help="Do not load the default bookmark on startup",
+    )
 
     if argcomplete:
         argcomplete.autocomplete(parser)

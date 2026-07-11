@@ -24,16 +24,26 @@ from rh_support_lib.constants import API_URL, STATUS_FILTER_MAP, SEVERITY_MAP
 from rh_support_lib.api import get_json
 
 
-def build_filter_payload(config: dict) -> dict:
+def build_filter_payload(
+    config: dict, bookmark: str = None, no_default_bookmark: bool = False
+) -> dict:
     """Constructs the filter payload based on config bookmarks."""
     payload = {"maxResults": 50, "offset": 0}
     if not config:
         return payload
 
     filters = {}
-    default_bk = config.get("default_bookmark")
-    if default_bk:
-        bks = default_bk if isinstance(default_bk, list) else [default_bk]
+
+    selected_bk = None
+    if bookmark == "none":
+        selected_bk = None
+    elif bookmark:
+        selected_bk = bookmark
+    elif not no_default_bookmark:
+        selected_bk = config.get("default_bookmark")
+
+    if selected_bk:
+        bks = selected_bk if isinstance(selected_bk, list) else [selected_bk]
         for bk_name in bks:
             bk_data = config.get("bookmarks", {}).get(bk_name)
             if bk_data:
@@ -171,6 +181,55 @@ class TemplateModal(ModalScreen[str]):
         self.dismiss("")
 
 
+class BookmarkModal(ModalScreen[str]):
+    """Modal screen for selecting and applying a bookmark."""
+
+    def __init__(self, config: dict, active_bookmark: str = None):
+        super().__init__()
+        self.config = config
+        self.active_bookmark = active_bookmark
+
+    def compose(self) -> ComposeResult:
+        bks = self.config.get("bookmarks", {})
+        choices = [("None (Clear Filters)", "none")]
+        for name in sorted(bks.keys()):
+            choices.append((name, name))
+
+        initial_value = None
+        for name, _ in choices:
+            if name == self.active_bookmark:
+                initial_value = name
+                break
+
+        yield Grid(
+            Label("Select Active Filter Bookmark", id="modal-title"),
+            Select(
+                choices,
+                prompt="Select a bookmark",
+                value=initial_value,
+                id="bookmark-select",
+            ),
+            Horizontal(
+                Button("Select", variant="success", id="select-btn"),
+                Button("Cancel", variant="error", id="cancel-btn"),
+                id="modal-buttons",
+            ),
+            id="template-modal-grid",  # reuse template modal size!
+        )
+
+    @on(Button.Pressed, "#select-btn")
+    def apply_bk(self) -> None:
+        select = self.query_one("#bookmark-select", Select)
+        if select.value:
+            self.dismiss(select.value)
+        else:
+            self.dismiss("")
+
+    @on(Button.Pressed, "#cancel-btn")
+    def cancel_bk(self) -> None:
+        self.dismiss("")
+
+
 class FocusableContainer(VerticalScroll):
     """A scrollable container that can receive keyboard focus and handles keyboard scrolling."""
 
@@ -212,6 +271,7 @@ class SupportApp(App):
         ("r", "refresh_cases", "Refresh"),
         ("c", "add_comment", "Add Comment"),
         ("t", "apply_template", "Apply Template"),
+        ("b", "select_bookmark", "Select Bookmark"),
     ]
 
     CSS = """
@@ -314,10 +374,18 @@ class SupportApp(App):
     }
     """
 
-    def __init__(self, token: str, config: dict):
+    def __init__(
+        self,
+        token: str,
+        config: dict,
+        bookmark: str = None,
+        no_default_bookmark: bool = False,
+    ):
         super().__init__()
         self.token = token
         self.config = config
+        self.active_bookmark = bookmark
+        self.no_default_bookmark = no_default_bookmark
         self.cases = []
         self.selected_case_id = ""
 
@@ -350,7 +418,9 @@ class SupportApp(App):
         self.call_from_thread(show_loading)
 
         try:
-            payload = build_filter_payload(self.config)
+            payload = build_filter_payload(
+                self.config, self.active_bookmark, self.no_default_bookmark
+            )
             headers = {
                 "Authorization": f"Bearer {self.token}",
                 "Content-Type": "application/json",
@@ -438,6 +508,10 @@ class SupportApp(App):
     def on_template_click(self) -> None:
         self.action_apply_template()
 
+    @on(Button.Pressed, "#tui-bookmark-btn")
+    def on_bookmark_click(self) -> None:
+        self.action_select_bookmark()
+
     @on(Button.Pressed, "#tui-refresh-btn")
     def on_refresh_click(self) -> None:
         self.action_refresh_cases()
@@ -497,10 +571,9 @@ class SupportApp(App):
         # Header Action Buttons
         widgets.append(
             Horizontal(
-                Button("💬 Add Comment (C)", id="tui-comment-btn", variant="success"),
-                Button(
-                    "📋 Apply Template (T)", id="tui-template-btn", variant="primary"
-                ),
+                Button("💬 Comment (C)", id="tui-comment-btn", variant="success"),
+                Button("📋 Template (T)", id="tui-template-btn", variant="primary"),
+                Button("🔖 Bookmark (B)", id="tui-bookmark-btn", variant="warning"),
                 Button("🔄 Refresh (R)", id="tui-refresh-btn", variant="default"),
                 id="tui-action-row",
             )
@@ -666,8 +739,20 @@ class SupportApp(App):
         except Exception as e:
             self.call_from_thread(self.show_error, f"Error: {e}")
 
+    def action_select_bookmark(self) -> None:
+        def handle_bookmark(bookmark_name: str) -> None:
+            if bookmark_name:
+                self.active_bookmark = bookmark_name
+                self.run_worker(self.fetch_cases, thread=True)
+
+        self.push_screen(
+            BookmarkModal(self.config, self.active_bookmark), handle_bookmark
+        )
+
 
 def cmd_tui(args, token, config):
     """Entry point to run the TUI."""
-    app = SupportApp(token, config)
+    bookmark = getattr(args, "bookmark", None)
+    no_default = getattr(args, "no_default_bookmark", False)
+    app = SupportApp(token, config, bookmark, no_default)
     app.run()

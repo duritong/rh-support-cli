@@ -212,18 +212,35 @@ rh-support-cli list-templates
 
 Launches a beautiful, interactive Terminal User Interface (TUI) to browse and manage your Red Hat support cases directly inside your terminal session.
 
+**Options:**
+- `-b`, `--bookmark`: Use a preset bookmark of filters on startup instead of the default bookmark
+- `--no-default-bookmark`: Do not load any default bookmark on startup (loads all cases unfiltered)
+
 **Features:**
 - **Split Dashboard Layout**: Scroll through the list of cases in the left pane while viewing details, description (fully parsed Markdown), and complete comment threads in the right pane.
 - **Asynchronous Background Processing**: Keeps the UI highly responsive by loading cases and updates asynchronously.
 - **Vim / Arrow Navigation**: Navigate intuitively with standard keyboard binds.
-- **Quick Modals**:
-  - Press **`c`** to write and submit a comment directly inside the terminal.
-  - Press **`t`** to select and apply a local template (e.g. standard watchers) to the active case.
-  - Press **`r`** to refresh the list of cases.
+- **Quick Modals & Action Buttons**:
+  - Press **`c`** (or click `Comment (C)`) to write and submit a comment directly inside the terminal.
+  - Press **`t`** (or click `Template (T)`) to select and apply a local template (e.g. standard watchers) to the active case.
+  - Press **`b`** (or click `Bookmark (B)`) to select and apply any filter bookmark dynamically to refresh the case list, or clear filters entirely.
+  - Press **`r`** (or click `Refresh (R)`) to refresh the list of cases.
 
-**Example:**
+**Examples:**
+
+*Launch TUI with default bookmark filters:*
 ```bash
 rh-support-cli tui
+```
+
+*Launch TUI with a specific bookmark override:*
+```bash
+rh-support-cli tui -b my_cases
+```
+
+*Launch TUI unfiltered (all cases):*
+```bash
+rh-support-cli tui --no-default-bookmark
 ```
 
 ## Configuration & Bookmarks
