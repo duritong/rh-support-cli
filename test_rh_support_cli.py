@@ -1789,6 +1789,9 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 self.assertFalse(app.screen.has_class("focused-left"))
                 self.assertFalse(app.screen.has_class("focused-right"))
 
+                # 4. Test contextual refresh layouts programmatically
+                app.action_refresh()
+
         try:
             asyncio.run(run_headless())
         finally:

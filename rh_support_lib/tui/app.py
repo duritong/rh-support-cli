@@ -268,7 +268,7 @@ class SupportApp(App):
     TITLE = "Red Hat Support CLI"
     BINDINGS = [
         ("q", "quit", "Quit"),
-        ("r", "refresh_cases", "Refresh"),
+        ("r", "refresh", "Refresh"),
         ("c", "add_comment", "Add Comment"),
         ("t", "apply_template", "Apply Template"),
         ("b", "select_bookmark", "Select Bookmark"),
@@ -541,7 +541,13 @@ class SupportApp(App):
 
     @on(Button.Pressed, "#tui-refresh-btn")
     def on_refresh_click(self) -> None:
-        self.action_refresh_cases()
+        if self.selected_case_id:
+            self.run_worker(
+                lambda: self.fetch_case_details(self.selected_case_id),
+                thread=True,
+            )
+        else:
+            self.run_worker(self.fetch_cases, thread=True)
 
     def fetch_case_details(self, case_id: str) -> None:
         """Fetches the details and comments for the selected case."""
@@ -671,8 +677,29 @@ class SupportApp(App):
         # Update TUI Viewport with compiled child widgets mounted directly into VerticalScroll
         detail_container.mount(*widgets)
 
-    def action_refresh_cases(self) -> None:
-        self.run_worker(self.fetch_cases, thread=True)
+    def action_refresh(self) -> None:
+        """Contextual refresh depending on which pane is focused."""
+        focused_widget = self.focused
+        is_left = True
+        if focused_widget:
+            current = focused_widget
+            while current:
+                if current.id in ["case-table", "case-list-container"]:
+                    is_left = True
+                    break
+                if current.id == "case-detail-container":
+                    is_left = False
+                    break
+                current = current.parent
+
+        if is_left:
+            self.run_worker(self.fetch_cases, thread=True)
+        else:
+            if self.selected_case_id:
+                self.run_worker(
+                    lambda: self.fetch_case_details(self.selected_case_id),
+                    thread=True,
+                )
 
     def action_add_comment(self) -> None:
         if not self.selected_case_id:
