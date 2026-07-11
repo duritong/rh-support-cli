@@ -286,23 +286,25 @@ class SupportApp(App):
         grid-columns: 2fr 3fr;
         scrollbar-size: 1 1;
     }
-    .focused-left {
-        grid-columns: 1fr;
+    Screen.focused-left {
+        layout: vertical;
     }
-    .focused-left #case-detail-container {
+    Screen.focused-left #case-detail-container {
         display: none;
     }
-    .focused-left #case-list-container {
+    Screen.focused-left #case-list-container {
         width: 100%;
+        height: 100%;
     }
-    .focused-right {
-        grid-columns: 1fr;
+    Screen.focused-right {
+        layout: vertical;
     }
-    .focused-right #case-list-container {
+    Screen.focused-right #case-list-container {
         display: none;
     }
-    .focused-right #case-detail-container {
+    Screen.focused-right #case-detail-container {
         width: 100%;
+        height: 100%;
     }
     ScrollBar {
         background: transparent;
