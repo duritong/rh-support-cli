@@ -1,9 +1,11 @@
 import os
 import requests
+import time
+import pathlib
 from textual import on
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Grid, Container, Horizontal, VerticalScroll
+from textual.containers import Grid, Container, Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import (
     Header,
@@ -94,35 +96,6 @@ def build_filter_payload(
     return payload
 
 
-class CommentModal(ModalScreen[str]):
-    """Modal screen for posting comments."""
-
-    def __init__(self, case_id: str):
-        super().__init__()
-        self.case_id = case_id
-
-    def compose(self) -> ComposeResult:
-        yield Grid(
-            Label(f"Post Comment to Case #{self.case_id}", id="modal-title"),
-            TextArea(id="comment-body", show_line_numbers=True),
-            Horizontal(
-                Button("Post", variant="success", id="submit-btn"),
-                Button("Cancel", variant="error", id="cancel-btn"),
-                id="modal-buttons",
-            ),
-            id="comment-modal-grid",
-        )
-
-    @on(Button.Pressed, "#submit-btn")
-    def submit(self) -> None:
-        text_area = self.query_one("#comment-body", TextArea)
-        self.dismiss(text_area.text)
-
-    @on(Button.Pressed, "#cancel-btn")
-    def cancel(self) -> None:
-        self.dismiss("")
-
-
 class TemplateModal(ModalScreen[str]):
     """Modal screen for applying templates."""
 
@@ -165,7 +138,7 @@ class TemplateModal(ModalScreen[str]):
                 Button("Cancel", variant="error", id="cancel-btn"),
                 id="modal-buttons",
             ),
-            id="template-modal-grid",
+            id="template-modal-grid",  # reuse template modal size!
         )
 
     @on(Button.Pressed, "#apply-btn")
@@ -230,6 +203,42 @@ class BookmarkModal(ModalScreen[str]):
         self.dismiss("")
 
 
+class UnsavedChangesModal(ModalScreen[str]):
+    """Modal screen shown when there are unsaved comment drafts."""
+
+    def __init__(self, comment_text: str):
+        super().__init__()
+        self.comment_text = comment_text
+
+    def compose(self) -> ComposeResult:
+        yield Grid(
+            Label("Unsaved Draft Comment", id="modal-title"),
+            Label(
+                "You have an unsaved comment draft. What would you like to do?",
+                id="unsaved-label",
+            ),
+            Horizontal(
+                Button("Discard", variant="error", id="discard-btn"),
+                Button("Save to File", variant="primary", id="save-btn"),
+                Button("Cancel", variant="default", id="cancel-btn"),
+                id="modal-buttons",
+            ),
+            id="template-modal-grid",  # reuse template modal size
+        )
+
+    @on(Button.Pressed, "#discard-btn")
+    def discard(self) -> None:
+        self.dismiss("discard")
+
+    @on(Button.Pressed, "#save-btn")
+    def save(self) -> None:
+        self.dismiss("save")
+
+    @on(Button.Pressed, "#cancel-btn")
+    def cancel(self) -> None:
+        self.dismiss("cancel")
+
+
 class FocusableContainer(VerticalScroll):
     """A scrollable container that can receive keyboard focus and handles keyboard scrolling."""
 
@@ -274,12 +283,10 @@ class SupportApp(App):
         ("b", "select_bookmark", "Select Bookmark"),
         ("f", "focus_pane", "Focus Pane"),
         ("x", "exit_focus", "Exit Focus"),
+        Binding("escape", "exit_commenting", "Cancel Commenting", show=False),
     ]
 
     CSS = """
-    * {
-        scrollbar-size: 1 1;
-    }
     Screen {
         layout: grid;
         grid-size: 2;
@@ -289,7 +296,7 @@ class SupportApp(App):
     Screen.focused-left {
         layout: vertical;
     }
-    Screen.focused-left #case-detail-container {
+    Screen.focused-left #right-column-container {
         display: none;
     }
     Screen.focused-left #case-list-container {
@@ -302,16 +309,23 @@ class SupportApp(App):
     Screen.focused-right #case-list-container {
         display: none;
     }
-    Screen.focused-right #case-detail-container {
+    Screen.focused-right #right-column-container {
         width: 100%;
         height: 100%;
     }
-    ScrollBar {
-        background: transparent;
-        color: $primary;
+    Screen.focused-comment {
+        layout: vertical;
     }
-    ScrollBar:hover {
-        color: $primary-lighten-1;
+    Screen.focused-comment #case-list-container {
+        display: none;
+    }
+    Screen.focused-comment #case-detail-container {
+        display: none;
+    }
+    Screen.focused-comment #comment-pane-container {
+        width: 100%;
+        height: 100%;
+        display: block;
     }
     Header {
         background: $primary-darken-1;
@@ -327,6 +341,10 @@ class SupportApp(App):
         padding: 1;
         height: 100%;
     }
+    #right-column-container {
+        height: 100%;
+        layout: vertical;
+    }
     #case-detail-container {
         border: solid yellow;
         margin: 1;
@@ -338,15 +356,58 @@ class SupportApp(App):
         border: double yellow;
         background: $surface;
     }
+    Screen.commenting #case-detail-container {
+        height: 65%;
+    }
+    Screen.commenting #comment-pane-container {
+        display: block;
+    }
+    #comment-pane-container {
+        border: solid $primary;
+        height: 35%;
+        margin: 1;
+        padding: 0 1;
+        background: $surface;
+        display: none;
+    }
+    #comment-pane-container:focus-within {
+        border: double $primary;
+    }
+    #comment-pane-header-row {
+        height: 1;
+        margin-top: 1;
+        margin-bottom: 1;
+        align: left middle;
+    }
+    #comment-pane-header-row Label {
+        margin-right: 1;
+    }
+    #comment-pane-header-row Select {
+        width: 25;
+        height: 1;
+        border: none;
+    }
+    #tui-comment-textarea {
+        height: 100%;
+        min-height: 4;
+        border: solid $primary;
+    }
+    #comment-pane-buttons-row {
+        height: 1;
+        margin-top: 1;
+        align: right middle;
+    }
     #case-table {
         height: 100%;
         scrollbar-size: 1 1;
+        overflow-x: hidden;
+        overflow-y: scroll;
     }
     #case-table ScrollBar {
         scrollbar-size: 1 1;
         background: transparent;
     }
-    CommentModal, TemplateModal {
+    TemplateModal, UnsavedChangesModal, BookmarkModal {
         align: center middle;
     }
     #comment-modal-grid {
@@ -362,6 +423,10 @@ class SupportApp(App):
         height: 18;
         border: thick $primary 80%;
         background: $surface;
+    }
+    #unsaved-label {
+        text-align: center;
+        margin-bottom: 1;
     }
     #modal-title {
         text-align: center;
@@ -387,12 +452,19 @@ class SupportApp(App):
         margin-bottom: 1;
         align: center middle;
     }
-    #tui-action-row Button {
+    #tui-action-row Button, #comment-pane-container Button {
         height: 1;
         min-width: 15;
         border: none;
         padding: 0 1;
         margin: 0 1;
+    }
+    ScrollBar {
+        background: transparent;
+        color: $primary;
+    }
+    ScrollBar:hover {
+        color: $primary-lighten-1;
     }
     """
 
@@ -421,9 +493,13 @@ class SupportApp(App):
             DataTable(id="case-table"),
             id="case-list-container",
         )
-        yield FocusableContainer(
-            Static("Select a case to view details..."),
-            id="case-detail-container",
+        yield Vertical(
+            FocusableContainer(
+                Static("Select a case to view details..."),
+                id="case-detail-container",
+            ),
+            Container(id="comment-pane-container"),
+            id="right-column-container",
         )
         yield Footer()
 
@@ -522,7 +598,23 @@ class SupportApp(App):
 
     @on(DataTable.RowSelected)
     def on_row_selected(self, event: DataTable.RowSelected) -> None:
-        self.selected_case_id = str(event.row_key.value)
+        next_case_id = str(event.row_key.value)
+        if self.selected_case_id == next_case_id:
+            return
+
+        # Check if commenting is open and holds dirty text
+        if self.screen.has_class("commenting"):
+            text_area = self.query_one("#tui-comment-textarea", TextArea)
+            comment_text = text_area.text.strip()
+            if comment_text:
+                self.prompt_unsaved_changes_on_navigation(comment_text, next_case_id)
+                return
+            else:
+                self.screen.remove_class("commenting")
+                text_area.text = ""
+
+        # Proceed to fetch case details
+        self.selected_case_id = next_case_id
         self.run_worker(
             lambda: self.fetch_case_details(self.selected_case_id), thread=True
         )
@@ -548,6 +640,35 @@ class SupportApp(App):
             )
         else:
             self.run_worker(self.fetch_cases, thread=True)
+
+    @on(Button.Pressed, "#tui-comment-post-btn")
+    def on_comment_post_click(self) -> None:
+        text_area = self.query_one("#tui-comment-textarea", TextArea)
+        comment_body = text_area.text.strip()
+        if not comment_body:
+            self.show_error("Comment body cannot be empty.")
+            return
+
+        select = self.query_one("#tui-comment-status-select", Select)
+        target_status = select.value
+
+        self.run_worker(
+            lambda: self.execute_comment_submission(comment_body, target_status),
+            thread=True,
+        )
+
+    @on(Button.Pressed, "#tui-comment-save-btn")
+    def on_comment_save_click(self) -> None:
+        text_area = self.query_one("#tui-comment-textarea", TextArea)
+        comment_text = text_area.text.strip()
+        if not comment_text:
+            self.show_error("Comment draft is empty.")
+            return
+        self.save_comment_to_file(comment_text)
+
+    @on(Button.Pressed, "#tui-comment-cancel-btn")
+    def on_comment_cancel_click(self) -> None:
+        self.action_exit_commenting()
 
     def fetch_case_details(self, case_id: str) -> None:
         """Fetches the details and comments for the selected case."""
@@ -706,41 +827,200 @@ class SupportApp(App):
             self.show_error("Please select a case first.")
             return
 
-        def handle_comment(comment_body: str) -> None:
-            if comment_body:
-                self.run_worker(lambda: self.submit_comment(comment_body), thread=True)
+        # Show the inline comment pane
+        self.screen.add_class("commenting")
+        self.compose_comment_pane()
+        self.query_one("#tui-comment-textarea", TextArea).focus()
 
-        self.push_screen(CommentModal(self.selected_case_id), handle_comment)
+    def compose_comment_pane(self) -> None:
+        container = self.query_one("#comment-pane-container")
+        if len(container.children) > 0:
+            self.update_comment_status_dropdown()
+            return
 
-    def submit_comment(self, body: str) -> None:
+        status_choices = [
+            ("Waiting on Red Hat", "Waiting on Red Hat"),
+            ("Waiting on Customer", "Waiting on Customer"),
+            ("Closed", "Closed"),
+            ("Reopened", "Reopened"),
+        ]
+
+        container.mount(
+            Vertical(
+                Horizontal(
+                    Label("[bold cyan]Drafting Comment...[/]"),
+                    Label("  Apply Status: "),
+                    Select(
+                        status_choices,
+                        id="tui-comment-status-select",
+                        prompt="Select Status",
+                    ),
+                    id="comment-pane-header-row",
+                ),
+                TextArea(id="tui-comment-textarea", show_line_numbers=True),
+                Horizontal(
+                    Button("💬 Post", variant="success", id="tui-comment-post-btn"),
+                    Button(
+                        "💾 Save Draft", variant="default", id="tui-comment-save-btn"
+                    ),
+                    Button("❌ Cancel", variant="error", id="tui-comment-cancel-btn"),
+                    id="comment-pane-buttons-row",
+                ),
+            )
+        )
+        self.update_comment_status_dropdown()
+
+    def update_comment_status_dropdown(self) -> None:
+        if not self.selected_case_id:
+            return
+
+        case = next(
+            (
+                c
+                for c in self.cases
+                if str(c.get("caseNumber") or c.get("id")) == self.selected_case_id
+            ),
+            None,
+        )
+        if not case:
+            return
+
+        current_status = case.get("status") or "Waiting on Red Hat"
+        if current_status == "Waiting on Customer":
+            target_status = "Waiting on Red Hat"
+        else:
+            target_status = current_status
+
+        select = self.query_one("#tui-comment-status-select", Select)
+        select.value = target_status
+
+    def execute_comment_submission(self, comment_body: str, target_status: str) -> None:
         def show_posting():
             container = self.query_one("#case-detail-container")
             container.query("*").remove()
             container.mount(Static("Posting comment..."))
 
         self.call_from_thread(show_posting)
+        self.screen.remove_class("commenting")
 
         try:
-            payload = {"isPublic": True, "commentBody": body}
-            token = self.api_client.get_token()
-            headers = {
-                "Authorization": f"Bearer {token}",
-                "Content-Type": "application/json",
-            }
-            resp = requests.post(
+            payload = {"isPublic": True, "commentBody": comment_body}
+            resp = self.api_client.post(
                 f"{API_URL}/cases/{self.selected_case_id}/comments",
-                headers=headers,
                 json=payload,
-                timeout=30,
             )
-            if resp.status_code in [200, 201]:
-                self.fetch_case_details(self.selected_case_id)
-            else:
+            if resp.status_code not in [200, 201]:
                 self.call_from_thread(
-                    self.show_error, f"Failed to post comment: HTTP {resp.status_code}"
+                    self.show_error,
+                    f"Failed to post comment: HTTP {resp.status_code}",
                 )
+                return
+
+            case = next(
+                (
+                    c
+                    for c in self.cases
+                    if str(c.get("caseNumber") or c.get("id")) == self.selected_case_id
+                ),
+                None,
+            )
+            current_status = case.get("status") if case else None
+
+            if target_status and target_status != current_status:
+                status_payload = {"status": target_status}
+                put_resp = self.api_client.put(
+                    f"{API_URL}/cases/{self.selected_case_id}",
+                    json=status_payload,
+                )
+                if put_resp.status_code not in [200, 201]:
+                    self.call_from_thread(
+                        self.show_error,
+                        f"Warning: Comment posted, but failed to update status (HTTP {put_resp.status_code})",
+                    )
+                    time.sleep(1)
+
+            # Clear drafting text area
+            self.query_one("#tui-comment-textarea", TextArea).text = ""
+
+            self.fetch_case_details(self.selected_case_id)
+            self.run_worker(self.fetch_cases, thread=True)
+
         except Exception as e:
             self.call_from_thread(self.show_error, f"Error: {e}")
+
+    def action_exit_commenting(self) -> None:
+        """Hides the comment pane, checking for unsaved changes if needed."""
+        if not self.screen.has_class("commenting"):
+            return
+
+        text_area = self.query_one("#tui-comment-textarea", TextArea)
+        comment_text = text_area.text.strip()
+
+        if comment_text:
+            self.prompt_unsaved_changes(comment_text)
+        else:
+            self.screen.remove_class("commenting")
+            text_area.text = ""
+
+    def prompt_unsaved_changes(self, comment_text: str) -> None:
+        def handle_choice(choice: str) -> None:
+            if choice == "discard":
+                self.screen.remove_class("commenting")
+                self.query_one("#tui-comment-textarea", TextArea).text = ""
+            elif choice == "save":
+                self.save_comment_to_file(comment_text)
+
+        self.push_screen(UnsavedChangesModal(comment_text), handle_choice)
+
+    def prompt_unsaved_changes_on_navigation(
+        self, comment_text: str, next_case_id: str
+    ) -> None:
+        def handle_choice(choice: str) -> None:
+            if choice == "discard":
+                self.screen.remove_class("commenting")
+                self.query_one("#tui-comment-textarea", TextArea).text = ""
+                self.selected_case_id = next_case_id
+                self.run_worker(
+                    lambda: self.fetch_case_details(self.selected_case_id),
+                    thread=True,
+                )
+            elif choice == "save":
+                self.save_comment_to_file(comment_text, next_case_id)
+
+        self.push_screen(UnsavedChangesModal(comment_text), handle_choice)
+
+    def save_comment_to_file(self, comment_text: str, next_case_id: str = None) -> None:
+        drafts_dir = os.path.expanduser("~/.config/rh-support-cli/drafts")
+        try:
+            pathlib.Path(drafts_dir).mkdir(parents=True, exist_ok=True)
+            timestamp = int(time.time())
+            filename = f"comment_draft_{self.selected_case_id}_{timestamp}.txt"
+            path = os.path.join(drafts_dir, filename)
+            with open(path, "w") as f:
+                f.write(comment_text)
+
+            # Inform user of file location
+            def show_saved():
+                container = self.query_one("#case-detail-container")
+                container.query("*").remove()
+                container.mount(
+                    Static(f"[bold green]Success:[/] Draft saved to {path}")
+                )
+
+            self.call_from_thread(show_saved)
+
+            self.screen.remove_class("commenting")
+            self.query_one("#tui-comment-textarea", TextArea).text = ""
+
+            if next_case_id:
+                time.sleep(1)
+                self.selected_case_id = next_case_id
+                self.run_worker(
+                    lambda: self.fetch_case_details(self.selected_case_id),
+                    thread=True,
+                )
+        except Exception as e:
+            self.show_error(f"Failed to save draft to file: {e}")
 
     def action_apply_template(self) -> None:
         if not self.selected_case_id:
@@ -814,9 +1094,13 @@ class SupportApp(App):
         # Traverse up to find which parent container is focused
         current = focused_widget
         is_left = False
+        is_comment = False
         while current:
             if current.id in ["case-table", "case-list-container"]:
                 is_left = True
+                break
+            if current.id == "comment-pane-container":
+                is_comment = True
                 break
             if current.id == "case-detail-container":
                 is_left = False
@@ -825,15 +1109,22 @@ class SupportApp(App):
 
         if is_left:
             self.screen.remove_class("focused-right")
+            self.screen.remove_class("focused-comment")
             self.screen.add_class("focused-left")
+        elif is_comment:
+            self.screen.remove_class("focused-left")
+            self.screen.remove_class("focused-right")
+            self.screen.add_class("focused-comment")
         else:
             self.screen.remove_class("focused-left")
+            self.screen.remove_class("focused-comment")
             self.screen.add_class("focused-right")
 
     def action_exit_focus(self) -> None:
         """Restores the standard dual-pane split view layout."""
         self.screen.remove_class("focused-left")
         self.screen.remove_class("focused-right")
+        self.screen.remove_class("focused-comment")
 
 
 def cmd_tui(args, api_client, config):
