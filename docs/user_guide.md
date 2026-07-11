@@ -103,6 +103,8 @@ summary: "[Proactive] Planning upgrade on {{ cluster_name }} from {{ current_ver
 description: |
   We are planning an upgrade of OCP cluster "{{ cluster_name }}".
   
+  Planned Upgrade Start Window: {{ planned_start | parse_date }}
+  
   Cluster Details:
   - Current Version: {{ current_version }}
   - Target Version: {{ next_version }}
@@ -148,7 +150,7 @@ tar -czf /tmp/must-gather.tar.gz ./must-gather.local.*
 ```
 
 #### 4. Submit Case and Upload Diagnostics
-Create the case using the `proactive_upgrade` template, passing your local diagnostic statuses file contents as a template variable, and attaching the `must-gather` tarball:
+Create the case using the `proactive_upgrade` template, passing your local diagnostic statuses file contents and planned start window as template variables, and attaching the `must-gather` tarball:
 
 ```bash
 rh-support-cli create \
@@ -156,12 +158,15 @@ rh-support-cli create \
   --template-var cluster_name="Production-OCP-1" \
   --template-var current_version="4.12.9" \
   --template-var next_version="4.12.18" \
+  --template-var planned_start="next saturday 10pm" \
   --template-var cluster_id="a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6" \
   --template-var cluster_details="$(cat /tmp/cluster_status.txt)" \
   --attachment /tmp/must-gather.tar.gz
 ```
 
 *This command automatically authenticates, renders the template with your dynamic variables (injecting the cluster status file), creates the support ticket on Red Hat Portal, and uploads the heavy `must-gather.tar.gz` diagnostic archive as an attachment to the case.*
+
+*Note: The built-in `parse_date` Jinja2 filter utilizes Python's `dateparser` library to dynamically parse human-friendly natural date strings (like `"next saturday 10pm"`, `"tomorrow 3pm"`, or `"in 2 days"`) into a clean standard calendar timestamp format (`%d-%m-%Y %H:%M:%S`), which is extremely useful for scheduling upgrade windows automatically on Red Hat's side.*
 
 ---
 
