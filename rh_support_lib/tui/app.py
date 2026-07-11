@@ -398,13 +398,17 @@ class SupportApp(App):
 
     def __init__(
         self,
-        token: str,
+        token,
         config: dict,
         bookmark: str = None,
         no_default_bookmark: bool = False,
     ):
         super().__init__()
-        self.token = token
+        from rh_support_lib.api import RedHatAPIClient, LegacyAPIClient
+
+        if not isinstance(token, (RedHatAPIClient, LegacyAPIClient)):
+            token = LegacyAPIClient(token)
+        self.api_client = token
         self.config = config
         self.active_bookmark = bookmark
         self.no_default_bookmark = no_default_bookmark
@@ -443,8 +447,9 @@ class SupportApp(App):
             payload = build_filter_payload(
                 self.config, self.active_bookmark, self.no_default_bookmark
             )
+            token = self.api_client.get_token()
             headers = {
-                "Authorization": f"Bearer {self.token}",
+                "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json",
             }
             resp = requests.post(
@@ -549,12 +554,13 @@ class SupportApp(App):
         self.call_from_thread(show_loading)
 
         try:
-            case = get_json(f"{API_URL}/cases/{case_id}", self.token)
+            token = self.api_client.get_token()
+            case = get_json(f"{API_URL}/cases/{case_id}", token)
             if not case or not isinstance(case, dict):
                 self.call_from_thread(self.show_error, f"Case {case_id} not found.")
                 return
 
-            comments = get_json(f"{API_URL}/cases/{case_id}/comments", self.token)
+            comments = get_json(f"{API_URL}/cases/{case_id}/comments", token)
             if not isinstance(comments, list):
                 comments = []
 
@@ -689,8 +695,9 @@ class SupportApp(App):
 
         try:
             payload = {"isPublic": True, "commentBody": body}
+            token = self.api_client.get_token()
             headers = {
-                "Authorization": f"Bearer {self.token}",
+                "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json",
             }
             resp = requests.post(
@@ -749,7 +756,7 @@ class SupportApp(App):
             # To prevent TUI from crashing/exiting, we can wrap it or execute its logic safely
             # Let's catch SystemExit and handle refreshing case details afterwards!
             try:
-                cmd_apply(args, self.token, self.config)
+                cmd_apply(args, self.api_client, self.config)
             except SystemExit as ex:
                 if ex.code != 0:
                     self.call_from_thread(
@@ -802,9 +809,9 @@ class SupportApp(App):
         self.screen.remove_class("focused-right")
 
 
-def cmd_tui(args, token, config):
+def cmd_tui(args, api_client, config):
     """Entry point to run the TUI."""
     bookmark = getattr(args, "bookmark", None)
     no_default = getattr(args, "no_default_bookmark", False)
-    app = SupportApp(token, config, bookmark, no_default)
+    app = SupportApp(api_client, config, bookmark, no_default)
     app.run()

@@ -224,3 +224,99 @@ def get_json(url, token):
     except requests.exceptions.RequestException as e:
         print(f"Warning: Failed to fetch metadata from {url}: {e}")
         return []
+
+
+class RedHatAPIClient:
+    """OIDC Client for Red Hat Support Case API with transparent token refreshing."""
+
+    def __init__(self, token_file_arg=None):
+        self.token_file_arg = token_file_arg
+        self._token = None
+
+    def get_token(self, force_refresh=False):
+        if force_refresh:
+            cache_dir = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
+            token_cache_file = os.path.join(
+                cache_dir, "rh-support-cli", "token_cache.json"
+            )
+            if os.path.exists(token_cache_file):
+                try:
+                    os.remove(token_cache_file)
+                except Exception:
+                    pass
+            self._token = None
+
+        if not self._token:
+            self._token = get_access_token(self.token_file_arg)
+        return self._token
+
+    def request(self, method, url, **kwargs):
+        headers = kwargs.get("headers", {})
+        token = self.get_token()
+        headers["Authorization"] = f"Bearer {token}"
+        headers.setdefault("Accept", "application/json")
+        kwargs["headers"] = headers
+        kwargs.setdefault("timeout", 30)
+
+        try:
+            resp = requests.request(method, url, **kwargs)
+            if resp.status_code == 401:
+                # Force refresh OIDC token and retry once
+                token = self.get_token(force_refresh=True)
+                headers["Authorization"] = f"Bearer {token}"
+                resp = requests.request(method, url, **kwargs)
+            return resp
+        except requests.exceptions.RequestException as e:
+            raise e
+
+    def get(self, url, **kwargs):
+        return self.request("GET", url, **kwargs)
+
+    def post(self, url, **kwargs):
+        return self.request("POST", url, **kwargs)
+
+    def put(self, url, **kwargs):
+        return self.request("PUT", url, **kwargs)
+
+    def delete(self, url, **kwargs):
+        return self.request("DELETE", url, **kwargs)
+
+    def get_json(self, url, **kwargs):
+        resp = self.get(url, **kwargs)
+        resp.raise_for_status()
+        return resp.json()
+
+
+class LegacyAPIClient:
+    """A wrapper to adapt a raw legacy token string to the RedHatAPIClient interface."""
+
+    def __init__(self, token):
+        self.token = token
+
+    def get_token(self, force_refresh=False):
+        return self.token
+
+    def request(self, method, url, **kwargs):
+        headers = kwargs.get("headers", {})
+        headers["Authorization"] = f"Bearer {self.token}"
+        headers.setdefault("Accept", "application/json")
+        kwargs["headers"] = headers
+        kwargs.setdefault("timeout", 30)
+        return requests.request(method, url, **kwargs)
+
+    def get(self, url, **kwargs):
+        return self.request("GET", url, **kwargs)
+
+    def post(self, url, **kwargs):
+        return self.request("POST", url, **kwargs)
+
+    def put(self, url, **kwargs):
+        return self.request("PUT", url, **kwargs)
+
+    def delete(self, url, **kwargs):
+        return self.request("DELETE", url, **kwargs)
+
+    def get_json(self, url, **kwargs):
+        resp = self.get(url, **kwargs)
+        resp.raise_for_status()
+        return resp.json()

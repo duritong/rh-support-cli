@@ -6,7 +6,12 @@ from rh_support_lib.utils import open_editor, strip_header_comments
 from rh_support_lib.api import get_json
 
 
-def cmd_attach(args, token):
+def cmd_attach(args, api_client):
+    from rh_support_lib.api import RedHatAPIClient, LegacyAPIClient
+
+    if not isinstance(api_client, (RedHatAPIClient, LegacyAPIClient)):
+        api_client = LegacyAPIClient(api_client)
+    token = api_client.get_token()
     if not isinstance(args.file, list):
         args.file = [args.file]
 
@@ -60,7 +65,12 @@ def cmd_attach(args, token):
         sys.exit(1)
 
 
-def cmd_comment(args, token):
+def cmd_comment(args, api_client):
+    from rh_support_lib.api import RedHatAPIClient, LegacyAPIClient
+
+    if not isinstance(api_client, (RedHatAPIClient, LegacyAPIClient)):
+        api_client = LegacyAPIClient(api_client)
+    token = api_client.get_token()
     # Determine status label
     status_key = args.status if args.status else "redhat"
     final_status = STATUS_MAP.get(status_key, "Waiting on Red Hat")

@@ -1,6 +1,6 @@
 import argparse
 import sys
-from rh_support_lib.api import get_access_token, enable_debug_logging
+from rh_support_lib.api import enable_debug_logging
 from rh_support_lib.config import load_config
 from rh_support_lib.commands.list_cases import cmd_list
 from rh_support_lib.commands.show_case import cmd_show
@@ -219,25 +219,27 @@ Authentication:
     if args.debug or debug_file:
         enable_debug_logging(log_file=debug_file)
 
-    # Authenticate before running commands
+    # Instantiate RedHatAPIClient before running commands
+    from rh_support_lib.api import RedHatAPIClient
+
     if args.command != "tui":
         print("Authenticating...")
-    token = get_access_token(args.token_file)
+    api_client = RedHatAPIClient(args.token_file)
 
     if args.command == "attach":
-        cmd_attach(args, token)
+        cmd_attach(args, api_client)
     elif args.command == "create":
-        cmd_create(args, token, config)
+        cmd_create(args, api_client, config)
     elif args.command == "comment":
-        cmd_comment(args, token)
+        cmd_comment(args, api_client)
     elif args.command == "list":
-        cmd_list(args, token, config)
+        cmd_list(args, api_client, config)
     elif args.command == "show":
-        cmd_show(args, token)
+        cmd_show(args, api_client)
     elif args.command == "apply":
-        cmd_apply(args, token, config)
+        cmd_apply(args, api_client, config)
     elif args.command == "tui":
-        cmd_tui(args, token, config)
+        cmd_tui(args, api_client, config)
 
 
 if __name__ == "__main__":

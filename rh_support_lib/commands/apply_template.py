@@ -49,7 +49,13 @@ VALID_PUT_FIELDS = {
 }
 
 
-def cmd_apply(args, token, config):
+def cmd_apply(args, api_client, config):
+    from rh_support_lib.api import RedHatAPIClient, LegacyAPIClient
+
+    if not isinstance(api_client, (RedHatAPIClient, LegacyAPIClient)):
+        api_client = LegacyAPIClient(api_client)
+    token = api_client.get_token()
+
     # 1. Fetch Case Details
     print(f"Fetching case {args.case} details...")
     try:

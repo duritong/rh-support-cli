@@ -11,7 +11,13 @@ from rh_support_lib.utils import select_from_list, prompt_text, strip_header_com
 from rh_support_lib.templates import TemplateEngine
 
 
-def cmd_create(args, token, config):
+def cmd_create(args, api_client, config):
+    from rh_support_lib.api import RedHatAPIClient, LegacyAPIClient
+
+    if not isinstance(api_client, (RedHatAPIClient, LegacyAPIClient)):
+        api_client = LegacyAPIClient(api_client)
+    token = api_client.get_token()
+
     # Process Templates
     defaults = {}
 

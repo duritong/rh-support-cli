@@ -7,7 +7,13 @@ from rich.box import ROUNDED
 from rh_support_lib.constants import API_URL, STATUS_FILTER_MAP, SEVERITY_MAP
 
 
-def cmd_list(args, token, config=None):
+def cmd_list(args, api_client, config=None):
+    from rh_support_lib.api import RedHatAPIClient, LegacyAPIClient
+
+    if not isinstance(api_client, (RedHatAPIClient, LegacyAPIClient)):
+        api_client = LegacyAPIClient(api_client)
+    token = api_client.get_token()
+
     if config is None:
         config = {}
 

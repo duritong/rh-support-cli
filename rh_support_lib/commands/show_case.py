@@ -4,7 +4,13 @@ from rh_support_lib.constants import API_URL
 from rh_support_lib.api import get_json
 
 
-def cmd_show(args, token):
+def cmd_show(args, api_client):
+    from rh_support_lib.api import RedHatAPIClient, LegacyAPIClient
+
+    if not isinstance(api_client, (RedHatAPIClient, LegacyAPIClient)):
+        api_client = LegacyAPIClient(api_client)
+    token = api_client.get_token()
+
     print(f"Fetching case {args.case}...")
     # 1. Fetch Case
     try:
