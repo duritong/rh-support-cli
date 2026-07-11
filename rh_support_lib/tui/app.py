@@ -388,7 +388,7 @@ class SupportApp(App):
         border: none;
     }
     #tui-comment-textarea {
-        height: 100%;
+        height: 1fr;
         min-height: 4;
         border: solid $primary;
     }
