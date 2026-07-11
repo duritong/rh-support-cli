@@ -108,35 +108,3 @@ Toggle focus between the case list and details pane using **`Tab`** or **`Shift+
 | **`t`** | Select and apply a local template (Template Modal) |
 | **`r`** | Pull-to-refresh the active case list |
 | **`q`** | Quit the TUI |
-
----
-
-## 6. Remote VM Terminal Color Configurations (SSH + Tmux + Podman)
-
-When running the TUI inside nested SSH sessions, TMUX multiplexers, and Podman containers, terminal colors or escape lines can get lost. Follow these settings to propagate them cleanly:
-
-### 1. SSH Layer
-Start SSH requesting a 256-color terminal:
-```bash
-TERM=xterm-256color ssh user@vm-host
-```
-
-### 2. Tmux Layer
-Add this to your `~/.tmux.conf` on the VM to override and translate 24-bit RGB Truecolors:
-```tmux
-set -g default-terminal "screen-256color"
-set -as terminal-overrides ",xterm-256color:Tc"
-```
-And launch `tmux` forcing 256 colors:
-```bash
-tmux -2
-```
-
-### 3. Podman Layer
-Run Podman container allocating a TTY, passing your `TERM` environment variable, and mounting the host's terminfo database:
-```bash
-podman run --rm -it \
-  -e TERM=$TERM \
-  -v /usr/share/terminfo:/usr/share/terminfo:ro \
-  your-image-name /bin/bash
-```
