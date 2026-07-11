@@ -327,16 +327,6 @@ rh-support-cli create \
   --template-var cluster_id=12345
 ```
 
-*For Post-Creation Compliance (`apply`):*
-```bash
-rh-support-cli apply \
-  -c 12345678 \
-  --template proactive \
-  --template-var cluster_name=Prod1 \
-  --template-var next_version=4.13 \
-  --template-var cluster_id=12345
-```
-
 **Requirements:**
 - `jinja2`
 - `dateparser` (optional, for `parse_date` filter)

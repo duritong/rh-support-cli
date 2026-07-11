@@ -86,6 +86,83 @@ watchers:
   - bob
 ```
 
+### Real-World Recipe: Proactive OpenShift Upgrade Case
+
+Below is a complete, step-by-step recipe demonstrating how to use the CLI and templates to open a proactive support case prior to upgrading an OpenShift Container Platform (OCP) cluster, including gathering local diagnostics and attaching a `must-gather` archive.
+
+#### 1. Define your Proactive Template
+Create your template inside `~/.config/rh-support-cli/templates/proactive_upgrade.yaml`:
+
+```yaml
+_template_description: "Proactive OCP cluster upgrade planning case"
+product: "Red Hat OpenShift Container Platform"
+version: "{{ current_version }}"
+caseType: "Other"
+severity: "4 (Low)"
+summary: "[Proactive] Planning upgrade on {{ cluster_name }} from {{ current_version }} to {{ next_version }}"
+description: |
+  We are planning an upgrade of OCP cluster "{{ cluster_name }}".
+  
+  Cluster Details:
+  - Current Version: {{ current_version }}
+  - Target Version: {{ next_version }}
+  - Cluster ID: {{ cluster_id }}
+  
+  Diagnostic Status Output:
+  ```text
+  {{ cluster_details }}
+  ```
+watchers:
+  - ocp-leads-mailing-list@example.com
+```
+
+#### 2. Gather Cluster Status
+Run diagnostic status commands against your OpenShift cluster and save the output to a temporary file:
+
+```bash
+# Authenticate against your cluster first
+oc login --token=... --server=...
+
+# Fetch status of versions, operators, machine configs, and nodes
+{
+  echo "=== CLUSTER VERSION ==="
+  oc get clusterversion
+  echo -e "\n=== CLUSTER OPERATORS ==="
+  oc get clusteroperator
+  echo -e "\n=== MACHINE CONFIG POOLS ==="
+  oc get mcp
+  echo -e "\n=== NODES STATUS ==="
+  oc get nodes
+} > /tmp/cluster_status.txt
+```
+
+#### 3. Gather must-gather Diagnostics
+Execute an OpenShift `must-gather` diagnostic query and package it into a compressed tarball:
+
+```bash
+# Run must-gather (this will generate a local folder directory, e.g., must-gather.local.554238)
+oc adm must-gather
+
+# Package it into a compressed tarball
+tar -czf /tmp/must-gather.tar.gz ./must-gather.local.*
+```
+
+#### 4. Submit Case and Upload Diagnostics
+Create the case using the `proactive_upgrade` template, passing your local diagnostic statuses file contents as a template variable, and attaching the `must-gather` tarball:
+
+```bash
+rh-support-cli create \
+  --template proactive_upgrade \
+  --template-var cluster_name="Production-OCP-1" \
+  --template-var current_version="4.12.9" \
+  --template-var next_version="4.12.18" \
+  --template-var cluster_id="a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6" \
+  --template-var cluster_details="$(cat /tmp/cluster_status.txt)" \
+  --attachment /tmp/must-gather.tar.gz
+```
+
+*This command automatically authenticates, renders the template with your dynamic variables (injecting the cluster status file), creates the support ticket on Red Hat Portal, and uploads the heavy `must-gather.tar.gz` diagnostic archive as an attachment to the case.*
+
 ---
 
 ## 5. Subcommands Usage
