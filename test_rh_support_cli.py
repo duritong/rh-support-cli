@@ -1778,14 +1778,25 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 # Ensure that compiled Static panels are now mounted directly inside the container
                 self.assertTrue(len(detail_container.children) > 0)
 
-                # 3. Test focus/unfocus layouts programmatically
+                # 3. Test focus/unfocus toggling layouts programmatically using 'f'
                 app.action_focus_pane()
                 self.assertTrue(
                     app.screen.has_class("focused-left")
                     or app.screen.has_class("focused-right")
                 )
 
-                app.action_exit_focus()
+                # Press 'f' again to toggle it off!
+                app.action_focus_pane()
+                self.assertFalse(app.screen.has_class("focused-left"))
+                self.assertFalse(app.screen.has_class("focused-right"))
+
+                # Focus again and test escape_action to unfocus!
+                app.action_focus_pane()
+                self.assertTrue(
+                    app.screen.has_class("focused-left")
+                    or app.screen.has_class("focused-right")
+                )
+                app.action_escape_action()
                 self.assertFalse(app.screen.has_class("focused-left"))
                 self.assertFalse(app.screen.has_class("focused-right"))
 

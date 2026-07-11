@@ -314,8 +314,7 @@ class SupportApp(App):
         ("t", "apply_template", "Apply Template"),
         ("b", "select_bookmark", "Select Bookmark"),
         ("f", "focus_pane", "Focus Pane"),
-        ("x", "exit_focus", "Exit Focus"),
-        Binding("escape", "exit_commenting", "Cancel Commenting", show=False),
+        Binding("escape", "escape_action", "Cancel/Unfocus", show=False),
     ]
 
     CSS = """
@@ -432,7 +431,6 @@ class SupportApp(App):
     #case-table {
         height: 100%;
         scrollbar-size: 1 1;
-        overflow-x: hidden;
         overflow-y: scroll;
     }
     #case-table ScrollBar {
@@ -763,7 +761,7 @@ class SupportApp(App):
         widgets.append(
             Horizontal(
                 Button("💬 Comment (C)", id="tui-comment-btn", variant="success"),
-                Button("📎 Attach (A)", id="tui-attach-btn", variant="info"),
+                Button("📎 Attach (A)", id="tui-attach-btn", variant="primary"),
                 Button("📋 Template (T)", id="tui-template-btn", variant="primary"),
                 Button("🔖 Bookmark (B)", id="tui-bookmark-btn", variant="warning"),
                 Button("🔄 Refresh (R)", id="tui-refresh-btn", variant="default"),
@@ -1192,7 +1190,16 @@ class SupportApp(App):
         )
 
     def action_focus_pane(self) -> None:
-        """Zooms / focuses the currently highlighted pane into fullscreen."""
+        """Zooms / focuses the currently highlighted pane into fullscreen, or toggles it off."""
+        # If we are already focused on ANY pane, pressing 'f' toggles it OFF!
+        if (
+            self.screen.has_class("focused-left")
+            or self.screen.has_class("focused-right")
+            or self.screen.has_class("focused-comment")
+        ):
+            self.action_exit_focus()
+            return
+
         focused_widget = self.focused
         if not focused_widget:
             return
@@ -1231,6 +1238,21 @@ class SupportApp(App):
         self.screen.remove_class("focused-left")
         self.screen.remove_class("focused-right")
         self.screen.remove_class("focused-comment")
+
+    def action_escape_action(self) -> None:
+        """Handles Escape key: either exits fullscreen focus mode or exits commenting mode."""
+        # 1. If we are currently in fullscreen focus mode, exit focus first!
+        if (
+            self.screen.has_class("focused-left")
+            or self.screen.has_class("focused-right")
+            or self.screen.has_class("focused-comment")
+        ):
+            self.action_exit_focus()
+            return
+
+        # 2. Otherwise, if we are in commenting mode, exit commenting!
+        if self.screen.has_class("commenting"):
+            self.action_exit_commenting()
 
 
 def cmd_tui(args, api_client, config):

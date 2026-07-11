@@ -222,7 +222,7 @@ Launches a beautiful, interactive Terminal User Interface (TUI) to browse and ma
 - **Vim / Arrow Navigation**: Navigate intuitively with standard keyboard binds.
 - **Single-Pane Focus / Zoom**:
   - Highlight either the case list on the left or case details on the right, and press **`f`** to "zoom" that panel into fullscreen mode (fully hiding the other pane to maximize reading space).
-  - Press **`x`** to exit single-pane mode and instantly restore the standard dual-pane split dashboard layout!
+  - **Intuitive Toggling**: Press **`f`** again or press **`Escape`** to instantly exit single-pane mode and restore the standard dual-pane split dashboard layout!
 - **Quick Modals & Action Buttons**:
   - Press **`c`** (or click `Comment (C)`) to open the inline **Comment Pane** at the bottom of your case view, allowing you to scroll through and read the case description and comment history while drafting. Includes status dropdown integration (pre-selecting `"Waiting on Red Hat"` if the case is `"Waiting on Customer"`) and "dirty-state" draft auto-saving under `~/.config/rh-support-cli/drafts/`.
   - Press **`a`** (or click `Attach (A)`) to easily specify and upload local file attachments in the background.
