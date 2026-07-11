@@ -20,7 +20,33 @@ python3 rh-support-cli.py <subcommand>
 
 ---
 
-## 2. Configuration & Bookmarks
+## 2. Retrieving Your Red Hat Offline Token
+
+To authenticate with the Red Hat Support Case API, you must obtain a **Red Hat Offline Token**. This token acts as a long-lived credential that the CLI exchanges automatically for short-lived OIDC access tokens.
+
+### How to generate your token:
+1.  Navigate to the official Red Hat API Portal: **[Red Hat Customer Portal - API Offline Token Generator](https://access.redhat.com/management/api)**.
+2.  Log in using your standard Red Hat Customer or Partner credentials.
+3.  Click **"Generate Token"** (or view your active token).
+4.  Copy the generated token string.
+
+### Storing your token:
+The CLI looks for this token in three places (in order of priority):
+1.  **Environment Variable**: Export the token globally in your shell session:
+    ```bash
+    export REDHAT_SUPPORT_OFFLINE_TOKEN="your_token_string"
+    ```
+2.  **Global Token File**: Store the token string inside your configuration directory at:
+    ```bash
+    ~/.config/rh-support-cli/token
+    ```
+3.  **Command-Line Prompt**: If no token is detected, the CLI will interactively prompt you to paste it on startup.
+
+*To minimize round-trips and avoid re-authenticating on every run, active OIDC tokens are automatically cached locally inside `~/.cache/rh-support-cli/token_cache.json`.*
+
+---
+
+## 3. Configuration & Bookmarks
 
 Configuration is stored in your user configuration folder: `~/.config/rh-support-cli/config.yaml`.
 
@@ -32,7 +58,7 @@ default_create_template: base-template
 # Set your default bookmark filters on case list startup
 default_bookmark: ocp-team
 
-# Set your background debug file for logging full redacted HTTP sessions
+# Optionally: Set your background debug file for logging full redacted HTTP sessions to analyze API responses
 debug_file: ~/.config/rh-support-cli/debug_log.txt
 
 # Group custom filter bookmarks
@@ -45,7 +71,7 @@ bookmarks:
 
 ---
 
-## 3. Case Sizing Templates
+## 4. Case Sizing Templates
 
 Templates are Jinja2-compatible YAML files located inside `~/.config/rh-support-cli/templates/`. They allow pre-filling case values during creation (`create`) or enforcing compliance/adding default watchers post-creation (`apply`).
 
@@ -62,7 +88,7 @@ watchers:
 
 ---
 
-## 4. Subcommands Usage
+## 5. Subcommands Usage
 
 ### Listing local templates
 List all configured local templates, including their private descriptions, target fields, and watchers. This command runs **completely offline**:
@@ -84,7 +110,7 @@ rh-support-cli --simple-output show -c 12345678
 
 ---
 
-## 5. Interactive TUI Mode (`tui`)
+## 6. Interactive TUI Mode (`tui`)
 
 Launch a full split-pane interactive dashboard to manage your cases directly inside your terminal:
 ```bash
@@ -97,8 +123,7 @@ rh-support-cli tui
 
 ### Core Features & Layout
 *   **Dual-Pane View**: Case table on the left, full rich case details, descriptions (fully rendered Markdown), and complete scrollable comments thread on the right.
-*   **Contextual Command Buttons**: Interactive action buttons (`Comment (C)`, `Template (T)`, `Bookmark (B)`, `Refresh (R)`) are rendered at the top of the details view for easy mouse-clicks or keyboard legends.
-*   **Compact Scrollbars**: Universal stylesheet styles make all horizontal and vertical scrollbars a super-sleek 1-character-thin column with a transparent track background.
+*   **Contextual Command Buttons**: Interactive action buttons (`Comment (C)`, `Template (T)`, `Bookmark (B)`, `Refresh (R)`) for easy mouse-clicks or keyboard legends.
 
 ### Keyboard Navigation & Scrolling Controls
 Toggle focus between the case list and details pane using **`Tab`** or **`Shift+Tab`**. When focused on a pane:
