@@ -226,10 +226,10 @@ class SupportApp(App):
     }
     ScrollBar {
         background: transparent;
-        color: $primary-darken-2;
+        color: $primary;
     }
     ScrollBar:hover {
-        color: $primary;
+        color: $primary-lighten-1;
     }
     Header {
         background: $primary-darken-1;
@@ -260,6 +260,7 @@ class SupportApp(App):
         height: 100%;
         scrollbar-size: 1 1;
         overflow-x: hidden;
+        overflow-y: scroll;
     }
     #case-table ScrollBar {
         scrollbar-size: 1 1;
