@@ -259,8 +259,6 @@ class SupportApp(App):
     #case-table {
         height: 100%;
         scrollbar-size: 1 1;
-        overflow-x: hidden;
-        overflow-y: scroll;
     }
     #case-table ScrollBar {
         scrollbar-size: 1 1;
@@ -386,8 +384,6 @@ class SupportApp(App):
         for idx, c in enumerate(self.cases):
             num = str(c.get("caseNumber") or c.get("id") or "")
             title = c.get("summary") or ""
-            if len(title) > 35:
-                title = title[:32] + "..."
             sev = c.get("severity") or ""
             status = c.get("status") or ""
 
