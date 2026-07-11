@@ -415,6 +415,7 @@ class SupportApp(App):
     }
     #comment-pane-header-row Label {
         margin-right: 1;
+        margin-top: 1;
     }
     #comment-pane-header-row Select {
         width: 30;
@@ -612,7 +613,7 @@ class SupportApp(App):
                 status_style = "dim"
 
             table.add_row(
-                num,
+                Text(num, style=status_style),
                 title,
                 Text(sev, style=sev_style),
                 Text(status, style=status_style),
