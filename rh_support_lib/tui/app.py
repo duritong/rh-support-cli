@@ -405,9 +405,11 @@ class SupportApp(App):
     #comment-pane-container:focus-within {
         border: double $primary;
     }
+    #tui-comment-pane-title {
+        margin-top: 1;
+    }
     #comment-pane-header-row {
         height: 3;
-        margin-top: 1;
         margin-bottom: 1;
         align: left middle;
     }
@@ -905,12 +907,9 @@ class SupportApp(App):
 
         container.mount(
             Vertical(
+                Label("[bold cyan]Drafting Comment...[/]", id="tui-comment-pane-title"),
                 Horizontal(
-                    Label("[bold cyan]Drafting Comment...[/]"),
-                    Label(
-                        f"  Apply Status (Detected: [bold yellow]{target_status}[/]): ",
-                        id="tui-comment-detected-label",
-                    ),
+                    Label("Apply Status: "),
                     Select(
                         status_choices,
                         id="tui-comment-status-select",
@@ -954,14 +953,6 @@ class SupportApp(App):
 
         select = self.query_one("#tui-comment-status-select", Select)
         select.value = target_status
-
-        try:
-            label = self.query_one("#tui-comment-detected-label", Label)
-            label.update(
-                f"  Apply Status (Detected: [bold yellow]{target_status}[/]): "
-            )
-        except Exception:
-            pass
 
     def execute_comment_submission(self, comment_body: str, target_status: str) -> None:
         def show_posting():
