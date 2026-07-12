@@ -86,6 +86,37 @@ watchers:
   - bob
 ```
 
+### Comment Templates
+You can also use templates inside the `comment` subcommand to pre-fill comment bodies and automatically change a case's status (e.g. closing a case, or requesting an escalation).
+
+Comment templates can define:
+*   `comment` (or `body` / `commentBody`): The rendered Jinja2-compatible comment text.
+*   `status`: The case status (e.g., `closed`, `redhat`, `customer`) to update the case to after adding the comment.
+
+#### Example `templates/close_case.yaml`:
+```yaml
+_template_description: "Standard request to close a support case"
+status: "closed"
+comment: |
+  Hi Support,
+
+  We have verified that the proposed solution works perfectly for our {{ cluster }} cluster. 
+
+  Please go ahead and close this support case.
+
+  Thanks!
+```
+
+#### Example Usage:
+*   **Post directly and close a case**:
+    ```bash
+    rh-support-cli comment -c 1001 -t close_case --template-var cluster="Production-OCP-1"
+    ```
+*   **Open the editor to review/tweak the template before posting**:
+    ```bash
+    rh-support-cli comment -c 1001 -t close_case --template-var cluster="Production-OCP-1" --edit
+    ```
+
 ### Real-World Recipe: Proactive OpenShift Upgrade Case
 
 Below is a complete, step-by-step recipe demonstrating how to use the CLI and templates to open a proactive support case prior to upgrading an OpenShift Container Platform (OCP) cluster, including gathering local diagnostics and attaching a `must-gather` archive.
@@ -224,3 +255,56 @@ Toggle focus between the case list and details pane using **`Tab`** or **`Shift+
 | **`Ctrl+X`** | Close / Cancel commenting from anywhere inside the TUI (Comment Pane) |
 | **`r`** | Trigger contextual refresh (refreshes case details if focused; refreshes case list if table is focused) |
 | **`q`** | Quit the TUI |
+
+## 7. Stateful Offline Mock Support Mode (Offline & Demos)
+
+To facilitate zero-setup demonstrations, offline testing, and development without real credentials or network connectivity, the tool includes an advanced, built-in **Stateful Offline Mock Support Mode**.
+
+### 1. In-Process Auto-Start Mock Mode (`--mock`)
+Simply pass the `--mock` flag to **any** CLI command or the interactive TUI. The tool will automatically spawn a local loopback server in a background thread, dynamically redirect all REST requests, bypass OIDC login, and serve synthetic cases.
+
+*   **List Cases Offline**:
+    ```bash
+    rh-support-cli --mock list --no-default-bookmark
+    ```
+*   **Show Case Details Offline**:
+    ```bash
+    rh-support-cli --mock show -c 1001 --no-pager
+    ```
+*   **Create Cases & Add Comments (Stateful Mutations)**:
+    Stateful mutations will automatically write back to a local temporary folder and persist for the duration of the command:
+    ```bash
+    rh-support-cli --mock comment -c 1001 -f "This is an offline mock comment."
+    ```
+*   **Launch Interactive TUI Offline**:
+    ```bash
+    rh-support-cli --mock tui
+    ```
+
+### 2. Standalone Dedicated Mock Portal (`mock-portal`)
+If you want to run a persistent local REST API server or point external tools to your mock data:
+1.  Start the standalone mock portal:
+    ```bash
+    rh-support-cli mock-portal --port 8080
+    ```
+2.  Redirect your environment variables:
+    ```bash
+    export RH_API_URL=http://localhost:8080
+    export RH_SSO_URL=http://localhost:8080/auth/token
+    export REDHAT_SUPPORT_OFFLINE_TOKEN=cli_token
+    ```
+3.  Any standard CLI/TUI command will now communicate against this local server, persisting state mutations in real-time.
+
+### 3. Using a Custom Synthetic Corpus (`--mock-corpus`)
+By default, `--mock` and `mock-portal` copy and read from a built-in default database inside a transient temporary directory. If you want state mutations (like case creation and comment replies) to persist across multiple separate commands permanently, specify a writable directory path:
+
+```bash
+# Execute against custom local persistent database
+rh-support-cli --mock --mock-corpus ./my_custom_database list
+
+# Mutation comments will persist inside ./my_custom_database/cases/1001.json
+rh-support-cli --mock --mock-corpus ./my_custom_database comment -c 1001 -f "Persistent comment"
+
+# Run mock portal server pointing to your custom database
+rh-support-cli mock-portal --corpus ./my_custom_database --port 8080
+```

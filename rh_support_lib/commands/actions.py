@@ -71,23 +71,61 @@ def cmd_comment(args, api_client):
     if not isinstance(api_client, (RedHatAPIClient, LegacyAPIClient)):
         api_client = LegacyAPIClient(api_client)
     token = api_client.get_token()
+
+    # 1. Process templates if specified
+    template_content = ""
+    template_status = None
+    if getattr(args, "template", None):
+        import yaml
+        from rh_support_lib.templates import TemplateEngine
+
+        template_vars = {}
+        if getattr(args, "template_var", None):
+            for tv in args.template_var:
+                if "=" in tv:
+                    k, v = tv.split("=", 1)
+                    try:
+                        template_vars[k] = yaml.safe_load(v)
+                    except Exception:
+                        template_vars[k] = v
+
+        templates_dir = os.path.expanduser("~/.config/rh-support-cli/templates")
+        engine = TemplateEngine(templates_dir)
+        template_data = engine.process(args.template, template_vars)
+
+        # Look for comment text in standard fields
+        template_content = (
+            template_data.get("comment")
+            or template_data.get("body")
+            or template_data.get("commentBody")
+            or ""
+        )
+        template_content = str(template_content).strip()
+        template_status = template_data.get("status")
+
     # Determine status label
-    status_key = args.status if args.status else "redhat"
-    final_status = STATUS_MAP.get(status_key, "Waiting on Red Hat")
+    status_key = (
+        args.status
+        if args.status
+        else (template_status if template_status else "redhat")
+    )
+    final_status = STATUS_MAP.get(str(status_key).lower(), status_key)
 
     # Get Content
     comment_body = ""
     temp_file_path = None
     file_content = ""
 
-    if args.file:
+    if template_content:
+        file_content = template_content
+    elif args.file:
         if not os.path.isfile(args.file):
             sys.exit(f"Error: File '{args.file}' does not exist.")
         with open(args.file, "r") as f:
             lines = f.readlines()
         file_content = strip_header_comments(lines).strip()
 
-    if args.edit or not args.file:
+    if args.edit or (not args.file and not getattr(args, "template", None)):
         # Prepare context if needed
         header_content = None
         if args.include_previous_comments and args.include_previous_comments > 0:

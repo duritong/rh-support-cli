@@ -497,6 +497,62 @@ class TestRhSupportCli(unittest.TestCase):
             if os.path.exists("status_update.txt"):
                 os.remove("status_update.txt")
 
+    def test_comment_from_template(self):
+        """Test posting a comment using a template with dynamic variables and status overrides"""
+        import tempfile
+        import shutil
+
+        temp_home = tempfile.mkdtemp()
+        orig_home = self.env.get("HOME")
+        self.env["HOME"] = temp_home
+
+        try:
+            # Create templates directory
+            templates_dir = os.path.join(
+                temp_home, ".config", "rh-support-cli", "templates"
+            )
+            os.makedirs(templates_dir, exist_ok=True)
+
+            # Write template file
+            template_path = os.path.join(templates_dir, "ping_case.yaml")
+            with open(template_path, "w") as f:
+                f.write(
+                    "status: customer\n"
+                    "comment: |\n"
+                    "  Ping support for {{ environment }} environment by {{ user_name }}.\n"
+                )
+
+            # Execute comment using template
+            result = self.run_cli(
+                [
+                    "comment",
+                    "-c",
+                    "01234567",
+                    "-t",
+                    "ping_case",
+                    "--template-var",
+                    "environment=Production",
+                    "--template-var",
+                    "user_name=Alice",
+                ]
+            )
+
+            if result.returncode != 0:
+                print("\nSTDOUT:", result.stdout)
+                print("STDERR:", result.stderr)
+
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Success: Comment added.", result.stdout)
+            self.assertIn(
+                "Success: Case status updated to 'Waiting on Customer'.", result.stdout
+            )
+        finally:
+            if orig_home:
+                self.env["HOME"] = orig_home
+            else:
+                del self.env["HOME"]
+            shutil.rmtree(temp_home)
+
     def test_create_case(self):
         """Test creating a new case with flags and attachments"""
         # Create dummy files
@@ -1901,6 +1957,164 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             self.assertEqual(modal_bk.active_bookmark, "my_team")
         finally:
             shutil.rmtree(temp_home)
+
+    def test_mock_mode_list_and_show(self):
+        """Test that --mock runs the CLI offline against the in-process synthetic corpus"""
+        from rh_support_lib.main import main
+        import io
+        from unittest import mock
+
+        # Mock stdout to capture outputs
+        stdout_capture = io.StringIO()
+        with mock.patch(
+            "sys.argv",
+            [
+                "rh-support-cli.py",
+                "--mock",
+                "--simple-output",
+                "list",
+                "--no-default-bookmark",
+            ],
+        ):
+            with mock.patch("sys.stdout", stdout_capture):
+                try:
+                    main()
+                except SystemExit as e:
+                    self.assertEqual(e.code, 0)
+
+        output = stdout_capture.getvalue()
+        self.assertIn("Cannot mount NFS share on RHEL", output)
+        self.assertIn("1001", output)
+        self.assertIn("1002", output)
+        self.assertIn("1003", output)
+
+        # Test show case details
+        stdout_capture_show = io.StringIO()
+        with mock.patch(
+            "sys.argv",
+            [
+                "rh-support-cli.py",
+                "--mock",
+                "--simple-output",
+                "show",
+                "-c",
+                "1001",
+                "--no-pager",
+            ],
+        ):
+            with mock.patch("sys.stdout", stdout_capture_show):
+                try:
+                    main()
+                except SystemExit as e:
+                    self.assertEqual(e.code, 0)
+
+        show_output = stdout_capture_show.getvalue()
+        self.assertIn("CASE: 1001", show_output)
+        self.assertIn("Cannot mount NFS share on RHEL 9.0", show_output)
+        self.assertIn("COMMENTS (2)", show_output)
+
+    def test_mock_mode_create_and_comment(self):
+        """Test that creating cases and writing comments in --mock mode mutates state correctly"""
+        from rh_support_lib.main import main
+        import io
+        import tempfile
+        import shutil
+        from unittest import mock
+
+        # Use a writable mock corpus directory to verify mutation
+        temp_corpus = tempfile.mkdtemp()
+        from rh_support_lib.synthetic_corpus import generate_default_corpus
+
+        generate_default_corpus(temp_corpus)
+        try:
+            # Create a description file for case creation
+            desc_file_path = os.path.join(temp_corpus, "desc.txt")
+            with open(desc_file_path, "w") as f:
+                f.write("A brand new synthetic mock issue description.")
+
+            # Create a case - we must mock stdin to answer 'y' to the submit prompt
+            stdout_capture = io.StringIO()
+            stdin_mock = io.StringIO("y\n")
+            with mock.patch(
+                "sys.argv",
+                [
+                    "rh-support-cli.py",
+                    "--mock",
+                    "--mock-corpus",
+                    temp_corpus,
+                    "--simple-output",
+                    "create",
+                    "--product",
+                    "RHEL",
+                    "--version",
+                    "9.0",
+                    "--summary",
+                    "Synthetic Test Summary",
+                    "--description-file",
+                    desc_file_path,
+                    "--severity",
+                    "Normal",
+                    "--type",
+                    "Standard",
+                ],
+            ):
+                with (
+                    mock.patch("sys.stdout", stdout_capture),
+                    mock.patch("sys.stdin", stdin_mock),
+                ):
+                    try:
+                        main()
+                    except SystemExit as e:
+                        self.assertEqual(e.code, 0)
+
+            # Check that case #1004 was created and file exists
+            case_file = os.path.join(temp_corpus, "cases", "1004.json")
+            self.assertTrue(os.path.exists(case_file))
+            with open(case_file, "r") as f:
+                case_data = json.load(f)
+            self.assertEqual(case_data["summary"], "Synthetic Test Summary")
+            self.assertEqual(
+                case_data["description"].strip(),
+                "A brand new synthetic mock issue description.",
+            )
+
+            # Post a comment to the newly created case
+            comment_file_path = os.path.join(temp_corpus, "comment.txt")
+            with open(comment_file_path, "w") as f:
+                f.write("A custom comment body text.")
+
+            stdout_comment = io.StringIO()
+            with mock.patch(
+                "sys.argv",
+                [
+                    "rh-support-cli.py",
+                    "--mock",
+                    "--mock-corpus",
+                    temp_corpus,
+                    "--simple-output",
+                    "comment",
+                    "-c",
+                    "1004",
+                    "-f",
+                    comment_file_path,
+                ],
+            ):
+                with mock.patch("sys.stdout", stdout_comment):
+                    try:
+                        main()
+                    except SystemExit as e:
+                        self.assertEqual(e.code, 0)
+
+            # Verify comment was written to file
+            with open(case_file, "r") as f:
+                case_data_updated = json.load(f)
+            self.assertEqual(len(case_data_updated["comments"]), 1)
+            self.assertEqual(
+                case_data_updated["comments"][0]["body"], "A custom comment body text."
+            )
+
+        finally:
+            shutil.rmtree(temp_corpus)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 import argparse
 import sys
+import os
 from rh_support_lib.api import enable_debug_logging
 from rh_support_lib.config import load_config
 from rh_support_lib.commands.list_cases import cmd_list
@@ -21,6 +22,50 @@ except ImportError:
 
 
 def main():
+    if "--mock" in sys.argv:
+        import threading
+        import http.server
+        import rh_support_lib.constants
+
+        # Check if a custom mock-corpus is provided
+        corpus_dir = None
+        if "--mock-corpus" in sys.argv:
+            try:
+                idx = sys.argv.index("--mock-corpus")
+                if idx + 1 < len(sys.argv):
+                    corpus_dir = sys.argv[idx + 1]
+            except ValueError:
+                pass
+
+        # Start loopback mock server
+        from rh_support_lib.synthetic_corpus.server import StatefulMockHandler
+
+        StatefulMockHandler.corpus_dir = corpus_dir
+
+        server = http.server.HTTPServer(("127.0.0.1", 0), StatefulMockHandler)
+        port = server.server_port
+
+        server_thread = threading.Thread(target=server.serve_forever)
+        server_thread.daemon = True
+        server_thread.start()
+
+        mock_api_url = f"http://127.0.0.1:{port}"
+        mock_sso_url = f"http://127.0.0.1:{port}/auth/token"
+
+        os.environ["RH_API_URL"] = mock_api_url
+        os.environ["RH_SSO_URL"] = mock_sso_url
+        os.environ.setdefault("REDHAT_SUPPORT_OFFLINE_TOKEN", "cli_token")
+
+        # Update bound variables in any loaded modules
+        rh_support_lib.constants.API_URL = mock_api_url
+        rh_support_lib.constants.SSO_URL = mock_sso_url
+        for mod_name, mod in list(sys.modules.items()):
+            if mod_name.startswith("rh_support_lib.") or mod_name == "rh_support_lib":
+                if hasattr(mod, "API_URL"):
+                    mod.API_URL = mock_api_url
+                if hasattr(mod, "SSO_URL"):
+                    mod.SSO_URL = mock_sso_url
+
     parser = argparse.ArgumentParser(
         description="Red Hat Support Case CLI Tool",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -46,6 +91,15 @@ Authentication:
     parser.add_argument(
         "--debug-file",
         help="Log debug output to file (implies --debug, disables truncation)",
+    )
+    parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Run the CLI/TUI completely offline against an in-process stateful mock support portal",
+    )
+    parser.add_argument(
+        "--mock-corpus",
+        help="Path to custom synthetic support corpus directory to use with --mock (defaults to a transient temporary directory)",
     )
     subparsers = parser.add_subparsers(
         dest="command", required=True, help="Subcommand to run"
@@ -143,6 +197,15 @@ Authentication:
         help="Update case status (default: redhat)",
     )
     parser_comment.add_argument(
+        "-t",
+        "--template",
+        action="append",
+        help="Use a template (can be used multiple times)",
+    )
+    parser_comment.add_argument(
+        "--template-var", action="append", help="Variable for template (key=value)"
+    )
+    parser_comment.add_argument(
         "--include-previous-comments",
         type=int,
         nargs="?",
@@ -198,6 +261,22 @@ Authentication:
         help="Do not load the default bookmark on startup",
     )
 
+    # Mock Portal Subcommand
+    parser_mock_portal = subparsers.add_parser(
+        "mock-portal",
+        help="Launch a local stateful mock Red Hat Support Portal REST API",
+    )
+    parser_mock_portal.add_argument(
+        "--corpus",
+        help="Path to directory for the synthetic support case corpus (defaults to a transient temporary directory)",
+    )
+    parser_mock_portal.add_argument(
+        "--port",
+        type=int,
+        default=8080,
+        help="Local TCP port to bind the server to (default: 8080)",
+    )
+
     if argcomplete:
         argcomplete.autocomplete(parser)
 
@@ -213,6 +292,11 @@ Authentication:
         sys.exit(0)
     elif args.command in ["list-templates", "list-template"]:
         cmd_list_templates(args, config)
+        sys.exit(0)
+    elif args.command == "mock-portal":
+        from rh_support_lib.synthetic_corpus.server import run_mock_server
+
+        run_mock_server(corpus_dir=args.corpus, port=args.port)
         sys.exit(0)
 
     debug_file = args.debug_file or config.get("debug_file")
