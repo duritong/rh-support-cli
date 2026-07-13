@@ -1328,7 +1328,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
         # Use the cache dir set in setUp
         cache_path = os.path.join(
-            self.env["XDG_CACHE_HOME"], "rh-support-cli", "token_cache.json"
+            self.env["XDG_CACHE_HOME"], "rh-support-cli", "token_cache_mock.json"
         )
 
         # 1. First run: Should hit SSO and populate cache

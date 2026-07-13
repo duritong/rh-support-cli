@@ -106,6 +106,15 @@ def enable_debug_logging(log_file=None):
 from rh_support_lib.constants import SSO_URL  # noqa: E402
 
 
+def _get_token_cache_file():
+    cache_dir = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
+    token_cache_dir = os.path.join(cache_dir, "rh-support-cli")
+    cache_filename = "token_cache.json"
+    if os.environ.get("RH_SSO_URL") or os.environ.get("RH_API_URL"):
+        cache_filename = "token_cache_mock.json"
+    return token_cache_dir, os.path.join(token_cache_dir, cache_filename)
+
+
 def get_access_token(token_file_arg=None):
     """
     Retrieves the access token using the offline token.
@@ -152,9 +161,7 @@ def get_access_token(token_file_arg=None):
         sys.exit("Error: Token cannot be empty.")
 
     # 5. Check Cache
-    cache_dir = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
-    token_cache_dir = os.path.join(cache_dir, "rh-support-cli")
-    token_cache_file = os.path.join(token_cache_dir, "token_cache.json")
+    token_cache_dir, token_cache_file = _get_token_cache_file()
 
     if os.path.exists(token_cache_file):
         try:
@@ -165,7 +172,14 @@ def get_access_token(token_file_arg=None):
             # Check if token is valid (with 30s buffer)
             if time.time() < (expiry - 30):
                 # cache hit
-                return cache_data.get("access_token")
+                access_token = cache_data.get("access_token")
+                # Ensure the cached token is valid (contains 2 periods for real OIDC JWT, or we are in mock/custom SSO mode)
+                if access_token and (
+                    access_token.count(".") == 2
+                    or os.environ.get("RH_SSO_URL")
+                    or os.environ.get("RH_API_URL")
+                ):
+                    return access_token
         except Exception:
             # ignore cache errors
             pass
@@ -235,10 +249,7 @@ class RedHatAPIClient:
 
     def get_token(self, force_refresh=False):
         if force_refresh:
-            cache_dir = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
-            token_cache_file = os.path.join(
-                cache_dir, "rh-support-cli", "token_cache.json"
-            )
+            _, token_cache_file = _get_token_cache_file()
             if os.path.exists(token_cache_file):
                 try:
                     os.remove(token_cache_file)
