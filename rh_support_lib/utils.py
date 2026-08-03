@@ -1,7 +1,8 @@
 import os
-import tempfile
-import subprocess
 import shlex
+import subprocess
+import tempfile
+
 from rh_support_lib.constants import COLORS
 
 

@@ -1,11 +1,11 @@
-import unittest
 import http.server
-import threading
-import os
-import sys
-import subprocess
 import json
+import os
+import subprocess
+import sys
+import threading
 import time
+import unittest
 from unittest import mock
 
 # Configuration for the mock server
@@ -391,7 +391,9 @@ class TestRhSupportCli(unittest.TestCase):
     def run_cli(self, args):
         """Helper to run the CLI script as a subprocess"""
         cmd = [sys.executable, self.cli_path] + args
-        return subprocess.run(cmd, env=self.env, capture_output=True, text=True)
+        return subprocess.run(
+            cmd, env=self.env, capture_output=True, text=True, check=False
+        )
 
     def test_auth_failure_missing_token(self):
         """Test that the CLI fails gracefully if no token is provided"""
@@ -407,7 +409,12 @@ class TestRhSupportCli(unittest.TestCase):
         cmd = [sys.executable, self.cli_path, "comment", "-c", "123", "-s", "redhat"]
         # Pipe empty stdin to simulate EOF or empty return
         result = subprocess.run(
-            cmd, env=env_no_token, capture_output=True, text=True, input="\n"
+            cmd,
+            env=env_no_token,
+            capture_output=True,
+            text=True,
+            input="\n",
+            check=False,
         )
 
         self.assertNotEqual(result.returncode, 0)
@@ -499,8 +506,8 @@ class TestRhSupportCli(unittest.TestCase):
 
     def test_comment_from_template(self):
         """Test posting a comment using a template with dynamic variables and status overrides"""
-        import tempfile
         import shutil
+        import tempfile
 
         temp_home = tempfile.mkdtemp()
         orig_home = self.env.get("HOME")
@@ -589,7 +596,12 @@ class TestRhSupportCli(unittest.TestCase):
             ]
 
             result = subprocess.run(
-                cmd, env=self.env, capture_output=True, text=True, input="y\n"
+                cmd,
+                env=self.env,
+                capture_output=True,
+                text=True,
+                input="y\n",
+                check=False,
             )
 
             if result.returncode != 0:
@@ -607,8 +619,8 @@ class TestRhSupportCli(unittest.TestCase):
 
     def test_create_case_default_template(self):
         """Test creating a case using default_create_template"""
-        import tempfile
         import shutil
+        import tempfile
 
         temp_home = tempfile.mkdtemp()
         self.env["HOME"] = temp_home
@@ -642,7 +654,12 @@ class TestRhSupportCli(unittest.TestCase):
             ]
 
             result = subprocess.run(
-                cmd, env=self.env, capture_output=True, text=True, input="y\n"
+                cmd,
+                env=self.env,
+                capture_output=True,
+                text=True,
+                input="y\n",
+                check=False,
             )
 
             if result.returncode != 0:
@@ -663,7 +680,12 @@ class TestRhSupportCli(unittest.TestCase):
             ]
 
             result_no_tmpl = subprocess.run(
-                cmd_no_tmpl, env=self.env, capture_output=True, text=True, input="EOF\n"
+                cmd_no_tmpl,
+                env=self.env,
+                capture_output=True,
+                text=True,
+                input="EOF\n",
+                check=False,
             )
             self.assertNotEqual(result_no_tmpl.returncode, 0)
 
@@ -674,10 +696,11 @@ class TestRhSupportCli(unittest.TestCase):
 
     def test_template_circular_dependency(self):
         """Test template engine circular dependency detection"""
-        from rh_support_lib.templates import TemplateEngine
-        from unittest.mock import patch
-        import tempfile
         import shutil
+        import tempfile
+        from unittest.mock import patch
+
+        from rh_support_lib.templates import TemplateEngine
 
         temp_dir = tempfile.mkdtemp()
         try:
@@ -730,7 +753,9 @@ class TestRhSupportCli(unittest.TestCase):
             del env_no_token["REDHAT_SUPPORT_OFFLINE_TOKEN"]
 
         cmd = [sys.executable, self.cli_path, "link", "--case", "12345"]
-        result = subprocess.run(cmd, env=env_no_token, capture_output=True, text=True)
+        result = subprocess.run(
+            cmd, env=env_no_token, capture_output=True, text=True, check=False
+        )
 
         self.assertEqual(result.returncode, 0)
         self.assertIn("https://access.redhat.com/support/cases/12345", result.stdout)
@@ -833,8 +858,8 @@ bookmarks:
 
     def test_auth_priority(self):
         """Test the priority of token sources: CLI > ENV > FILE"""
-        import tempfile
         import shutil
+        import tempfile
 
         # Create a temp directory for HOME
         temp_home = tempfile.mkdtemp()
@@ -899,8 +924,8 @@ bookmarks:
             print("Skipping test_templates: jinja2 not installed")
             return
 
-        import tempfile
         import shutil
+        import tempfile
 
         # Temp HOME for templates
         temp_home = tempfile.mkdtemp()
@@ -953,7 +978,12 @@ description: |
 
             # input='y\n' for confirmation
             result = subprocess.run(
-                cmd, env=self.env, capture_output=True, text=True, input="y\n"
+                cmd,
+                env=self.env,
+                capture_output=True,
+                text=True,
+                input="y\n",
+                check=False,
             )
 
             if result.returncode != 0:
@@ -987,8 +1017,8 @@ description: |
             print("Skipping test_templates_advanced: jinja2 not installed")
             return
 
-        import tempfile
         import shutil
+        import tempfile
 
         temp_home = tempfile.mkdtemp()
         self.env["HOME"] = temp_home
@@ -1035,7 +1065,12 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 "4.12",
             ]
             result = subprocess.run(
-                cmd, env=self.env, capture_output=True, text=True, input="y\n"
+                cmd,
+                env=self.env,
+                capture_output=True,
+                text=True,
+                input="y\n",
+                check=False,
             )
 
             if result.returncode != 0:
@@ -1081,7 +1116,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             # 3. Run comment command on a failing case ID
             cmd = [sys.executable, self.cli_path, "comment", "-c", "FAIL_COMMENT"]
             result = subprocess.run(
-                cmd, env=env_with_editor, capture_output=True, text=True
+                cmd, env=env_with_editor, capture_output=True, text=True, check=False
             )
 
             # 4. Expect failure
@@ -1137,7 +1172,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             # /cases/12345/comments returns 2 comments in mock.
             cmd = [sys.executable, self.cli_path, "comment", "-c", "12345"]
             result = subprocess.run(
-                cmd, env=env_with_editor, capture_output=True, text=True
+                cmd, env=env_with_editor, capture_output=True, text=True, check=False
             )
             self.assertEqual(result.returncode, 0)
 
@@ -1161,7 +1196,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 "2",
             ]
             result = subprocess.run(
-                cmd, env=env_with_editor, capture_output=True, text=True
+                cmd, env=env_with_editor, capture_output=True, text=True, check=False
             )
             self.assertEqual(result.returncode, 0)
 
@@ -1182,7 +1217,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 "0",
             ]
             result = subprocess.run(
-                cmd, env=env_with_editor, capture_output=True, text=True
+                cmd, env=env_with_editor, capture_output=True, text=True, check=False
             )
             self.assertEqual(result.returncode, 0)
 
@@ -1295,7 +1330,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 "--edit",
             ]
             result = subprocess.run(
-                cmd, env=env_with_editor, capture_output=True, text=True
+                cmd, env=env_with_editor, capture_output=True, text=True, check=False
             )
             self.assertEqual(result.returncode, 0)
 
@@ -1462,8 +1497,8 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
     def test_apply_template_dry_run(self):
         """Test applying a template to a case in dry-run mode"""
-        import tempfile
         import shutil
+        import tempfile
 
         temp_home = tempfile.mkdtemp()
         self.env["HOME"] = temp_home
@@ -1503,8 +1538,8 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
     def test_apply_template_execution(self):
         """Test executing applying a template to a case (real PUT/POST)"""
-        import tempfile
         import shutil
+        import tempfile
 
         temp_home = tempfile.mkdtemp()
         self.env["HOME"] = temp_home
@@ -1527,8 +1562,8 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
     def test_apply_template_no_changes(self):
         """Test applying a template when no changes are needed"""
-        import tempfile
         import shutil
+        import tempfile
 
         temp_home = tempfile.mkdtemp()
         self.env["HOME"] = temp_home
@@ -1554,8 +1589,8 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
     def test_apply_template_vars(self):
         """Test applying a template with template variables"""
-        import tempfile
         import shutil
+        import tempfile
 
         temp_home = tempfile.mkdtemp()
         self.env["HOME"] = temp_home
@@ -1594,8 +1629,8 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
     def test_apply_case_not_found(self):
         """Test applying a template to a non-existent case fails gracefully"""
-        import tempfile
         import shutil
+        import tempfile
 
         temp_home = tempfile.mkdtemp()
         self.env["HOME"] = temp_home
@@ -1618,8 +1653,8 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
     def test_list_templates(self):
         """Test listing local templates and parsing their metadata"""
-        import tempfile
         import shutil
+        import tempfile
 
         temp_home = tempfile.mkdtemp()
         self.env["HOME"] = temp_home
@@ -1661,8 +1696,8 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
     def test_list_templates_empty(self):
         """Test listing when there are no templates"""
-        import tempfile
         import shutil
+        import tempfile
 
         temp_home = tempfile.mkdtemp()
         self.env["HOME"] = temp_home
@@ -1680,8 +1715,8 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
     def test_list_templates_no_directory(self):
         """Test listing when the template directory does not exist"""
-        import tempfile
         import shutil
+        import tempfile
 
         temp_home = tempfile.mkdtemp()
         self.env["HOME"] = temp_home
@@ -1695,8 +1730,8 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
     def test_template_fields_starting_with_underscore_ignored(self):
         """Test that any template fields starting with an underscore are completely ignored in create and apply"""
-        import tempfile
         import shutil
+        import tempfile
 
         temp_home = tempfile.mkdtemp()
         self.env["HOME"] = temp_home
@@ -1754,7 +1789,12 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 "test_underscore",
             ]
             result_create = subprocess.run(
-                cmd, env=self.env, capture_output=True, text=True, input="y\n"
+                cmd,
+                env=self.env,
+                capture_output=True,
+                text=True,
+                input="y\n",
+                check=False,
             )
             if result_create.returncode != 0:
                 print("\n--- CREATE STDOUT ---\n", result_create.stdout)
@@ -1763,7 +1803,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
             # Verify MockRedHatHandler.last_case_payload does not contain any key starting with '_'
             self.assertIsNotNone(MockRedHatHandler.last_case_payload)
-            for k in MockRedHatHandler.last_case_payload.keys():
+            for k in MockRedHatHandler.last_case_payload:
                 self.assertFalse(
                     k.startswith("_"),
                     f"Key starting with underscore found in payload: {k}",
@@ -1782,7 +1822,8 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
     def test_tui_activation(self):
         """Test that running the tui subcommand initializes and launches the SupportApp"""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
+
         from rh_support_lib.tui.app import cmd_tui
 
         with patch("rh_support_lib.tui.app.SupportApp.run") as mock_run:
@@ -1795,9 +1836,11 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
     def test_tui_app_headless(self):
         """Programmatically launch the TUI app headlessly to verify CSS parsing and startup widgets"""
         import asyncio
+
+        from textual.widgets import DataTable
+
         import rh_support_lib.tui.app
         from rh_support_lib.tui.app import SupportApp
-        from textual.widgets import DataTable
 
         # Temporarily route API_URL in the parent process to our mock HTTP server
         orig_tui_url = rh_support_lib.tui.app.API_URL
@@ -1864,7 +1907,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 await pilot.pause()
 
                 # Verify that the comment pane is displayed
-                from textual.widgets import TextArea, Select
+                from textual.widgets import Select, TextArea
 
                 self.assertTrue(app.screen.has_class("commenting"))
                 textarea = app.query_one("#tui-comment-textarea", TextArea)
@@ -1912,13 +1955,14 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
     def test_tui_config_handling(self):
         """Test that TUI correctly processes default_bookmark and default_create_template from config"""
-        from rh_support_lib.tui.app import (
-            build_filter_payload,
-            TemplateModal,
-            BookmarkModal,
-        )
-        import tempfile
         import shutil
+        import tempfile
+
+        from rh_support_lib.tui.app import (
+            BookmarkModal,
+            TemplateModal,
+            build_filter_payload,
+        )
 
         config = {
             "default_bookmark": "my_team",
@@ -1960,27 +2004,30 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
     def test_mock_mode_list_and_show(self):
         """Test that --mock runs the CLI offline against the in-process synthetic corpus"""
-        from rh_support_lib.main import main
         import io
         from unittest import mock
 
+        from rh_support_lib.main import main
+
         # Mock stdout to capture outputs
         stdout_capture = io.StringIO()
-        with mock.patch(
-            "sys.argv",
-            [
-                "rh-support-cli.py",
-                "--mock",
-                "--simple-output",
-                "list",
-                "--no-default-bookmark",
-            ],
+        with (
+            mock.patch(
+                "sys.argv",
+                [
+                    "rh-support-cli.py",
+                    "--mock",
+                    "--simple-output",
+                    "list",
+                    "--no-default-bookmark",
+                ],
+            ),
+            mock.patch("sys.stdout", stdout_capture),
         ):
-            with mock.patch("sys.stdout", stdout_capture):
-                try:
-                    main()
-                except SystemExit as e:
-                    self.assertEqual(e.code, 0)
+            try:
+                main()
+            except SystemExit as e:
+                self.assertEqual(e.code, 0)
 
         output = stdout_capture.getvalue()
         self.assertIn("Cannot mount NFS share on RHEL", output)
@@ -1990,23 +2037,25 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
         # Test show case details
         stdout_capture_show = io.StringIO()
-        with mock.patch(
-            "sys.argv",
-            [
-                "rh-support-cli.py",
-                "--mock",
-                "--simple-output",
-                "show",
-                "-c",
-                "1001",
-                "--no-pager",
-            ],
+        with (
+            mock.patch(
+                "sys.argv",
+                [
+                    "rh-support-cli.py",
+                    "--mock",
+                    "--simple-output",
+                    "show",
+                    "-c",
+                    "1001",
+                    "--no-pager",
+                ],
+            ),
+            mock.patch("sys.stdout", stdout_capture_show),
         ):
-            with mock.patch("sys.stdout", stdout_capture_show):
-                try:
-                    main()
-                except SystemExit as e:
-                    self.assertEqual(e.code, 0)
+            try:
+                main()
+            except SystemExit as e:
+                self.assertEqual(e.code, 0)
 
         show_output = stdout_capture_show.getvalue()
         self.assertIn("CASE: 1001", show_output)
@@ -2015,11 +2064,12 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
     def test_mock_mode_create_and_comment(self):
         """Test that creating cases and writing comments in --mock mode mutates state correctly"""
-        from rh_support_lib.main import main
         import io
-        import tempfile
         import shutil
+        import tempfile
         from unittest import mock
+
+        from rh_support_lib.main import main
 
         # Use a writable mock corpus directory to verify mutation
         temp_corpus = tempfile.mkdtemp()
@@ -2035,37 +2085,37 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             # Create a case - we must mock stdin to answer 'y' to the submit prompt
             stdout_capture = io.StringIO()
             stdin_mock = io.StringIO("y\n")
-            with mock.patch(
-                "sys.argv",
-                [
-                    "rh-support-cli.py",
-                    "--mock",
-                    "--mock-corpus",
-                    temp_corpus,
-                    "--simple-output",
-                    "create",
-                    "--product",
-                    "RHEL",
-                    "--version",
-                    "9.0",
-                    "--summary",
-                    "Synthetic Test Summary",
-                    "--description-file",
-                    desc_file_path,
-                    "--severity",
-                    "Normal",
-                    "--type",
-                    "Standard",
-                ],
+            with (
+                mock.patch(
+                    "sys.argv",
+                    [
+                        "rh-support-cli.py",
+                        "--mock",
+                        "--mock-corpus",
+                        temp_corpus,
+                        "--simple-output",
+                        "create",
+                        "--product",
+                        "RHEL",
+                        "--version",
+                        "9.0",
+                        "--summary",
+                        "Synthetic Test Summary",
+                        "--description-file",
+                        desc_file_path,
+                        "--severity",
+                        "Normal",
+                        "--type",
+                        "Standard",
+                    ],
+                ),
+                mock.patch("sys.stdout", stdout_capture),
+                mock.patch("sys.stdin", stdin_mock),
             ):
-                with (
-                    mock.patch("sys.stdout", stdout_capture),
-                    mock.patch("sys.stdin", stdin_mock),
-                ):
-                    try:
-                        main()
-                    except SystemExit as e:
-                        self.assertEqual(e.code, 0)
+                try:
+                    main()
+                except SystemExit as e:
+                    self.assertEqual(e.code, 0)
 
             # Check that case #1004 was created and file exists
             case_file = os.path.join(temp_corpus, "cases", "1004.json")
@@ -2084,26 +2134,28 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 f.write("A custom comment body text.")
 
             stdout_comment = io.StringIO()
-            with mock.patch(
-                "sys.argv",
-                [
-                    "rh-support-cli.py",
-                    "--mock",
-                    "--mock-corpus",
-                    temp_corpus,
-                    "--simple-output",
-                    "comment",
-                    "-c",
-                    "1004",
-                    "-f",
-                    comment_file_path,
-                ],
+            with (
+                mock.patch(
+                    "sys.argv",
+                    [
+                        "rh-support-cli.py",
+                        "--mock",
+                        "--mock-corpus",
+                        temp_corpus,
+                        "--simple-output",
+                        "comment",
+                        "-c",
+                        "1004",
+                        "-f",
+                        comment_file_path,
+                    ],
+                ),
+                mock.patch("sys.stdout", stdout_comment),
             ):
-                with mock.patch("sys.stdout", stdout_comment):
-                    try:
-                        main()
-                    except SystemExit as e:
-                        self.assertEqual(e.code, 0)
+                try:
+                    main()
+                except SystemExit as e:
+                    self.assertEqual(e.code, 0)
 
             # Verify comment was written to file
             with open(case_file, "r") as f:

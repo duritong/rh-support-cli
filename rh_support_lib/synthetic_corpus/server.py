@@ -5,6 +5,7 @@ import re
 import tempfile
 import urllib.parse
 from datetime import datetime, timezone
+
 from rh_support_lib.synthetic_corpus.generator import generate_default_corpus
 
 
@@ -76,7 +77,7 @@ class StatefulMockHandler(http.server.BaseHTTPRequestHandler):
         if self.path == "/cases/filter" or self.path.endswith("/cases/filter"):
             try:
                 payload = json.loads(body.decode("utf-8")) if body else {}
-            except Exception:
+            except json.JSONDecodeError:
                 self._send_error("Invalid JSON payload")
                 return
 
@@ -85,11 +86,13 @@ class StatefulMockHandler(http.server.BaseHTTPRequestHandler):
             cases = []
             if cases_dir.exists():
                 for case_file in cases_dir.glob("*.json"):
-                    try:
-                        with open(case_file, "r") as f:
-                            cases.append(json.load(f))
-                    except Exception:
-                        pass
+                    import contextlib
+
+                    with (
+                        contextlib.suppress(OSError, json.JSONDecodeError),
+                        open(case_file, "r") as f,
+                    ):
+                        cases.append(json.load(f))
 
             # Apply filters
             filtered_cases = []
@@ -165,7 +168,7 @@ class StatefulMockHandler(http.server.BaseHTTPRequestHandler):
         if self.path == "/cases" or self.path.endswith("/cases"):
             try:
                 payload = json.loads(body.decode("utf-8"))
-            except Exception:
+            except json.JSONDecodeError:
                 self._send_error("Invalid JSON payload")
                 return
 
@@ -229,7 +232,7 @@ class StatefulMockHandler(http.server.BaseHTTPRequestHandler):
 
             try:
                 payload = json.loads(body.decode("utf-8"))
-            except Exception:
+            except json.JSONDecodeError:
                 self._send_error("Invalid JSON payload")
                 return
 
@@ -321,7 +324,7 @@ class StatefulMockHandler(http.server.BaseHTTPRequestHandler):
 
             try:
                 payload = json.loads(body.decode("utf-8"))
-            except Exception:
+            except json.JSONDecodeError:
                 self._send_error("Invalid JSON payload")
                 return
 
@@ -450,7 +453,7 @@ class StatefulMockHandler(http.server.BaseHTTPRequestHandler):
 
             try:
                 payload = json.loads(body.decode("utf-8"))
-            except Exception:
+            except json.JSONDecodeError:
                 self._send_error("Invalid JSON payload")
                 return
 

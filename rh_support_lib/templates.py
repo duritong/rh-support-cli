@@ -1,10 +1,11 @@
 import os
 import sys
+
 import yaml
 
 try:
-    import jinja2
     import dateparser
+    import jinja2
 except ImportError:
     jinja2 = None
     dateparser = None
@@ -33,7 +34,7 @@ class TemplateEngine:
         try:
             with open(path, "r") as f:
                 return yaml.safe_load(f) or {}
-        except Exception as e:
+        except (OSError, yaml.YAMLError) as e:
             print(f"Warning: Failed to load template {path}: {e}")
             return None
 
@@ -98,7 +99,7 @@ class TemplateEngine:
                 env.filters["parse_date"] = self._parse_date
                 tmpl = env.from_string(data)
                 return tmpl.render(**context)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 # print(f"Warning: Failed to render '{data}': {e}") # formatting noise
                 return data
         else:

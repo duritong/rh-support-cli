@@ -1,11 +1,12 @@
-import sys
 import pydoc
-from rh_support_lib.constants import API_URL
+import sys
+
 from rh_support_lib.api import get_json
+from rh_support_lib.constants import API_URL
 
 
 def cmd_show(args, api_client):
-    from rh_support_lib.api import RedHatAPIClient, LegacyAPIClient
+    from rh_support_lib.api import LegacyAPIClient, RedHatAPIClient
 
     if not isinstance(api_client, (RedHatAPIClient, LegacyAPIClient)):
         api_client = LegacyAPIClient(api_client)
@@ -15,7 +16,7 @@ def cmd_show(args, api_client):
     # 1. Fetch Case
     try:
         case = get_json(f"{API_URL}/cases/{args.case}", token)
-    except Exception:
+    except Exception:  # noqa: BLE001
         case = None
 
     if not case or not isinstance(case, dict):
@@ -117,9 +118,9 @@ def cmd_show(args, api_client):
     else:
         # Rich modern layout using Panels, Markdown syntax highlighting, and Grid tables
         from rich.console import Console
+        from rich.markdown import Markdown
         from rich.panel import Panel
         from rich.table import Table
-        from rich.markdown import Markdown
         from rich.text import Text
 
         console = Console()

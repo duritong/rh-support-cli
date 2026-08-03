@@ -1,11 +1,13 @@
 import os
 import sys
-import yaml
+
 import requests
-from rh_support_lib.constants import API_URL, COLORS
+import yaml
+
 from rh_support_lib.api import get_json
-from rh_support_lib.utils import colorize
+from rh_support_lib.constants import API_URL, COLORS
 from rh_support_lib.templates import TemplateEngine
+from rh_support_lib.utils import colorize
 
 # Full set of valid fields in UpdateCaseRequest
 VALID_PUT_FIELDS = {
@@ -50,7 +52,7 @@ VALID_PUT_FIELDS = {
 
 
 def cmd_apply(args, api_client, config):
-    from rh_support_lib.api import RedHatAPIClient, LegacyAPIClient
+    from rh_support_lib.api import LegacyAPIClient, RedHatAPIClient
 
     if not isinstance(api_client, (RedHatAPIClient, LegacyAPIClient)):
         api_client = LegacyAPIClient(api_client)
@@ -60,7 +62,8 @@ def cmd_apply(args, api_client, config):
     print(f"Fetching case {args.case} details...")
     try:
         case = get_json(f"{API_URL}/cases/{args.case}", token)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
+        # Catch-all is intentional to gracefully report any network or API failures and exit the CLI
         sys.exit(f"Error fetching case details: {e}")
 
     if not case or not isinstance(case, dict):
@@ -75,7 +78,7 @@ def cmd_apply(args, api_client, config):
                 k, v = tv.split("=", 1)
                 try:
                     template_vars[k] = yaml.safe_load(v)
-                except Exception:
+                except yaml.YAMLError:
                     template_vars[k] = v
 
     templates_dir = os.path.expanduser("~/.config/rh-support-cli/templates")
@@ -230,9 +233,9 @@ def cmd_list_templates(args, config):
     files = []
     try:
         for f in os.listdir(templates_dir):
-            if f.endswith(".yaml") or f.endswith(".yml"):
+            if f.endswith((".yaml", ".yml")):
                 files.append(f)
-    except Exception as e:
+    except OSError as e:
         sys.exit(f"Error listing template files: {e}")
 
     if not files:
@@ -249,7 +252,7 @@ def cmd_list_templates(args, config):
         try:
             with open(path, "r") as fh:
                 data = yaml.safe_load(fh) or {}
-        except Exception as e:
+        except (OSError, yaml.YAMLError) as e:
             print(f"Template:    {colorize(name, COLORS.RED, args.simple_output)}")
             print(f"  File:      {f}")
             print(f"  Error:     Failed to load: {e}\n")

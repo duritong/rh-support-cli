@@ -1,34 +1,36 @@
 import os
-import requests
-import time
 import pathlib
-from textual import on
-from textual.app import App, ComposeResult
-from textual.binding import Binding
-from textual.containers import Grid, Container, Horizontal, Vertical, VerticalScroll
-from textual.screen import ModalScreen
-from textual.widgets import (
-    Header,
-    Footer,
-    DataTable,
-    Static,
-    Button,
-    Label,
-    TextArea,
-    Select,
-    Input,
-)
+import time
+from typing import ClassVar
+
+import requests
+from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
-from rich.markdown import Markdown
+from textual import on
+from textual.app import App, ComposeResult
+from textual.binding import Binding
+from textual.containers import Container, Grid, Horizontal, Vertical, VerticalScroll
+from textual.screen import ModalScreen
+from textual.widgets import (
+    Button,
+    DataTable,
+    Footer,
+    Header,
+    Input,
+    Label,
+    Select,
+    Static,
+    TextArea,
+)
 
-from rh_support_lib.constants import API_URL, STATUS_FILTER_MAP, SEVERITY_MAP
 from rh_support_lib.api import get_json
+from rh_support_lib.constants import API_URL, SEVERITY_MAP, STATUS_FILTER_MAP
 
 
 def build_filter_payload(
-    config: dict, bookmark: str = None, no_default_bookmark: bool = False
+    config: dict, bookmark: str | None = None, no_default_bookmark: bool = False
 ) -> dict:
     """Constructs the filter payload based on config bookmarks."""
     payload = {"maxResults": 50, "offset": 0}
@@ -110,12 +112,12 @@ class TemplateModal(ModalScreen[str]):
         templates_dir = os.path.expanduser("~/.config/rh-support-cli/templates")
         choices = []
         if os.path.isdir(templates_dir):
-            try:
+            import contextlib
+
+            with contextlib.suppress(OSError):
                 for f in os.listdir(templates_dir):
-                    if f.endswith(".yaml") or f.endswith(".yml"):
+                    if f.endswith((".yaml", ".yml")):
                         choices.append((os.path.splitext(f)[0], os.path.splitext(f)[0]))
-            except Exception:
-                pass
 
         if not choices:
             choices = [("No templates found", "none")]
@@ -158,7 +160,7 @@ class TemplateModal(ModalScreen[str]):
 class BookmarkModal(ModalScreen[str]):
     """Modal screen for selecting and applying a bookmark."""
 
-    def __init__(self, config: dict, active_bookmark: str = None):
+    def __init__(self, config: dict, active_bookmark: str | None = None):
         super().__init__()
         self.config = config
         self.active_bookmark = active_bookmark
@@ -274,7 +276,7 @@ class FocusableContainer(VerticalScroll):
     """A scrollable container that can receive keyboard focus and handles keyboard scrolling."""
 
     can_focus = True
-    BINDINGS = [
+    BINDINGS: ClassVar[list] = [
         Binding("up", "scroll_up", "Scroll Up"),
         Binding("down", "scroll_down", "Scroll Down"),
         Binding("pageup", "scroll_page_up", "Scroll Page Up", show=False),
@@ -306,7 +308,7 @@ class SupportApp(App):
     """Terminal User Interface (TUI) for Red Hat Support Case CLI."""
 
     TITLE = "Red Hat Support CLI"
-    BINDINGS = [
+    BINDINGS: ClassVar[list] = [
         ("q", "quit", "Quit"),
         ("r", "refresh", "Refresh"),
         ("c", "add_comment", "Add Comment"),
@@ -505,11 +507,11 @@ class SupportApp(App):
         self,
         token,
         config: dict,
-        bookmark: str = None,
+        bookmark: str | None = None,
         no_default_bookmark: bool = False,
     ):
         super().__init__()
-        from rh_support_lib.api import RedHatAPIClient, LegacyAPIClient
+        from rh_support_lib.api import LegacyAPIClient, RedHatAPIClient
 
         if not isinstance(token, (RedHatAPIClient, LegacyAPIClient)):
             token = LegacyAPIClient(token)
@@ -581,7 +583,7 @@ class SupportApp(App):
                 self.call_from_thread(
                     self.show_error, f"Failed to load cases: HTTP {resp.status_code}"
                 )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.call_from_thread(self.show_error, f"Network Error: {e}")
 
     def populate_cases_table(self) -> None:
@@ -732,7 +734,7 @@ class SupportApp(App):
             comments.sort(key=lambda x: x.get("createdDate", ""), reverse=False)
 
             self.call_from_thread(self.render_case_details, case, comments)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.call_from_thread(self.show_error, f"Failed to fetch details: {e}")
 
     def render_case_details(self, case: dict, comments: list) -> None:
@@ -1006,7 +1008,7 @@ class SupportApp(App):
             self.fetch_case_details(self.selected_case_id)
             self.run_worker(self.fetch_cases, thread=True)
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.call_from_thread(self.show_error, f"Error: {e}")
 
     def action_exit_commenting(self) -> None:
@@ -1050,7 +1052,9 @@ class SupportApp(App):
 
         self.push_screen(UnsavedChangesModal(comment_text), handle_choice)
 
-    def save_comment_to_file(self, comment_text: str, next_case_id: str = None) -> None:
+    def save_comment_to_file(
+        self, comment_text: str, next_case_id: str | None = None
+    ) -> None:
         drafts_dir = os.path.expanduser("~/.config/rh-support-cli/drafts")
         try:
             pathlib.Path(drafts_dir).mkdir(parents=True, exist_ok=True)
@@ -1080,7 +1084,7 @@ class SupportApp(App):
                     lambda: self.fetch_case_details(self.selected_case_id),
                     thread=True,
                 )
-        except Exception as e:
+        except OSError as e:
             self.show_error(f"Failed to save draft to file: {e}")
 
     def action_add_attachment(self) -> None:
@@ -1112,6 +1116,7 @@ class SupportApp(App):
 
         try:
             from types import SimpleNamespace
+
             from rh_support_lib.commands.actions import cmd_attach
 
             args = SimpleNamespace(
@@ -1126,7 +1131,7 @@ class SupportApp(App):
                     return
 
             self.fetch_case_details(self.selected_case_id)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.call_from_thread(self.show_error, f"Error uploading attachment: {e}")
 
     def action_apply_template(self) -> None:
@@ -1156,6 +1161,7 @@ class SupportApp(App):
         try:
             # We construct a mock args class to invoke apply_template logic
             from types import SimpleNamespace
+
             from rh_support_lib.commands.apply_template import cmd_apply
 
             # We create a dummy args class
@@ -1179,7 +1185,7 @@ class SupportApp(App):
                     return
 
             self.fetch_case_details(self.selected_case_id)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.call_from_thread(self.show_error, f"Error: {e}")
 
     def action_select_bookmark(self) -> None:

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-import sys
 import os
+import sys
 
 # Ensure the current directory is in sys.path so rh_support_lib can be imported
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

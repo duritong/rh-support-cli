@@ -1,18 +1,20 @@
-import os
-import sys
 import json
+import os
+import subprocess
+import sys
+import tempfile
+
 import requests
 import yaml
-import tempfile
-import subprocess
-from rh_support_lib.constants import API_URL
+
 from rh_support_lib.api import get_json
-from rh_support_lib.utils import select_from_list, prompt_text, strip_header_comments
+from rh_support_lib.constants import API_URL
 from rh_support_lib.templates import TemplateEngine
+from rh_support_lib.utils import prompt_text, select_from_list, strip_header_comments
 
 
 def cmd_create(args, api_client, config):
-    from rh_support_lib.api import RedHatAPIClient, LegacyAPIClient
+    from rh_support_lib.api import LegacyAPIClient, RedHatAPIClient
 
     if not isinstance(api_client, (RedHatAPIClient, LegacyAPIClient)):
         api_client = LegacyAPIClient(api_client)
@@ -38,7 +40,7 @@ def cmd_create(args, api_client, config):
                     k, v = tv.split("=", 1)
                     try:
                         template_vars[k] = yaml.safe_load(v)
-                    except Exception:
+                    except yaml.YAMLError:
                         template_vars[k] = v
 
         templates_dir = os.path.expanduser("~/.config/rh-support-cli/templates")
@@ -284,7 +286,7 @@ def cmd_create(args, api_client, config):
                         print(
                             f"  - {os.path.basename(fpath)}: Failed ({up_resp.status_code})"
                         )
-            except Exception as e:
+            except (OSError, requests.exceptions.RequestException) as e:
                 print(f"  - {os.path.basename(fpath)}: Error ({e})")
 
     return case_number

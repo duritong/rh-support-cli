@@ -1,4 +1,5 @@
 import os
+
 import yaml
 
 
@@ -25,6 +26,6 @@ def load_config(config_file_arg=None):
     try:
         with open(config_path, "r") as f:
             return yaml.safe_load(f) or {}
-    except Exception as e:
+    except (OSError, yaml.YAMLError) as e:
         print(f"Warning: Failed to load config from {config_path}: {e}")
         return {}

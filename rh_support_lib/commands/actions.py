@@ -1,13 +1,15 @@
 import os
 import sys
+
 import requests
+
+from rh_support_lib.api import get_json
 from rh_support_lib.constants import API_URL, STATUS_MAP
 from rh_support_lib.utils import open_editor, strip_header_comments
-from rh_support_lib.api import get_json
 
 
 def cmd_attach(args, api_client):
-    from rh_support_lib.api import RedHatAPIClient, LegacyAPIClient
+    from rh_support_lib.api import LegacyAPIClient, RedHatAPIClient
 
     if not isinstance(api_client, (RedHatAPIClient, LegacyAPIClient)):
         api_client = LegacyAPIClient(api_client)
@@ -66,7 +68,7 @@ def cmd_attach(args, api_client):
 
 
 def cmd_comment(args, api_client):
-    from rh_support_lib.api import RedHatAPIClient, LegacyAPIClient
+    from rh_support_lib.api import LegacyAPIClient, RedHatAPIClient
 
     if not isinstance(api_client, (RedHatAPIClient, LegacyAPIClient)):
         api_client = LegacyAPIClient(api_client)
@@ -77,6 +79,7 @@ def cmd_comment(args, api_client):
     template_status = None
     if getattr(args, "template", None):
         import yaml
+
         from rh_support_lib.templates import TemplateEngine
 
         template_vars = {}
@@ -86,7 +89,7 @@ def cmd_comment(args, api_client):
                     k, v = tv.split("=", 1)
                     try:
                         template_vars[k] = yaml.safe_load(v)
-                    except Exception:
+                    except yaml.YAMLError:
                         template_vars[k] = v
 
         templates_dir = os.path.expanduser("~/.config/rh-support-cli/templates")
@@ -151,8 +154,7 @@ def cmd_comment(args, api_client):
 
                     # Take last N
                     n = args.include_previous_comments
-                    if n > len(comments):
-                        n = len(comments)
+                    n = min(n, len(comments))
                     subset = comments[-n:]
 
                     header_lines = []
@@ -170,7 +172,9 @@ def cmd_comment(args, api_client):
 
                     header_content = "\n".join(header_lines).strip()
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
+                # Broad except is intentional to gracefully handle any API or network failure
+                # during previous comments context fetching and allow user to continue editing.
                 print(f"Warning: Failed to fetch previous comments: {e}")
 
         # Open Editor (using file_content as initial body if provided)

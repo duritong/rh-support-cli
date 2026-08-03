@@ -1,9 +1,9 @@
-import os
-import sys
 import getpass
 import json
-import time
+import os
 import pathlib
+import sys
+import time
 
 try:
     import requests
@@ -13,6 +13,7 @@ except ImportError:
     sys.exit(1)
 
 import logging
+
 import requests.sessions
 
 
@@ -81,7 +82,7 @@ def enable_debug_logging(log_file=None):
                             if "refresh_token" in masked_json:
                                 masked_json["refresh_token"] = "<HIDDEN>"
                             content = json.dumps(masked_json)
-                except Exception:
+                except (json.JSONDecodeError, TypeError):
                     pass
 
                 if content is None:
@@ -90,7 +91,8 @@ def enable_debug_logging(log_file=None):
                         content = content[:1000] + "... (truncated)"
 
                 logger.debug(f"Response Body: {content}")
-            except Exception:
+            except Exception:  # noqa: BLE001
+                # Broad exception catch is intentional to prevent logging errors from crashing requests
                 logger.debug("Response Body: (Binary or non-text)")
 
             return response
@@ -103,7 +105,7 @@ def enable_debug_logging(log_file=None):
     requests.sessions.Session.request = debug_request
 
 
-from rh_support_lib.constants import SSO_URL  # noqa: E402
+from rh_support_lib.constants import SSO_URL
 
 
 def _get_token_cache_file():
@@ -133,7 +135,7 @@ def get_access_token(token_file_arg=None):
         try:
             with open(token_file_arg, "r") as f:
                 offline_token = f.read().strip()
-        except Exception as e:
+        except OSError as e:
             sys.exit(f"Error reading token file: {e}")
 
     # 2. Environment Variable
@@ -147,7 +149,7 @@ def get_access_token(token_file_arg=None):
             try:
                 with open(config_path, "r") as f:
                     offline_token = f.read().strip()
-            except Exception as e:
+            except OSError as e:
                 print(f"Warning: Failed to read token from {config_path}: {e}")
 
     # 4. Prompt
@@ -180,7 +182,7 @@ def get_access_token(token_file_arg=None):
                     or os.environ.get("RH_API_URL")
                 ):
                     return access_token
-        except Exception:
+        except (OSError, json.JSONDecodeError, TypeError):
             # ignore cache errors
             pass
 
@@ -215,7 +217,7 @@ def get_access_token(token_file_arg=None):
                 # Set file permissions before writing if possible, or after
                 os.fchmod(f.fileno(), 0o600)
                 json.dump(cache_data, f)
-        except Exception:
+        except (OSError, TypeError):
             # warn but don't fail
             # print(f"Warning: Failed to write token cache: {e}")
             pass
@@ -253,7 +255,7 @@ class RedHatAPIClient:
             if os.path.exists(token_cache_file):
                 try:
                     os.remove(token_cache_file)
-                except Exception:
+                except OSError:
                     pass
             self._token = None
 
@@ -269,16 +271,13 @@ class RedHatAPIClient:
         kwargs["headers"] = headers
         kwargs.setdefault("timeout", 30)
 
-        try:
+        resp = requests.request(method, url, **kwargs)
+        if resp.status_code == 401:
+            # Force refresh OIDC token and retry once
+            token = self.get_token(force_refresh=True)
+            headers["Authorization"] = f"Bearer {token}"
             resp = requests.request(method, url, **kwargs)
-            if resp.status_code == 401:
-                # Force refresh OIDC token and retry once
-                token = self.get_token(force_refresh=True)
-                headers["Authorization"] = f"Bearer {token}"
-                resp = requests.request(method, url, **kwargs)
-            return resp
-        except requests.exceptions.RequestException as e:
-            raise e
+        return resp
 
     def get(self, url, **kwargs):
         return self.request("GET", url, **kwargs)

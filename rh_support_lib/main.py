@@ -1,19 +1,20 @@
 import argparse
-import sys
 import os
+import sys
+
 from rh_support_lib.api import enable_debug_logging
-from rh_support_lib.config import load_config
-from rh_support_lib.commands.list_cases import cmd_list
-from rh_support_lib.commands.show_case import cmd_show
-from rh_support_lib.commands.create_case import cmd_create
-from rh_support_lib.commands.apply_template import cmd_apply, cmd_list_templates
-from rh_support_lib.tui.app import cmd_tui
 from rh_support_lib.commands.actions import (
     cmd_attach,
     cmd_comment,
-    cmd_link,
     cmd_completion,
+    cmd_link,
 )
+from rh_support_lib.commands.apply_template import cmd_apply, cmd_list_templates
+from rh_support_lib.commands.create_case import cmd_create
+from rh_support_lib.commands.list_cases import cmd_list
+from rh_support_lib.commands.show_case import cmd_show
+from rh_support_lib.config import load_config
+from rh_support_lib.tui.app import cmd_tui
 
 try:
     import argcomplete
@@ -23,8 +24,9 @@ except ImportError:
 
 def main():
     if "--mock" in sys.argv:
-        import threading
         import http.server
+        import threading
+
         import rh_support_lib.constants
 
         # Check if a custom mock-corpus is provided
