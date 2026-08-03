@@ -1,4 +1,6 @@
 [tool.ruff]
+target-version = "py39"
+
 # Exclude a variety of commonly ignored directories.
 exclude = [
     ".git",
@@ -9,5 +11,4 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-# No ignores to adhere strictly to all Ruff rules.
-
+# Zero ignores to strictly adhere to all Ruff 0.16 rules for Python 3.9+.
