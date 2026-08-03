@@ -1,14 +1,16 @@
 import sys
+
 import requests
+from rich.box import ROUNDED
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
-from rich.box import ROUNDED
-from rh_support_lib.constants import API_URL, STATUS_FILTER_MAP, SEVERITY_MAP
+
+from rh_support_lib.constants import API_URL, SEVERITY_MAP, STATUS_FILTER_MAP
 
 
 def cmd_list(args, api_client, config=None):
-    from rh_support_lib.api import RedHatAPIClient, LegacyAPIClient
+    from rh_support_lib.api import LegacyAPIClient, RedHatAPIClient
 
     if not isinstance(api_client, (RedHatAPIClient, LegacyAPIClient)):
         api_client = LegacyAPIClient(api_client)
@@ -130,7 +132,20 @@ def cmd_list(args, api_client, config=None):
         print("No cases found.")
         return
 
-    console = Console(no_color=args.simple_output, highlight=not args.simple_output)
+    console_width = None
+    if args.simple_output:
+        import os
+
+        try:
+            console_width = int(os.environ.get("COLUMNS", "200"))
+        except ValueError:
+            console_width = 200
+
+    console = Console(
+        no_color=args.simple_output,
+        highlight=not args.simple_output,
+        width=console_width,
+    )
 
     # Re-calculate table styling
     box_style = None if args.simple_output else ROUNDED
