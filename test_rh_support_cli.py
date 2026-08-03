@@ -1992,6 +1992,10 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         self.assertNotIn("accountNumber", payload_none)
 
         # 2. Test Modal initial values
+        import asyncio
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         temp_home = tempfile.mkdtemp()
         try:
             modal = TemplateModal("12345", "my_default_template")
@@ -2001,6 +2005,8 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             self.assertEqual(modal_bk.active_bookmark, "my_team")
         finally:
             shutil.rmtree(temp_home)
+            loop.close()
+            asyncio.set_event_loop(None)
 
     def test_mock_mode_list_and_show(self):
         """Test that --mock runs the CLI offline against the in-process synthetic corpus"""
