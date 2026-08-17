@@ -11,4 +11,4 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-# Zero ignores to strictly adhere to all Ruff 0.16 rules for Python 3.9+.
+extend-select = ["I"]
