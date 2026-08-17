@@ -1,7 +1,7 @@
 import os
 
 # --- CONFIGURATION ---
-API_URL = os.environ.get("RH_API_URL", "https://api.access.redhat.com/support/v1")
+API_URL = os.environ.get("RH_API_URL", "https://api.access.redhat.com/support/v3")
 SSO_URL = os.environ.get(
     "RH_SSO_URL",
     "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token",

@@ -16,6 +16,8 @@ import logging
 
 import requests.sessions
 
+from rh_support_lib.constants import SSO_URL
+
 
 def enable_debug_logging(log_file=None):
     if log_file:
@@ -103,9 +105,6 @@ def enable_debug_logging(log_file=None):
 
     # Patch the method
     requests.sessions.Session.request = debug_request
-
-
-from rh_support_lib.constants import SSO_URL
 
 
 def _get_token_cache_file():

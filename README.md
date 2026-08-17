@@ -356,7 +356,7 @@ This tool supports Bash completion via `argcomplete`.
 
 The following environment variables can be used to override default API URLs (useful for testing or pointing to different environments):
 
-- `RH_API_URL`: Base URL for the Support API (Default: `https://api.access.redhat.com/support/v1`)
+- `RH_API_URL`: Base URL for the Support API (Default: `https://api.access.redhat.com/support/v3`)
 - `RH_SSO_URL`: URL for the SSO Token endpoint (Default: `https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token`)
 
 ## API Documentation

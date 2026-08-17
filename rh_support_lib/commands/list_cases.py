@@ -1,3 +1,4 @@
+import os
 import sys
 
 import requests
@@ -133,18 +134,25 @@ def cmd_list(args, api_client, config=None):
         return
 
     console_width = None
-    if args.simple_output:
-        import os
-
+    if "COLUMNS" in os.environ:
         try:
-            console_width = int(os.environ.get("COLUMNS", "200"))
+            console_width = int(os.environ["COLUMNS"])
         except ValueError:
-            console_width = 200
-
+            pass
+    if console_width is None and (args.simple_output or not sys.stdout.isatty()):
+        console_width = 200
+    color_sys = (
+        None
+        if args.simple_output
+        else ("standard" if os.environ.get("FORCE_COLOR") == "1" else "auto")
+    )
     console = Console(
         no_color=args.simple_output,
         highlight=not args.simple_output,
         width=console_width,
+        height=int(os.environ.get("LINES", "100")),
+        color_system=color_sys,
+        force_terminal=True if os.environ.get("FORCE_COLOR") == "1" else None,
     )
 
     # Re-calculate table styling

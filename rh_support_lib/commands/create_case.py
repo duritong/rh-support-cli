@@ -1,9 +1,9 @@
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
-
 import requests
 import yaml
 
@@ -56,7 +56,8 @@ def cmd_create(args, api_client, config):
     product_code = None
     if not product:
         print("Fetching products...")
-        products = get_json(f"{API_URL.replace('/v1', '/v2')}/products", token)
+        prod_api_url = re.sub(r"/v\d+$", "/v2", API_URL)
+        products = get_json(f"{prod_api_url}/products", token)
         selected = select_from_list("Select Product", products)
         if selected:
             product = selected.get("name")
@@ -73,8 +74,9 @@ def cmd_create(args, api_client, config):
 
             print("Fetching versions...")
             encoded_product = urllib.parse.quote(product_code)
+            prod_api_url = re.sub(r"/v\d+$", "/v2", API_URL)
             versions = get_json(
-                f"{API_URL.replace('/v1', '/v2')}/products/{encoded_product}/versions",
+                f"{prod_api_url}/products/{encoded_product}/versions",
                 token,
             )
 

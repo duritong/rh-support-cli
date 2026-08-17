@@ -1,3 +1,4 @@
+import os
 import pydoc
 import sys
 
@@ -123,7 +124,10 @@ def cmd_show(args, api_client):
         from rich.table import Table
         from rich.text import Text
 
-        console = Console()
+        console = Console(
+            color_system="standard" if os.environ.get("FORCE_COLOR") == "1" else "auto",
+            force_terminal=True if os.environ.get("FORCE_COLOR") == "1" else None,
+        )
 
         def render_rich(con):
             # Header panel

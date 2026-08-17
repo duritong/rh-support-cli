@@ -207,20 +207,8 @@ def cmd_comment(args, api_client):
         "Content-Type": "application/json",
         "Accept": "application/json",
     }
-    # Swagger definition uses 'commentBody' and 'isPublic' (inferred from response schema and common patterns,
-    # though Swagger only shows response for POST /comments, input body schema Ref is CaseComment)
-    # Checking CaseComment definition in Swagger:
-    # "CaseComment": { "properties": { "body": { "type": "string" }, "public": { "type": "boolean" } ... } }
-    # WAIT. The codebase investigator said: "Swagger definition... shows 'commentBody' as the field name, not 'body'".
-    # Let me re-read the Swagger file content I just read.
-    # Searching for "CaseComment" definition... I need to find it in the truncated output or assume investigator was right.
-    # I see /v1/cases/{caseNumber}/comments POST parameters: schema $ref #/definitions/CaseComment
-    # I need to see definitions/CaseComment. It was likely in the truncated part or I missed it.
-    # Let's trust the investigator's specific finding about 'commentBody' vs 'body'.
-    # Actually, looking at `rh_support_lib/commands/show_case.py`:
-    # c_body = c.get("commentBody") or c.get("body") or c.get("text") or ""
-    # This suggests `commentBody` is a strong candidate.
-
+    # API definition for /v3/cases/{caseNumber}/comments uses 'commentBody'
+    # and CaseCommentRequest schema.
     payload = {"isPublic": True, "commentBody": comment_body}
 
     try:
