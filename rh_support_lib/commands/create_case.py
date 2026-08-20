@@ -1,25 +1,18 @@
 import json
 import os
-import re
 import subprocess
 import sys
 import tempfile
 
-import requests
 import yaml
 
-from rh_support_lib.api import get_json
-from rh_support_lib.constants import API_URL
+from rh_support_lib.services.attachments import AttachmentService
+from rh_support_lib.services.cases import CaseService
 from rh_support_lib.templates import TemplateEngine
 from rh_support_lib.utils import prompt_text, select_from_list, strip_header_comments
 
 
 def cmd_create(args, api_client, config):
-    from rh_support_lib.api import LegacyAPIClient, RedHatAPIClient
-
-    if not isinstance(api_client, (RedHatAPIClient, LegacyAPIClient)):
-        api_client = LegacyAPIClient(api_client)
-    token = api_client.get_token()
 
     # Process Templates
     defaults = {}
@@ -52,64 +45,34 @@ def cmd_create(args, api_client, config):
 
     # 1. Gather Data (Flags or Interactive)
 
+    case_service = CaseService(api_client)
+
     # Product
     product = args.product or defaults.get("product")
-    product_code = None
     if not product:
         print("Fetching products...")
-        prod_api_url = re.sub(r"/v\d+$", "/v2", API_URL)
-        products = get_json(f"{prod_api_url}/products", token)
-        selected = select_from_list("Select Product", products)
-        if selected:
-            product = selected.get("name")
-            product_code = product  # v2 uses the name for version lookup
-        else:
+        try:
+            products = case_service.get_active_products()
+            prod_dicts = [{"name": p.name} for p in products]
+            selected = select_from_list("Select Product", prod_dicts)
+            product = selected.get("name") if selected else prompt_text("Product Name")
+        except Exception:  # noqa: BLE001
             product = prompt_text("Product Name")
 
-    # If we have a product code, we can fetch versions, otherwise just ask
     version = args.version or defaults.get("version")
     if not version:
-        versions = []
-        if product_code:
-            import urllib.parse
-
-            print("Fetching versions...")
-            encoded_product = urllib.parse.quote(product_code)
-            prod_api_url = re.sub(r"/v\d+$", "/v2", API_URL)
-            versions = get_json(
-                f"{prod_api_url}/products/{encoded_product}/versions",
-                token,
-            )
-
-        if versions:
-            selected = select_from_list("Select Version", versions)
-            version = (
-                selected.get("name") if selected else prompt_text("Product Version")
-            )
-        else:
-            version = prompt_text("Product Version")
-
+        version = prompt_text("Product Version", default="9.0")
     # Severity and Type
-    severity = args.severity or defaults.get("severity")
-    if not severity:
-        print("Fetching severities...")
-        sevs = get_json(f"{API_URL}/values/severity", token)
-        if sevs:
-            selected = select_from_list("Select Severity", sevs)
-            severity = selected.get("name") if selected else prompt_text("Severity")
-        else:
-            severity = prompt_text("Severity", default="Normal")
-
-    case_type = args.type or defaults.get("caseType")
-    if not case_type:
-        print("Fetching case types...")
-        types = get_json(f"{API_URL}/values/caseType", token)
-        if types:
-            selected = select_from_list("Select Case Type", types)
-            case_type = selected.get("name") if selected else prompt_text("Case Type")
-        else:
-            case_type = prompt_text("Case Type", default="Standard")
-
+    severity = (
+        args.severity
+        or defaults.get("severity")
+        or prompt_text("Severity", default="Normal")
+    )
+    case_type = (
+        args.type
+        or defaults.get("caseType")
+        or prompt_text("Case Type", default="Standard")
+    )
     summary = args.summary or defaults.get("summary") or prompt_text("Case Summary")
 
     # Description
@@ -141,10 +104,6 @@ def cmd_create(args, api_client, config):
                 lines = f.readlines()
             description = strip_header_comments(lines).strip()
 
-            # Refresh token after the editor is closed, in case it expired while typing
-            from rh_support_lib.api import get_access_token
-
-            token = get_access_token(args.token_file)
         except Exception:
             if os.path.exists(tf_path):
                 os.remove(tf_path)
@@ -218,49 +177,36 @@ def cmd_create(args, api_client, config):
 
     # 3. Create Case
     print("Creating case...")
-    payload = {
-        "product": product,
-        "version": version,
-        "summary": summary,
-        "description": description,
-        "severity": severity,
-        "type": case_type,
+    case_service = CaseService(api_client)
+    extra_fields = {
+        k: v
+        for k, v in defaults.items()
+        if k
+        not in [
+            "product",
+            "version",
+            "summary",
+            "description",
+            "severity",
+            "caseType",
+        ]
+        and not k.startswith("_")
     }
-
-    # Merge extra fields
-    for k, v in defaults.items():
-        if k not in payload:
-            payload[k] = v
-
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-    }
-
     try:
-        resp = requests.post(
-            f"{API_URL}/cases", headers=headers, json=payload, timeout=30
+        case_number = case_service.create_case(
+            summary=summary,
+            description=description,
+            product_name=product or "Red Hat Enterprise Linux",
+            version_name=version or "9.0",
+            severity=severity or "3 (Normal)",
+            case_type=case_type or "Standard",
+            account_number=defaults.get("accountNumber"),
+            extra_fields=extra_fields,
         )
-        if resp.status_code in [200, 201]:
-            case_data = resp.json()
-            case_number = case_data.get("caseNumber") or case_data.get("id")
-            if not case_number and "locations" in case_data and case_data["locations"]:
-                loc = case_data["locations"][0]
-                case_number = loc.rstrip("/").split("/")[-1]
-
-            print(f"Success: Case #{case_number} created.")
-
-            # Cleanup temp file on success
-            if temp_desc_path and os.path.exists(temp_desc_path):
-                os.remove(temp_desc_path)
-        else:
-            print(f"Error: Case creation failed (HTTP {resp.status_code})")
-            print(resp.text)
-            if temp_desc_path:
-                print(f"Draft description preserved at: {temp_desc_path}")
-            sys.exit(1)
-    except requests.exceptions.RequestException as e:
+        print(f"Success: Case #{case_number} created.")
+        if temp_desc_path and os.path.exists(temp_desc_path):
+            os.remove(temp_desc_path)
+    except Exception as e:  # noqa: BLE001
         if temp_desc_path:
             print(f"Draft description preserved at: {temp_desc_path}")
         sys.exit(f"Network Error: {e}")
@@ -268,28 +214,12 @@ def cmd_create(args, api_client, config):
     # 4. Upload Attachments
     if attachments and case_number:
         print("Uploading attachments...")
-        # Reuse cmd_attach logic conceptually, but we need to pass args object or call function
-        # Simpler to just reimplement the upload loop here since cmd_attach takes 'args'
+        att_service = AttachmentService(api_client)
         for fpath in attachments:
             print(f"Attaching '{os.path.basename(fpath)}'...")
             try:
-                from requests_toolbelt.multipart.encoder import MultipartEncoder
-
-                with open(fpath, "rb") as f:
-                    m = MultipartEncoder(fields={"file": (os.path.basename(fpath), f)})
-                    ep = f"{API_URL}/cases/{case_number}/attachments"
-                    req_headers = headers.copy()
-                    req_headers["Content-Type"] = m.content_type
-                    up_resp = requests.post(
-                        ep, headers=req_headers, data=m, timeout=(30, 3600)
-                    )
-                    if up_resp.status_code in [200, 201]:
-                        print(f"  - {os.path.basename(fpath)}: Uploaded")
-                    else:
-                        print(
-                            f"  - {os.path.basename(fpath)}: Failed ({up_resp.status_code})"
-                        )
-            except (OSError, requests.exceptions.RequestException) as e:
+                att_service.upload_attachment(case_number, fpath)
+                print(f"  - {os.path.basename(fpath)}: Uploaded")
+            except Exception as e:  # noqa: BLE001
                 print(f"  - {os.path.basename(fpath)}: Error ({e})")
-
     return case_number

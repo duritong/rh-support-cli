@@ -10,6 +10,7 @@ from rh_support_lib.commands.actions import (
     cmd_link,
 )
 from rh_support_lib.commands.apply_template import cmd_apply, cmd_list_templates
+from rh_support_lib.commands.attachments import cmd_attachment
 from rh_support_lib.commands.create_case import cmd_create
 from rh_support_lib.commands.list_cases import cmd_list
 from rh_support_lib.commands.show_case import cmd_show
@@ -53,21 +54,30 @@ def main():
 
         mock_api_url = f"http://127.0.0.1:{port}"
         mock_sso_url = f"http://127.0.0.1:{port}/auth/token"
+        mock_graphql_url = f"http://127.0.0.1:{port}/graphql"
+        mock_attachment_url = f"http://127.0.0.1:{port}"
 
         os.environ["RH_API_URL"] = mock_api_url
         os.environ["RH_SSO_URL"] = mock_sso_url
+        os.environ["RH_GRAPHQL_URL"] = mock_graphql_url
+        os.environ["RH_ATTACHMENT_API_URL"] = mock_attachment_url
         os.environ.setdefault("REDHAT_SUPPORT_OFFLINE_TOKEN", "cli_token")
 
         # Update bound variables in any loaded modules
         rh_support_lib.constants.API_URL = mock_api_url
         rh_support_lib.constants.SSO_URL = mock_sso_url
+        rh_support_lib.constants.GRAPHQL_URL = mock_graphql_url
+        rh_support_lib.constants.ATTACHMENT_API_URL = mock_attachment_url
         for mod_name, mod in list(sys.modules.items()):
             if mod_name.startswith("rh_support_lib.") or mod_name == "rh_support_lib":
                 if hasattr(mod, "API_URL"):
                     mod.API_URL = mock_api_url
                 if hasattr(mod, "SSO_URL"):
                     mod.SSO_URL = mock_sso_url
-
+                if hasattr(mod, "GRAPHQL_URL"):
+                    mod.GRAPHQL_URL = mock_graphql_url
+                if hasattr(mod, "ATTACHMENT_API_URL"):
+                    mod.ATTACHMENT_API_URL = mock_attachment_url
     parser = argparse.ArgumentParser(
         description="Red Hat Support Case CLI Tool",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -146,8 +156,10 @@ Authentication:
     # Completion Subcommand
     subparsers.add_parser("completion", help="Print bash completion script")
 
-    # Attach Subcommand
-    parser_attach = subparsers.add_parser("attach", help="Attach a file to a case")
+    # Attach Subcommand (shortcut)
+    parser_attach = subparsers.add_parser(
+        "attach", help="Attach a file to a case (shortcut)"
+    )
     parser_attach.add_argument("-c", "--case", required=True, help="Case Number")
     parser_attach.add_argument(
         "-f",
@@ -156,7 +168,64 @@ Authentication:
         action="append",
         help="File path to attach (can be used multiple times)",
     )
+    parser_attach.add_argument("-d", "--description", help="Attachment description")
 
+    # Attachment Subcommand Group
+    for att_name in ("attachment", "attachments"):
+        parser_att = subparsers.add_parser(
+            att_name,
+            help="Manage case file attachments (list, upload, download, delete, status)",
+        )
+        parser_att.add_argument("-c", "--case", required=True, help="Case Number")
+        att_sub = parser_att.add_subparsers(
+            dest="attachment_action", help="Attachment action"
+        )
+
+        # list
+        p_att_list = att_sub.add_parser("list", help="List attachments for a case")
+        p_att_list.add_argument(
+            "--include-deleted", action="store_true", help="Include deleted files"
+        )
+
+        # upload / add
+        for up_name in ("upload", "add"):
+            p_att_up = att_sub.add_parser(
+                up_name, help="Upload attachment(s) to a case"
+            )
+            p_att_up.add_argument(
+                "-f", "--file", required=True, action="append", help="File to attach"
+            )
+            p_att_up.add_argument("-d", "--description", help="Attachment description")
+
+        # download / get
+        for down_name in ("download", "get"):
+            p_att_down = att_sub.add_parser(
+                down_name, help="Download an attachment from a case"
+            )
+            p_att_down.add_argument(
+                "-a", "--attachment", required=True, help="Attachment UUID"
+            )
+            p_att_down.add_argument(
+                "-o", "--output", help="Destination path or filename"
+            )
+
+        # delete / rm
+        for del_name in ("delete", "rm"):
+            p_att_del = att_sub.add_parser(
+                del_name, help="Delete an attachment from a case"
+            )
+            p_att_del.add_argument(
+                "-a", "--attachment", required=True, help="Attachment UUID"
+            )
+            p_att_del.add_argument(
+                "-y", "--yes", action="store_true", help="Skip confirmation prompt"
+            )
+
+        # status
+        p_att_stat = att_sub.add_parser(
+            "status", help="Get upload status of case attachments"
+        )
+        p_att_stat.add_argument("-a", "--attachment", help="Attachment UUID (optional)")
     # Create Subcommand
     parser_create = subparsers.add_parser("create", help="Create a new support case")
     parser_create.add_argument("--product", help="Product name")
@@ -314,6 +383,8 @@ Authentication:
 
     if args.command == "attach":
         cmd_attach(args, api_client)
+    elif args.command in ("attachment", "attachments"):
+        cmd_attachment(args, api_client)
     elif args.command == "create":
         cmd_create(args, api_client, config)
     elif args.command == "comment":

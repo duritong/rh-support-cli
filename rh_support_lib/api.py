@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import getpass
 import json
 import os
@@ -295,6 +297,26 @@ class RedHatAPIClient:
         resp.raise_for_status()
         return resp.json()
 
+    def execute_graphql(
+        self, query: str, variables: dict | None = None, url: str | None = None
+    ) -> dict:
+        import rh_support_lib.constants
+
+        target_url = url or rh_support_lib.constants.GRAPHQL_URL
+        headers = {
+            "Content-Type": "application/json",
+            "apollographql-client-name": "rh-support-cli",
+            "apollographql-client-version": "1.0.0",
+        }
+        payload = {"query": query, "variables": variables or {}}
+        resp = self.post(target_url, json=payload, headers=headers)
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("errors"):
+            error_msgs = [err.get("message", str(err)) for err in data["errors"]]
+            raise RuntimeError(f"GraphQL Error: {'; '.join(error_msgs)}")
+        return data.get("data", {})
+
 
 class LegacyAPIClient:
     """A wrapper to adapt a raw legacy token string to the RedHatAPIClient interface."""
@@ -329,3 +351,23 @@ class LegacyAPIClient:
         resp = self.get(url, **kwargs)
         resp.raise_for_status()
         return resp.json()
+
+    def execute_graphql(
+        self, query: str, variables: dict | None = None, url: str | None = None
+    ) -> dict:
+        import rh_support_lib.constants
+
+        target_url = url or rh_support_lib.constants.GRAPHQL_URL
+        headers = {
+            "Content-Type": "application/json",
+            "apollographql-client-name": "rh-support-cli",
+            "apollographql-client-version": "1.0.0",
+        }
+        payload = {"query": query, "variables": variables or {}}
+        resp = self.post(target_url, json=payload, headers=headers)
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("errors"):
+            error_msgs = [err.get("message", str(err)) for err in data["errors"]]
+            raise RuntimeError(f"GraphQL Error: {'; '.join(error_msgs)}")
+        return data.get("data", {})

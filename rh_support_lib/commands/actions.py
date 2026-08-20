@@ -1,78 +1,18 @@
 import os
 import sys
 
-import requests
-
-from rh_support_lib.api import get_json
-from rh_support_lib.constants import API_URL, STATUS_MAP
+from rh_support_lib.constants import STATUS_MAP
+from rh_support_lib.services.cases import CaseService
 from rh_support_lib.utils import open_editor, strip_header_comments
 
 
 def cmd_attach(args, api_client):
-    from rh_support_lib.api import LegacyAPIClient, RedHatAPIClient
+    from rh_support_lib.commands.attachments import cmd_attachment_upload
 
-    if not isinstance(api_client, (RedHatAPIClient, LegacyAPIClient)):
-        api_client = LegacyAPIClient(api_client)
-    token = api_client.get_token()
-    if not isinstance(args.file, list):
-        args.file = [args.file]
-
-    has_error = False
-
-    for fpath in args.file:
-        if not os.path.isfile(fpath):
-            print(f"Error: File '{fpath}' does not exist. Skipping.")
-            has_error = True
-            continue
-
-        # Check size (1GB limit warning)
-        file_size = os.path.getsize(fpath)
-        if file_size > 1073741824:
-            print(
-                f"Warning: File '{os.path.basename(fpath)}' exceeds 1GB. API upload might fail. Consider SFTP."
-            )
-
-        print(f"Attaching '{os.path.basename(fpath)}' to Case #{args.case}...")
-
-        endpoint = f"{API_URL}/cases/{args.case}/attachments"
-        headers = {"Authorization": f"Bearer {token}"}
-
-        # Streaming upload
-        try:
-            from requests_toolbelt.multipart.encoder import MultipartEncoder
-
-            with open(fpath, "rb") as f:
-                m = MultipartEncoder(fields={"file": (os.path.basename(fpath), f)})
-                req_headers = headers.copy()
-                req_headers["Content-Type"] = m.content_type
-                response = requests.post(
-                    endpoint, headers=req_headers, data=m, timeout=(30, 3600)
-                )
-
-            if response.status_code in [200, 201]:
-                print(f"Success: File '{os.path.basename(fpath)}' attached.")
-            else:
-                print(
-                    f"Error: Upload failed for '{os.path.basename(fpath)}' (HTTP {response.status_code})"
-                )
-                print(response.text)
-                has_error = True
-        except requests.exceptions.RequestException as e:
-            print(f"Network Error while uploading '{os.path.basename(fpath)}': {e}")
-            has_error = True
-
-    if has_error:
-        import sys
-
-        sys.exit(1)
+    cmd_attachment_upload(args, api_client)
 
 
 def cmd_comment(args, api_client):
-    from rh_support_lib.api import LegacyAPIClient, RedHatAPIClient
-
-    if not isinstance(api_client, (RedHatAPIClient, LegacyAPIClient)):
-        api_client = LegacyAPIClient(api_client)
-    token = api_client.get_token()
 
     # 1. Process templates if specified
     template_content = ""
@@ -128,53 +68,37 @@ def cmd_comment(args, api_client):
             lines = f.readlines()
         file_content = strip_header_comments(lines).strip()
 
+    case_service = CaseService(api_client)
+
     if args.edit or (not args.file and not getattr(args, "template", None)):
         # Prepare context if needed
         header_content = None
         if args.include_previous_comments and args.include_previous_comments > 0:
             print("Fetching previous comments for context...")
             try:
-                comments_data = get_json(f"{API_URL}/cases/{args.case}/comments", token)
-
-                # Normalize comments list
-                comments = []
-                if isinstance(comments_data, list):
-                    comments = comments_data
-                elif isinstance(comments_data, dict):
-                    # Try common wrapper keys
-                    for key in ["comments", "items", "list"]:
-                        if key in comments_data:
-                            comments = comments_data[key]
-                            break
+                details = case_service.get_case_details(
+                    args.case, first_comments=args.include_previous_comments
+                )
+                comments = details.comments if details else []
 
                 if comments:
                     # Sort by date (ascending) to get correct "last N"
-                    # Using string comparison for ISO dates works fine
-                    comments.sort(key=lambda x: x.get("createdDate", ""))
-
-                    # Take last N
+                    comments.sort(key=lambda x: x.created_date)
                     n = args.include_previous_comments
-                    n = min(n, len(comments))
                     subset = comments[-n:]
 
-                    header_lines = []
+                    header_lines = ["--- PREVIOUS COMMENTS ---"]
                     for c in subset:
-                        author = c.get("createdBy", "Unknown")
-                        date = c.get("createdDate", "Unknown Date")
-                        body = (
-                            c.get("commentBody") or c.get("body") or c.get("text") or ""
-                        )
-                        body = body.strip()
-                        # Format nicely
+                        author = c.created_by or "Unknown"
+                        date = c.created_date or "Unknown Date"
+                        body = (c.body or "").strip()
                         header_lines.append(f"--- Comment by {author} on {date} ---")
                         header_lines.append(body)
-                        header_lines.append("")  # Empty line separator
+                        header_lines.append("")
 
                     header_content = "\n".join(header_lines).strip()
 
             except Exception as e:  # noqa: BLE001
-                # Broad except is intentional to gracefully handle any API or network failure
-                # during previous comments context fetching and allow user to continue editing.
                 print(f"Warning: Failed to fetch previous comments: {e}")
 
         # Open Editor (using file_content as initial body if provided)
@@ -189,76 +113,29 @@ def cmd_comment(args, api_client):
             if temp_file_path and os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
             sys.exit(0)
-
-        # Refresh token after the editor is closed, in case it expired while typing
-        from rh_support_lib.api import get_access_token
-
-        token = get_access_token(args.token_file)
     else:
         # Non-interactive mode (File only, no edit)
         comment_body = file_content
 
-    # 1. Post Comment
+    # 1. Post Comment and update status via CaseService
     print(f"Posting comment to Case #{args.case}...")
-
-    comment_endpoint = f"{API_URL}/cases/{args.case}/comments"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-    }
-    # API definition for /v3/cases/{caseNumber}/comments uses 'commentBody'
-    # and CaseCommentRequest schema.
-    payload = {"isPublic": True, "commentBody": comment_body}
-
     try:
-        resp = requests.post(
-            comment_endpoint, headers=headers, json=payload, timeout=30
+        case_service.add_comment(
+            args.case,
+            comment_body,
+            is_public=True,
+            status=final_status if final_status else None,
         )
-        if resp.status_code in [200, 201]:
-            print("Success: Comment added.")
-        else:
-            print(f"Error: Comment failed (HTTP {resp.status_code})")
-            print(resp.text)
-            if temp_file_path:
-                print(f"Draft comment preserved at: {temp_file_path}")
-            sys.exit(1)
-
-    except requests.exceptions.RequestException as e:
+        print("Success: Comment added.")
+        if final_status:
+            print(f"Success: Case status updated to '{final_status}'.")
+        if temp_file_path and os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
+    except Exception as e:  # noqa: BLE001
+        print(f"Error: Comment failed ({e})")
         if temp_file_path:
             print(f"Draft comment preserved at: {temp_file_path}")
         sys.exit(f"Network Error: {e}")
-
-    # 2. Update Status
-    print(f"Updating status to '{final_status}'...")
-
-    status_endpoint = f"{API_URL}/cases/{args.case}"
-    status_payload = {"status": final_status}
-
-    try:
-        resp = requests.put(
-            status_endpoint, headers=headers, json=status_payload, timeout=30
-        )
-        if resp.status_code in [200, 204]:
-            print(f"Success: Case status updated to '{final_status}'.")
-            # Cleanup temp file only after complete success
-            if temp_file_path and os.path.exists(temp_file_path):
-                os.remove(temp_file_path)
-        else:
-            print(
-                f"Warning: Comment posted, but status update failed (HTTP {resp.status_code})"
-            )
-            print(resp.text)
-            # Since comment was posted, we can probably cleanup, but maybe keep it just in case?
-            # The prompt said "if submitting the comment fails". The comment succeeded here.
-            if temp_file_path and os.path.exists(temp_file_path):
-                os.remove(temp_file_path)
-            sys.exit(1)
-    except requests.exceptions.RequestException as e:
-        # Comment posted, status failed.
-        if temp_file_path and os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
-        sys.exit(f"Network Error during status update: {e}")
 
 
 def cmd_link(args):

@@ -2,6 +2,16 @@ import os
 
 # --- CONFIGURATION ---
 API_URL = os.environ.get("RH_API_URL", "https://api.access.redhat.com/support/v3")
+GRAPHQL_URL = os.environ.get(
+    "RH_GRAPHQL_URL",
+    f"{os.environ['RH_API_URL']}/graphql"
+    if "RH_API_URL" in os.environ
+    else "https://graphql.redhat.com",
+)
+ATTACHMENT_API_URL = os.environ.get(
+    "RH_ATTACHMENT_API_URL",
+    os.environ.get("RH_API_URL", "https://api.access.redhat.com/support"),
+)
 SSO_URL = os.environ.get(
     "RH_SSO_URL",
     "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token",

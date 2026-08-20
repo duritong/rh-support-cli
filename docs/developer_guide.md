@@ -14,25 +14,34 @@ The project is structured as a Python CLI wrapper around the Red Hat Support Cas
 ├── setup.py                # Package installation configuration
 ├── test_rh_support_cli.py  # Comprehensive end-to-end unit test suite
 └── rh_support_lib/         # Core application library
-    ├── api.py              # Red Hat SSO auth, OIDC token caching, HTTP client
+    ├── api.py              # Red Hat SSO auth, OIDC token caching, GraphQL/REST HTTP client
     ├── config.py           # Configuration (bookmarks, templates, debug files)
     ├── constants.py        # Shared API endpoints, severity mapping, color codes
+    ├── models.py           # Clean domain data models (Case, CaseComment, Attachment, CaseDetails)
     ├── templates.py        # YAML Jinja2 template processing engine
     ├── utils.py            # CLI text colorizing, smart comment header stripping
     ├── commands/           # Single-command CLI implementations
     │   ├── actions.py      # comment, attach, link, completion subcommands
+    │   ├── apply_template.py # apply, list-templates subcommands
+    │   ├── attachments.py  # attachment subcommand group (list, upload, download, delete, status)
     │   ├── create_case.py  # create subcommand
     │   ├── list_cases.py   # list subcommand (Rich Table based)
     │   └── show_case.py    # show subcommand (Rich Panels/Markdown based)
+    ├── services/           # Decoupled domain service layer
+    │   ├── attachments.py  # AttachmentService (v3 presigned upload, download, delete, status)
+    │   └── cases.py        # CaseService (GraphQL queries, mutations, case lookups)
+    ├── synthetic_corpus/   # Local stateful mock portal and synthetic generator
+    │   ├── generator.py    # Synthetic corpus generator
+    │   └── server.py       # Stateful loopback mock HTTP and GraphQL server
     └── tui/                # Interactive Terminal User Interface (TUI)
         └── app.py          # Dashboard UI, focus containers, modals (Textual)
 ```
 
 ### Key Design Decoupling
-*   **Separation of Concerns**: Core operations like OIDC authentication, OIDC caching, and requests are isolated in `api.py`. Commands in `commands/` and the interactive interface in `tui/` act as separate UI consumers of these library routines.
+*   **Library-First Domain Services**: Core domain logic is encapsulated within `rh_support_lib/services/` (`CaseService` for GraphQL case management and `AttachmentService` for presigned file transfers). Both CLI subcommands (`commands/`) and the interactive dashboard (`tui/`) act as presentation-only consumers of normalized domain models (`models.py`), ensuring complete separation of concerns and zero API leakages into UI code.
+*   **Single-Endpoint GraphQL Gateway**: Case querying, filtering, details retrieval with comments, creation, and updates route through `https://graphql.redhat.com` with `RedHatAPIClient.execute_graphql()`.
+*   **Presigned Direct Transfer Attachments**: Large files up to 5 TB bypass intermediate API gateways via `AttachmentService`, using single PUT ($\le 5\text{ GB}$) or multipart parallel chunks (> $5\text{ GB}$) with automatic completion verification.
 *   **No-Auth Execution Paths**: Commands that only inspect local resources (like `list-templates` and `completion`) are routed before OIDC token fetching in `main.py`, providing fast, completely offline execution.
-
----
 
 ## 2. Terminal User Interface (TUI) Architecture
 

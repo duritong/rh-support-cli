@@ -4,8 +4,8 @@ import sys
 import requests
 import yaml
 
-from rh_support_lib.api import get_json
-from rh_support_lib.constants import API_URL, COLORS
+from rh_support_lib.constants import API_URL, COLORS, SEVERITY_MAP, STATUS_MAP
+from rh_support_lib.services.cases import CaseService
 from rh_support_lib.templates import TemplateEngine
 from rh_support_lib.utils import colorize
 
@@ -52,23 +52,28 @@ VALID_PUT_FIELDS = {
 
 
 def cmd_apply(args, api_client, config):
-    from rh_support_lib.api import LegacyAPIClient, RedHatAPIClient
-
-    if not isinstance(api_client, (RedHatAPIClient, LegacyAPIClient)):
-        api_client = LegacyAPIClient(api_client)
-    token = api_client.get_token()
-
-    # 1. Fetch Case Details
+    # 1. Fetch Case Details via CaseService
     print(f"Fetching case {args.case} details...")
+    case_service = CaseService(api_client)
     try:
-        case = get_json(f"{API_URL}/cases/{args.case}", token)
+        details = case_service.get_case_details(args.case)
     except Exception as e:  # noqa: BLE001
-        # Catch-all is intentional to gracefully report any network or API failures and exit the CLI
         sys.exit(f"Error fetching case details: {e}")
 
-    if not case or not isinstance(case, dict):
+    if not details or not details.case:
         sys.exit(f"Error: Case {args.case} not found or invalid response.")
 
+    case = {
+        "summary": details.case.summary,
+        "description": details.description,
+        "status": details.case.status,
+        "product": details.case.product,
+        "version": details.case.version,
+        "caseType": details.case.case_type,
+        "severity": details.case.severity,
+        "accountNumber": details.case.account_number,
+        "owner": details.case.owner,
+    }
     # 2. Render templates
     templates_to_process = args.template
     template_vars = {}
@@ -107,10 +112,19 @@ def cmd_apply(args, api_client, config):
                 )
                 if current_bool != v:
                     updates[target_key] = v
+            elif target_key == "severity" and v is not None:
+                cur_s = SEVERITY_MAP.get(str(current_val).lower(), str(current_val))
+                tgt_s = SEVERITY_MAP.get(str(v).lower(), str(v))
+                if cur_s != tgt_s:
+                    updates[target_key] = v
+            elif target_key == "status" and v is not None:
+                cur_st = STATUS_MAP.get(str(current_val).lower(), str(current_val))
+                tgt_st = STATUS_MAP.get(str(v).lower(), str(v))
+                if cur_st != tgt_st:
+                    updates[target_key] = v
             elif v is not None:
                 if str(current_val).strip() != str(v).strip():
                     updates[target_key] = v
-
     # 4. Compute watchers/notified users differences
     watchers_keys = ["notified_users", "notifiedUsers", "watchers"]
     template_watchers = []
@@ -180,39 +194,26 @@ def cmd_apply(args, api_client, config):
         print("\n[Dry-run] Would apply changes listed above.")
         sys.exit(0)
 
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-    }
-
     if updates:
         print("\nUpdating case fields...")
         try:
-            resp = requests.put(
-                f"{API_URL}/cases/{args.case}",
-                headers=headers,
-                json=updates,
-                timeout=30,
+            case_service.update_case(
+                args.case,
+                status=updates.get("status"),
+                severity=updates.get("severity"),
+                summary=updates.get("summary"),
+                description=updates.get("description"),
             )
-            if resp.status_code in [200, 201]:
-                print("Success: Case fields updated.")
-            else:
-                print(f"Error: Field update failed (HTTP {resp.status_code})")
-                print(resp.text)
-                sys.exit(1)
-        except requests.exceptions.RequestException as e:
+            print("Success: Case fields updated.")
+        except Exception as e:  # noqa: BLE001
             sys.exit(f"Network Error updating fields: {e}")
-
     if watchers_to_add:
         print("Adding watchers...")
         payload = {"user": [{"ssoUsername": sso} for sso in watchers_to_add]}
         try:
-            resp = requests.post(
+            resp = api_client.post(
                 f"{API_URL}/cases/{args.case}/notifiedusers",
-                headers=headers,
                 json=payload,
-                timeout=30,
             )
             if resp.status_code in [200, 201]:
                 print("Success: Watchers added.")

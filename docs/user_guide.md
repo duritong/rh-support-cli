@@ -203,6 +203,32 @@ rh-support-cli create \
 
 ## 5. Subcommands Usage
 
+### Attachment Management (`attachment` / `attachments`)
+Manage file attachments on Red Hat support cases using the dedicated Attachment Service API (supporting files up to 5 TB with direct storage transfers):
+
+*   **List Attachments**:
+    ```bash
+    rh-support-cli attachment -c 12345678 list [--include-deleted]
+    ```
+*   **Upload Attachments**:
+    ```bash
+    rh-support-cli attachment -c 12345678 upload -f /path/to/sosreport.tar.xz [-d "Sosreport after OOM"]
+    # Shortcut:
+    rh-support-cli attach -c 12345678 -f /path/to/sosreport.tar.xz
+    ```
+*   **Download Attachment**:
+    ```bash
+    rh-support-cli attachment -c 12345678 download -a <ATTACHMENT_UUID> [-o /path/to/destination.tar.xz]
+    ```
+*   **Delete Attachment**:
+    ```bash
+    rh-support-cli attachment -c 12345678 delete -a <ATTACHMENT_UUID> [-y]
+    ```
+*   **Check Attachment Status**:
+    ```bash
+    rh-support-cli attachment -c 12345678 status [-a <ATTACHMENT_UUID>]
+    ```
+
 ### Listing local templates
 List all configured local templates, including their private descriptions, target fields, and watchers. This command runs **completely offline**:
 ```bash
@@ -220,8 +246,6 @@ If you are pipe-logging or working in a terminal that doesn't support rich forma
 ```bash
 rh-support-cli --simple-output show -c 12345678
 ```
-
----
 
 ## 6. Interactive TUI Mode (`tui`)
 

@@ -5,7 +5,7 @@ import pathlib
 import time
 from typing import ClassVar
 
-import requests
+from rich.box import ROUNDED
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
@@ -27,17 +27,26 @@ from textual.widgets import (
     TextArea,
 )
 
-from rh_support_lib.api import get_json
 from rh_support_lib.constants import API_URL, SEVERITY_MAP, STATUS_FILTER_MAP
+from rh_support_lib.models import Attachment, Case, CaseDetails
+from rh_support_lib.services.attachments import AttachmentService
+from rh_support_lib.services.cases import CaseService
+
+__all__ = [
+    "API_URL",
+    "SupportApp",
+    "build_filter_params",
+    "build_filter_payload",
+    "cmd_tui",
+]
 
 
 def build_filter_payload(
     config: dict, bookmark: str | None = None, no_default_bookmark: bool = False
 ) -> dict:
     """Constructs the filter payload based on config bookmarks."""
-    payload = {"maxResults": 50, "offset": 0}
     if not config:
-        return payload
+        return {}
 
     filters = {}
 
@@ -56,7 +65,7 @@ def build_filter_payload(
             if bk_data:
                 filters.update(bk_data)
 
-    # Convert filters to payload
+    payload: dict = {}
     acc = filters.get("account") or filters.get("accountNumber")
     if acc:
         payload["accountNumber"] = str(acc)
@@ -65,30 +74,23 @@ def build_filter_payload(
     if raw_status:
         if isinstance(raw_status, str):
             raw_status = [raw_status]
-
         mapped_statuses = []
         for s in raw_status:
             val = STATUS_FILTER_MAP.get(str(s).lower(), s)
             for v in val.split(","):
                 mapped_statuses.append(v.strip())
-
         if len(mapped_statuses) == 1:
             payload["status"] = mapped_statuses[0]
         else:
             payload["statuses"] = mapped_statuses
 
-        if any("closed" in s.lower() for s in mapped_statuses):
-            payload["includeClosed"] = True
-
     raw_sev = filters.get("severity")
     if raw_sev:
         if isinstance(raw_sev, str):
             raw_sev = [raw_sev]
-
         mapped_sevs = []
         for s in raw_sev:
             mapped_sevs.append(SEVERITY_MAP.get(str(s).lower(), s))
-
         if len(mapped_sevs) == 1:
             payload["severity"] = mapped_sevs[0]
         else:
@@ -99,6 +101,21 @@ def build_filter_payload(
         payload["ownerSSOName"] = str(own)
 
     return payload
+
+
+def build_filter_params(
+    config: dict, bookmark: str | None = None, no_default_bookmark: bool = False
+) -> dict:
+    """Constructs the filter parameters dictionary for CaseService."""
+    payload = build_filter_payload(config, bookmark, no_default_bookmark)
+    stat = payload.get("statuses") or payload.get("status")
+    sev = payload.get("severities") or payload.get("severity")
+    return {
+        "account": payload.get("accountNumber"),
+        "status": stat if isinstance(stat, list) else ([stat] if stat else None),
+        "severity": sev if isinstance(sev, list) else ([sev] if sev else None),
+        "owner": payload.get("ownerSSOName"),
+    }
 
 
 class TemplateModal(ModalScreen[str]):
@@ -498,17 +515,13 @@ class SupportApp(App):
     }
     ScrollBar {
         background: transparent;
-        color: $primary;
-    }
-    ScrollBar:hover {
-        color: $primary-lighten-1;
     }
     """
 
     def __init__(
         self,
-        token,
-        config: dict,
+        token: str,
+        config: dict | None = None,
         bookmark: str | None = None,
         no_default_bookmark: bool = False,
     ):
@@ -521,8 +534,10 @@ class SupportApp(App):
         self.config = config
         self.active_bookmark = bookmark
         self.no_default_bookmark = no_default_bookmark
-        self.cases = []
-        self.selected_case_id = ""
+        self.cases: list[Case] = []
+        self.selected_case_id: str | None = None
+        self.case_service = CaseService(self.api_client)
+        self.attachment_service = AttachmentService(self.api_client)
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -557,34 +572,11 @@ class SupportApp(App):
         self.call_from_thread(show_loading)
 
         try:
-            payload = build_filter_payload(
+            params = build_filter_params(
                 self.config, self.active_bookmark, self.no_default_bookmark
             )
-            token = self.api_client.get_token()
-            headers = {
-                "Authorization": f"Bearer {token}",
-                "Content-Type": "application/json",
-            }
-            resp = requests.post(
-                f"{API_URL}/cases/filter",
-                headers=headers,
-                json=payload,
-                timeout=30,
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                if isinstance(data, list):
-                    self.cases = data
-                elif isinstance(data, dict):
-                    self.cases = (
-                        data.get("cases") or data.get("items") or data.get("list") or []
-                    )
-
-                self.call_from_thread(self.populate_cases_table)
-            else:
-                self.call_from_thread(
-                    self.show_error, f"Failed to load cases: HTTP {resp.status_code}"
-                )
+            self.cases = self.case_service.list_cases(**params)
+            self.call_from_thread(self.populate_cases_table)
         except Exception as e:  # noqa: BLE001
             self.call_from_thread(self.show_error, f"Network Error: {e}")
 
@@ -592,10 +584,10 @@ class SupportApp(App):
         table = self.query_one("#case-table", DataTable)
         table.clear()
         for idx, c in enumerate(self.cases):
-            num = str(c.get("caseNumber") or c.get("id") or "")
-            title = c.get("summary") or ""
-            sev = c.get("severity") or ""
-            status = c.get("status") or ""
+            num = c.case_number or c.id
+            title = c.summary or ""
+            sev = c.severity or ""
+            status = c.status or ""
 
             # Standard color representations
             sev_style = ""
@@ -607,7 +599,6 @@ class SupportApp(App):
                 sev_style = "yellow"
             elif "Low" in sev or "4" in sev:
                 sev_style = "green"
-
             status_style = ""
             if "Red Hat" in status or "red hat" in status.lower():
                 status_style = "bold orange3"
@@ -722,45 +713,40 @@ class SupportApp(App):
         self.call_from_thread(show_loading)
 
         try:
-            token = self.api_client.get_token()
-            case = get_json(f"{API_URL}/cases/{case_id}", token)
-            if not case or not isinstance(case, dict):
+            details = self.case_service.get_case_details(case_id)
+            if not details or not details.case:
                 self.call_from_thread(self.show_error, f"Case {case_id} not found.")
                 return
 
-            comments = get_json(f"{API_URL}/cases/{case_id}/comments", token)
-            if not isinstance(comments, list):
-                comments = []
+            try:
+                attachments = self.attachment_service.list_attachments(case_id)
+            except Exception:  # noqa: BLE001
+                attachments = []
 
-            # Sort comments
-            comments.sort(key=lambda x: x.get("createdDate", ""), reverse=False)
-
-            self.call_from_thread(self.render_case_details, case, comments)
+            self.call_from_thread(self.render_case_details, details, attachments)
         except Exception as e:  # noqa: BLE001
             self.call_from_thread(self.show_error, f"Failed to fetch details: {e}")
 
-    def render_case_details(self, case: dict, comments: list) -> None:
+    def render_case_details(
+        self, details: CaseDetails, attachments: list[Attachment]
+    ) -> None:
         detail_container = self.query_one("#case-detail-container")
         detail_container.query("*").remove()
 
-        # Build beautiful layout
-        num = case.get("caseNumber") or case.get("id") or ""
-        title = case.get("summary") or ""
-        product = case.get("product") or ""
-        version = case.get("version") or ""
-        status = case.get("status") or ""
-        severity = case.get("severity") or ""
-        case_type = case.get("caseType") or case.get("type") or ""
-        account_num = case.get("accountNumber") or ""
-        created_by = case.get("createdById") or "Unknown"
-        created_date = case.get("createdDate") or ""
-        description = case.get("description") or ""
-
-        owner_obj = case.get("owner") or case.get("contact") or {}
-        owner = ""
-        if isinstance(owner_obj, dict):
-            owner = owner_obj.get("name") or owner_obj.get("fullName") or ""
-
+        case = details.case
+        num = case.case_number or case.id or ""
+        title = case.summary or ""
+        product = case.product or ""
+        version = case.version or ""
+        status = case.status or ""
+        severity = case.severity or ""
+        case_type = case.case_type or ""
+        account_num = case.account_number or ""
+        created_by = case.created_by or "Unknown"
+        created_date = case.created_date or ""
+        description = details.description or ""
+        owner = case.owner or "Unknown"
+        comments = details.comments
         # Construct Rich objects to print into details screen
         widgets = []
 
@@ -805,6 +791,29 @@ class SupportApp(App):
         widgets.append(
             Static(Panel(meta_table, title="Details", border_style="yellow"))
         )
+        # Attachments Section
+        if attachments:
+            widgets.append(
+                Static(f"\n[bold yellow]ATTACHMENTS ({len(attachments)}):[/]\n")
+            )
+            att_table = Table(box=ROUNDED, header_style="bold yellow", show_lines=False)
+            att_table.add_column("Filename", style="bold white")
+            att_table.add_column("Size", justify="right", style="green")
+            att_table.add_column("Uploaded By", style="yellow")
+            att_table.add_column("Status", style="cyan")
+            for att in attachments:
+                size_str = (
+                    f"{att.size_kb:.1f} KB"
+                    if att.size_kb < 1024
+                    else f"{att.size_kb / 1024.0:.1f} MB"
+                )
+                att_table.add_row(
+                    att.file_name,
+                    size_str,
+                    att.created_by or "Unknown",
+                    att.upload_status,
+                )
+            widgets.append(Static(att_table))
 
         # Description
         widgets.append(Static("\n[bold magenta]DESCRIPTION:[/]\n"))
@@ -815,17 +824,19 @@ class SupportApp(App):
 
         # Comments panels
         for c in comments:
-            c_date = c.get("createdDate", "")
-            c_by = c.get("createdBy", "Unknown")
-
-            is_public = "Public"
-            border_style = "green"
-            if c.get("isPublic") is False:
-                vis = c.get("visibility")
-                is_public = f"Private ({vis})" if vis else "Private"
-                border_style = "red"
-
-            c_body = c.get("commentBody") or c.get("body") or c.get("text") or ""
+            c_date = c.created_date or ""
+            c_by = c.created_by or "Unknown"
+            is_public = (
+                "Public"
+                if c.is_public
+                else (
+                    f"Private ({c.visibility})"
+                    if c.visibility and c.visibility != "Private"
+                    else "Private"
+                )
+            )
+            border_style = "green" if c.is_public else "red"
+            c_body = c.body or ""
             comment_header = f"{c_by} ({is_public}) - {c_date}"
             widgets.append(
                 Static(
@@ -836,8 +847,6 @@ class SupportApp(App):
                     )
                 )
             )
-
-        # Update TUI Viewport with compiled child widgets mounted directly into VerticalScroll
         detail_container.mount(*widgets)
 
     def action_refresh(self) -> None:
@@ -899,17 +908,16 @@ class SupportApp(App):
                 (
                     c
                     for c in self.cases
-                    if str(c.get("caseNumber") or c.get("id")) == self.selected_case_id
+                    if str(c.case_number or c.id) == self.selected_case_id
                 ),
                 None,
             )
             if case:
-                current_status = case.get("status") or "Waiting on Red Hat"
+                current_status = case.status or "Waiting on Red Hat"
                 if current_status == "Waiting on Customer":
                     target_status = "Waiting on Red Hat"
                 else:
                     target_status = current_status
-
         container.mount(
             Vertical(
                 Label("[bold cyan]Drafting Comment...[/]", id="tui-comment-pane-title"),
@@ -938,21 +946,18 @@ class SupportApp(App):
     def update_comment_status_dropdown(self) -> None:
         if not self.selected_case_id:
             return
-
         case = next(
-            (
-                c
-                for c in self.cases
-                if str(c.get("caseNumber") or c.get("id")) == self.selected_case_id
-            ),
+            (c for c in self.cases if (c.case_number or c.id) == self.selected_case_id),
             None,
         )
-        if not case:
-            return
-
-        current_status = case.get("status") or "Waiting on Red Hat"
-        if current_status == "Waiting on Customer":
+        current_status = case.status if case else None
+        target_status = "Waiting on Red Hat"
+        if current_status == "Waiting on Red Hat":
+            target_status = "Waiting on Customer"
+        elif current_status == "Waiting on Customer":
             target_status = "Waiting on Red Hat"
+        elif current_status == "Closed":
+            target_status = "Closed"
         else:
             target_status = current_status
 
@@ -967,42 +972,13 @@ class SupportApp(App):
 
         self.call_from_thread(show_posting)
         self.screen.remove_class("commenting")
-
         try:
-            payload = {"isPublic": True, "commentBody": comment_body}
-            resp = self.api_client.post(
-                f"{API_URL}/cases/{self.selected_case_id}/comments",
-                json=payload,
+            self.case_service.add_comment(
+                self.selected_case_id,
+                comment_body,
+                is_public=True,
+                status=target_status if target_status else None,
             )
-            if resp.status_code not in [200, 201]:
-                self.call_from_thread(
-                    self.show_error,
-                    f"Failed to post comment: HTTP {resp.status_code}",
-                )
-                return
-
-            case = next(
-                (
-                    c
-                    for c in self.cases
-                    if str(c.get("caseNumber") or c.get("id")) == self.selected_case_id
-                ),
-                None,
-            )
-            current_status = case.get("status") if case else None
-
-            if target_status and target_status != current_status:
-                status_payload = {"status": target_status}
-                put_resp = self.api_client.put(
-                    f"{API_URL}/cases/{self.selected_case_id}",
-                    json=status_payload,
-                )
-                if put_resp.status_code not in [200, 201]:
-                    self.call_from_thread(
-                        self.show_error,
-                        f"Warning: Comment posted, but failed to update status (HTTP {put_resp.status_code})",
-                    )
-                    time.sleep(1)
 
             # Clear drafting text area
             self.query_one("#tui-comment-textarea", TextArea).text = ""
@@ -1117,21 +1093,7 @@ class SupportApp(App):
         self.call_from_thread(show_uploading)
 
         try:
-            from types import SimpleNamespace
-
-            from rh_support_lib.commands.actions import cmd_attach
-
-            args = SimpleNamespace(
-                case=self.selected_case_id,
-                file=[file_path],
-            )
-            try:
-                cmd_attach(args, self.api_client)
-            except SystemExit as ex:
-                if ex.code != 0:
-                    self.call_from_thread(self.show_error, "Attachment upload failed.")
-                    return
-
+            self.attachment_service.upload_attachment(self.selected_case_id, file_path)
             self.fetch_case_details(self.selected_case_id)
         except Exception as e:  # noqa: BLE001
             self.call_from_thread(self.show_error, f"Error uploading attachment: {e}")

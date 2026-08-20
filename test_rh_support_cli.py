@@ -1,11 +1,15 @@
 import http.server
+import io
 import json
 import os
+import re
+import shutil
 import subprocess
 import sys
 import threading
 import time
 import unittest
+from typing import ClassVar
 from unittest import mock
 
 # Configuration for the mock server
@@ -16,6 +20,8 @@ MOCK_PORT = 0  # 0 means let the OS choose a free port
 class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
     last_case_payload = None
     last_comment_payload = None
+    last_update_payload = None
+    mock_storage: ClassVar[dict] = {}
 
     def log_message(self, format, *args):
         # Silence server logs to keep test output clean
@@ -27,8 +33,6 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
 
         # SSO Token Endpoint
         if self.path == "/auth/token":
-            # parse body to see refresh token
-            # request body is x-www-form-urlencoded
             from urllib.parse import parse_qs
 
             post_data = parse_qs(body.decode())
@@ -58,7 +62,6 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
 
         # Check Authorization header for other endpoints
         auth_header = self.headers.get("Authorization")
-        # Allow our dynamic tokens or the default one
         valid_tokens = [
             "Bearer mock_access_token_123",
             "Bearer access_from_cli",
@@ -72,7 +75,502 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(b"Unauthorized")
             return
 
-        # Create Case Endpoint: /cases
+        # GraphQL Endpoint: /graphql or / or payload contains "query"
+        if (
+            self.path == "/graphql"
+            or self.path == "/"
+            or (b'"query"' in body[:100] or b"query" in body[:50])
+        ):
+            try:
+                payload = json.loads(body.decode())
+            except json.JSONDecodeError:
+                self.send_response(400)
+                self.end_headers()
+                self.wfile.write(b"Invalid JSON")
+                return
+
+            query = payload.get("query", "")
+            variables = payload.get("variables") or {}
+            auth = self.headers.get("Authorization")
+            source = "unknown"
+            if auth == "Bearer access_from_cli":
+                source = "CLI"
+            elif auth == "Bearer access_from_env":
+                source = "ENV"
+            elif auth == "Bearer access_from_file":
+                source = "FILE"
+            elif auth == "Bearer mock_access_token_123":
+                source = "DEFAULT"
+            # 1. CreateNewCase (Mutation)
+            if "CreateNewCase" in query or "CaseCreate" in query:
+                case_in = variables.get("input", {}).get("RedHatSupportCase", {})
+                MockRedHatHandler.last_case_payload = {
+                    "product": case_in.get("product")
+                    or case_in.get("ProductId")
+                    or "RHEL",
+                    "version": case_in.get("version")
+                    or case_in.get("Version")
+                    or "8.0",
+                    "summary": case_in.get("Subject", ""),
+                    "description": case_in.get("Description", ""),
+                    "severity": case_in.get("Priority", "Normal"),
+                    "caseType": case_in.get("caseType")
+                    or case_in.get("Type", "Standard"),
+                    **case_in,
+                }
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                resp_data = {
+                    "data": {
+                        "redhat_support_uiapi": {
+                            "CaseCreate": {
+                                "RedHatSupportRecord": {
+                                    "Id": "50020230001",
+                                    "CaseNumber__c": {"value": "20230001"},
+                                    "Subject": {
+                                        "value": MockRedHatHandler.last_case_payload.get(
+                                            "Subject", ""
+                                        )
+                                    },
+                                    "Status": {"value": "Waiting on Red Hat"},
+                                    "CreatedDate": {"value": "2026-08-20T10:00:00Z"},
+                                }
+                            }
+                        }
+                    }
+                }
+                self.wfile.write(json.dumps(resp_data).encode())
+                return
+
+            # 2. UpdateCase (Mutation)
+            if "UpdateCase" in query or "CaseUpdate" in query:
+                MockRedHatHandler.last_update_payload = variables.get("input", {})
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                patch = MockRedHatHandler.last_update_payload.get(
+                    "RedHatSupportCase", {}
+                )
+                resp_data = {
+                    "data": {
+                        "redhat_support_uiapi": {
+                            "CaseUpdate": {
+                                "RedHatSupportRecord": {
+                                    "Id": MockRedHatHandler.last_update_payload.get(
+                                        "Id", "5001001"
+                                    ),
+                                    "CaseNumber__c": {"value": "1001"},
+                                    "Status": {
+                                        "value": patch.get(
+                                            "Status", "Waiting on Red Hat"
+                                        )
+                                    },
+                                    "Priority": {
+                                        "value": patch.get("Priority", "High")
+                                    },
+                                    "LastModifiedDate": {
+                                        "value": "2026-08-20T10:00:00Z"
+                                    },
+                                }
+                            }
+                        }
+                    }
+                }
+                self.wfile.write(json.dumps(resp_data).encode())
+                return
+
+            # 3. CreateCaseComment (Mutation)
+            if "CreateCaseComment" in query or "CaseComment__cCreate" in query:
+                comment_input = variables.get("input", {}).get(
+                    "RedHatSupportCaseComment__c", {}
+                )
+                MockRedHatHandler.last_comment_payload = {
+                    "commentBody": comment_input.get("Body__c", ""),
+                    "body": comment_input.get("Body__c", ""),
+                    "isPublic": comment_input.get("Visibility__c", "Public")
+                    == "Public",
+                    **comment_input,
+                }
+                if "FAIL_COMMENT" in comment_input.get(
+                    "Case__c", ""
+                ) or "FAIL_COMMENT" in comment_input.get("Body__c", ""):
+                    self.send_response(500)
+                    self.end_headers()
+                    self.wfile.write(b"Simulated Server Error")
+                    return
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                resp_data = {
+                    "data": {
+                        "redhat_support_uiapi": {
+                            "CaseComment__cCreate": {
+                                "RedHatSupportRecord": {
+                                    "Id": "comment_1",
+                                    "Body__c": {
+                                        "value": comment_input.get("Body__c", "")
+                                    },
+                                    "Case__c": {
+                                        "value": comment_input.get("Case__c", "")
+                                    },
+                                    "CreatedDate": {"value": "2026-08-20T10:00:00Z"},
+                                }
+                            }
+                        }
+                    }
+                }
+                self.wfile.write(json.dumps(resp_data).encode())
+                return
+
+            # 4. ResolveCaseLookupData
+            if "ResolveCaseLookupData" in query:
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                resp_data = {
+                    "data": {
+                        "redhat_support_uiapi": {
+                            "Contact": {
+                                "RedHatSupportContact": {
+                                    "edges": [
+                                        {
+                                            "node": {
+                                                "Id": "003MockContact",
+                                                "AccountId": {
+                                                    "value": "001MockAccount"
+                                                },
+                                            }
+                                        }
+                                    ]
+                                }
+                            },
+                            "Account": {
+                                "RedHatSupportAccount": {
+                                    "edges": [{"node": {"Id": "001MockAccount"}}]
+                                }
+                            },
+                            "RecordType": {
+                                "RedHatSupportRecordType": {
+                                    "edges": [{"node": {"Id": "012MockRecordType"}}]
+                                }
+                            },
+                            "Product": {
+                                "RedHatSupportProduct2": {
+                                    "edges": [
+                                        {
+                                            "node": {
+                                                "Id": "01tMockProduct",
+                                                "Name": {"value": "RHEL"},
+                                                "VersionName__c": {"value": "9.0"},
+                                            }
+                                        }
+                                    ]
+                                }
+                            },
+                        }
+                    }
+                }
+                self.wfile.write(json.dumps(resp_data).encode())
+                return
+
+            # 5. GetActiveProducts
+            if "GetActiveProducts" in query or "RedHatSupportProduct2" in query:
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                edges = [
+                    {
+                        "node": {
+                            "Id": "01tRHEL",
+                            "Name": {"value": "Red Hat Enterprise Linux"},
+                            "VersionName__c": {"value": "9.0"},
+                            "Family": {"value": "Linux"},
+                            "ParentProduct__c": {"value": None},
+                        }
+                    },
+                    {
+                        "node": {
+                            "Id": "01tOPENSHIFT",
+                            "Name": {"value": "Red Hat OpenShift Container Platform"},
+                            "VersionName__c": {"value": "4.12"},
+                            "Family": {"value": "Cloud"},
+                            "ParentProduct__c": {"value": None},
+                        }
+                    },
+                ]
+                resp_data = {
+                    "data": {
+                        "redhat_support_uiapi": {
+                            "query": {
+                                "RedHatSupportProduct2": {
+                                    "totalCount": len(edges),
+                                    "edges": edges,
+                                    "pageInfo": {
+                                        "hasNextPage": False,
+                                        "endCursor": None,
+                                    },
+                                }
+                            }
+                        }
+                    }
+                }
+                self.wfile.write(json.dumps(resp_data).encode())
+                return
+
+            # 6. GetCaseAndComments
+            if "GetCaseAndComments" in query or "CaseComments__r" in query:
+                case_num = str(variables.get("caseNumber", "12345"))
+                if not case_num.isdigit() or case_num in (
+                    "99999",
+                    "nonexistent",
+                    "not_found",
+                ):
+                    self.send_response(200)
+                    self.send_header("Content-type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(
+                        json.dumps(
+                            {
+                                "data": {
+                                    "redhat_support_uiapi": {
+                                        "query": {"RedHatSupportCase": {"edges": []}}
+                                    }
+                                }
+                            }
+                        ).encode()
+                    )
+                    return
+
+                if "FAIL_COMMENT" in case_num:
+                    self.send_response(500)
+                    self.end_headers()
+                    self.wfile.write(b"Simulated Server Error")
+                    return
+
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                node = {
+                    "Id": f"500{case_num}",
+                    "CaseNumber__c": {"value": str(case_num)},
+                    "Subject": {"value": "Test Case Details"},
+                    "Status": {"value": "Waiting on Red Hat"},
+                    "Priority": {"value": "High"},
+                    "Type": {"value": "Standard"},
+                    "Description": {"value": "This is a detailed description."},
+                    "Product": {
+                        "Id": "prod_1",
+                        "Name": {"value": "RHEL"},
+                        "ParentProduct__r": {
+                            "Id": "parent_prod",
+                            "Name": {"value": "RHEL"},
+                        },
+                    },
+                    "RedHatSupportAccount": {
+                        "Id": "acc_1",
+                        "Name": {"value": "Acme Corp"},
+                        "AccountNumber": {"value": "111111"},
+                    },
+                    "RedHatSupportContact": {
+                        "Id": "cont_1",
+                        "Name": {"value": "Test Owner"},
+                        "Email": {"value": "test@example.com"},
+                        "Phone": {"value": "1234567890"},
+                        "SSOUserName__c": {"value": "user123"},
+                    },
+                    "Owner": {
+                        "Id": "owner_1",
+                        "Name": {"value": "Red Hat Support"},
+                    },
+                    "CreatedDate": {"value": "2023-01-01T10:00:00Z"},
+                    "LastModifiedDate": {"value": "2023-01-02T10:00:00Z"},
+                    "LastModifiedBy": {"Name": {"value": "user123"}},
+                    "CaseComments__r": {
+                        "edges": [
+                            {
+                                "node": {
+                                    "Id": "comment_1",
+                                    "Body__c": {"value": "Comment 1"},
+                                    "LastModifiedByName__c": {
+                                        "value": "Red Hat Support"
+                                    },
+                                    "IsAssociate__c": {"value": True},
+                                    "IsCustomer__c": {"value": False},
+                                    "CreatedDate": {"value": "2023-01-02T10:00:00Z"},
+                                }
+                            },
+                            {
+                                "node": {
+                                    "Id": "comment_2",
+                                    "Body__c": {"value": "Comment 2"},
+                                    "LastModifiedByName__c": {"value": "Customer"},
+                                    "IsAssociate__c": {"value": False},
+                                    "IsCustomer__c": {"value": False},
+                                    "Visibility__c": {"value": "Internal"},
+                                    "isPublic": False,
+                                    "CreatedDate": {"value": "2023-01-03T10:00:00Z"},
+                                }
+                            },
+                        ],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                    },
+                }
+                resp_data = {
+                    "data": {
+                        "redhat_support_uiapi": {
+                            "query": {
+                                "RedHatSupportCase": {
+                                    "edges": [{"node": node, "cursor": "cur_1"}]
+                                }
+                            }
+                        }
+                    }
+                }
+                self.wfile.write(json.dumps(resp_data).encode())
+                return
+
+            # 7. GetCasesByFilters / GetSupportCases
+            if (
+                "GetCasesByFilters" in query
+                or "GetSupportCases" in query
+                or "RedHatSupportCase" in query
+            ):
+                where_clause = variables.get("where") or {}
+                filters_received = [f"AUTH={source}"]
+                if "RedHatSupportAccount" in where_clause:
+                    acc = (
+                        where_clause["RedHatSupportAccount"]
+                        .get("AccountNumber", {})
+                        .get("eq")
+                    )
+                    if acc:
+                        filters_received.append(f"ACC={acc}")
+                if "Status" in where_clause:
+                    stat = where_clause["Status"]
+                    if isinstance(stat, dict):
+                        if "eq" in stat:
+                            filters_received.append(f"STAT={stat['eq']}")
+                        elif "ne" in stat:
+                            filters_received.append(f"STAT_NE={stat['ne']}")
+                        elif "in" in stat:
+                            filters_received.append(f"STAT={','.join(stat['in'])}")
+                    else:
+                        filters_received.append(f"STAT={stat}")
+                if "Priority" in where_clause:
+                    prio = where_clause["Priority"]
+                    if isinstance(prio, dict) and "in" in prio:
+                        filters_received.append(f"SEV={','.join(prio['in'])}")
+                    elif isinstance(prio, dict) and "eq" in prio:
+                        filters_received.append(f"SEV={prio['eq']}")
+                    else:
+                        filters_received.append(f"SEV={prio}")
+                if "Owner" in where_clause:
+                    own = where_clause["Owner"].get("Name", {}).get("eq")
+                    if own:
+                        filters_received.append(f"OWN={own}")
+
+                summary_str = "Filters: " + "|".join(filters_received)
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                edges = [
+                    {
+                        "node": {
+                            "Id": "500FILTER_TEST",
+                            "CaseNumber__c": {"value": "FILTER_TEST"},
+                            "Subject": {"value": summary_str},
+                            "Status": {"value": "Waiting on Red Hat"},
+                            "Priority": {"value": "2 (High)"},
+                            "CreatedDate": {"value": "2026-07-10T14:30:00Z"},
+                            "LastModifiedDate": {"value": "2026-07-11T09:15:00Z"},
+                        },
+                        "cursor": "cursor_filter_test",
+                    }
+                ]
+                resp_data = {
+                    "data": {
+                        "redhat_support_uiapi": {
+                            "query": {
+                                "RedHatSupportCase": {
+                                    "edges": edges,
+                                    "pageInfo": {
+                                        "hasNextPage": False,
+                                        "endCursor": "cursor_filter_test",
+                                    },
+                                }
+                            }
+                        }
+                    }
+                }
+                self.wfile.write(json.dumps(resp_data).encode())
+                return
+
+        # Attachment Service: POST /v3/cases/attachments/upload
+        if (
+            "/attachments/upload" in self.path
+            and not self.path.endswith("/complete")
+            and not self.path.endswith("/abort")
+        ):
+            data = json.loads(body.decode())
+            filesize = data.get("fileSize", 1024)
+            host = self.headers.get("Host", "localhost")
+            attach_uuid = "att_test_uuid_123"
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            if filesize > 5368709120:
+                self.wfile.write(
+                    json.dumps(
+                        {
+                            "attachmentId": attach_uuid,
+                            "uploadStrategy": "MULTIPART",
+                            "uploadId": "upload_id_123",
+                            "expirationTime": "2026-12-31T23:59:59.000Z",
+                            "parts": [
+                                {
+                                    "partNumber": 1,
+                                    "presignedUrl": f"http://{host}/mock-storage/{attach_uuid}?partNumber=1",
+                                },
+                                {
+                                    "partNumber": 2,
+                                    "presignedUrl": f"http://{host}/mock-storage/{attach_uuid}?partNumber=2",
+                                },
+                            ],
+                        }
+                    ).encode()
+                )
+            else:
+                self.wfile.write(
+                    json.dumps(
+                        {
+                            "attachmentId": attach_uuid,
+                            "uploadStrategy": "SINGLE_PUT",
+                            "presignedUrl": f"http://{host}/mock-storage/{attach_uuid}",
+                            "expirationTime": "2026-12-31T23:59:59.000Z",
+                        }
+                    ).encode()
+                )
+            return
+
+        # Attachment Service: POST /v3/cases/attachments/upload/complete
+        if "/attachments/upload/complete" in self.path:
+            data = json.loads(body.decode())
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            self.wfile.write(
+                json.dumps(
+                    {
+                        "status": "success",
+                        "attachmentId": data.get("attachmentId", "att_test_uuid_123"),
+                        "message": "Upload completed.",
+                    }
+                ).encode()
+            )
+            return
+
+        # Legacy Create Case Endpoint: /cases
         if self.path == "/cases":
             data = json.loads(body.decode())
             MockRedHatHandler.last_case_payload = data
@@ -88,9 +586,8 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                 self.wfile.write(b"Missing required fields")
             return
 
-        # List Cases Endpoint: /cases/filter
+        # Legacy List Cases Endpoint: /cases/filter
         if self.path == "/cases/filter":
-            # Verify maxResults is present (Required by API)
             try:
                 data = json.loads(body.decode())
                 if "maxResults" not in data:
@@ -115,7 +612,6 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
             elif auth == "Bearer mock_access_token_123":
                 source = "DEFAULT"
 
-            # Construct summary from filters
             filters_received = [f"AUTH={source}"]
             if "accountNumber" in data:
                 filters_received.append(f"ACC={data['accountNumber']}")
@@ -131,8 +627,6 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                 filters_received.append(f"OWN={data['ownerSSOName']}")
 
             summary_str = "Filters: " + "|".join(filters_received)
-
-            # Just return a dummy list
             self.send_response(200)
             self.send_header("Content-type", "application/json")
             self.end_headers()
@@ -146,22 +640,18 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                     "status": "Waiting on Red Hat",
                 }
             ]
-            # Wrap in dictionary as per API behavior
             self.wfile.write(json.dumps({"cases": cases_list}).encode())
             return
 
-        # Attachments Endpoint: /cases/{case}/attachments
+        # Legacy Attachments Endpoint: /cases/{case}/attachments
         if "/attachments" in self.path:
-            # We are not parsing the multipart form data strictly here,
-            # just checking if the request was made successfully.
-            self.send_response(201)  # Created
+            self.send_response(201)
             self.send_header("Location", "http://mock/attachment/1")
             self.end_headers()
             return
 
-        # Comments Endpoint: /cases/{case}/comments
+        # Legacy Comments Endpoint: /cases/{case}/comments
         if "/comments" in self.path:
-            # Check for failure trigger
             if "FAIL_COMMENT" in self.path:
                 self.send_response(500)
                 self.end_headers()
@@ -169,11 +659,10 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                 return
 
             data = json.loads(body.decode())
-            # Support both new and old fields for testing/migration, or strict new ones
             c_body = data.get("body") or data.get("commentBody")
             if c_body:
                 MockRedHatHandler.last_comment_payload = data
-                self.send_response(201)  # Created
+                self.send_response(201)
                 self.send_header("Content-type", "application/json")
                 self.end_headers()
                 self.wfile.write(json.dumps({"id": "comment_1"}).encode())
@@ -203,6 +692,15 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
         content_length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(content_length) if content_length > 0 else b""
 
+        # Direct S3 Storage PUT
+        if self.path.startswith("/mock-storage/"):
+            att_id = self.path.split("/mock-storage/")[1].split("?")[0]
+            MockRedHatHandler.mock_storage[att_id] = body
+            self.send_response(200)
+            self.send_header("ETag", f'"{att_id}_etag"')
+            self.end_headers()
+            return
+
         # Check Authorization header
         auth_header = self.headers.get("Authorization")
         if auth_header != "Bearer mock_access_token_123":
@@ -210,8 +708,7 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             return
 
-        # Status/Case Update Endpoint: /cases/{case}
-        # Note: simplistic matching, assuming valid API usage
+        # Legacy Status/Case Update Endpoint: /cases/{case}
         if (
             "/cases/" in self.path
             and "/comments" not in self.path
@@ -232,11 +729,96 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
+        # Direct Storage Download
+        if self.path.startswith("/mock-storage/"):
+            att_id = self.path.split("/mock-storage/")[1].split("?")[0]
+            data = MockRedHatHandler.mock_storage.get(
+                att_id, b"mock file downloaded content"
+            )
+            self.send_response(200)
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return
+
         # Check Authorization header
         auth_header = self.headers.get("Authorization")
         if auth_header != "Bearer mock_access_token_123":
             self.send_response(401)
             self.end_headers()
+            return
+
+        # Attachment Download URL endpoint
+        match_download = re.search(
+            r"/attachments/downloadFile/([^/]+)/([^/]+)$", self.path
+        )
+        if match_download:
+            case_num = match_download.group(1)
+            att_id = match_download.group(2)
+            host = self.headers.get("Host", "localhost")
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            self.wfile.write(
+                json.dumps(
+                    {
+                        "downloadUrl": f"http://{host}/mock-storage/{att_id}",
+                        "fileName": "downloaded_test_file.txt",
+                        "expiresInSeconds": "3600",
+                    }
+                ).encode()
+            )
+            return
+
+        # Attachment List Endpoint: GET /v3/cases/{caseNumber}/attachments
+        match_list_att = re.search(r"/cases/([^/]+)/attachments(?:\?.*)?$", self.path)
+        if match_list_att:
+            case_num = match_list_att.group(1)
+            host = self.headers.get("Host", "localhost")
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            attachments = [
+                {
+                    "caseNumber": str(case_num),
+                    "uuid": "att_1001_uuid",
+                    "fileName": "test_attachment.log",
+                    "size": 2048,
+                    "sizeKB": 2.0,
+                    "createdDate": "2026-07-10T16:20:00Z",
+                    "createdBy": "Jane Developer",
+                    "description": "Initial log capture",
+                    "link": f"http://{host}/v3/cases/attachments/downloadFile/{case_num}/att_1001_uuid",
+                    "accountNumber": "111111",
+                    "uploadStatus": "Completed",
+                }
+            ]
+            self.wfile.write(json.dumps(attachments).encode())
+            return
+
+        # Attachment Status Endpoint: GET /v3/cases/{caseNumber}/attachments/status
+        match_att_status = re.search(
+            r"/cases/([^/]+)/attachments/(?:([^/]+)/)?status$", self.path
+        )
+        if match_att_status:
+            case_num = match_att_status.group(1)
+            att_id = match_att_status.group(2) or "att_1001_uuid"
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            self.wfile.write(
+                json.dumps(
+                    [
+                        {
+                            "fileName": "test_attachment.log",
+                            "caseNumber": str(case_num),
+                            "attachmentId": att_id,
+                            "status": "COMPLETED",
+                        }
+                    ]
+                ).encode()
+            )
             return
 
         if self.path == "/products":
@@ -303,10 +885,8 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
             return
 
         # GET /cases/{id}
-        # Simple check for numeric ID at end of path
         if "/cases/" in self.path:
             parts = self.path.split("/")
-            # /cases/12345 -> ["", "cases", "12345"] (if base is /) or check last part
             case_id = parts[-1]
             if case_id.isdigit():
                 self.send_response(200)
@@ -324,11 +904,51 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                     "contact": {"name": "Test Owner"},
                     "status": "Waiting on Red Hat",
                     "severity": "High",
-                    # Omit comments here to test separate fetch
                 }
                 self.wfile.write(json.dumps(case).encode())
                 return
 
+        self.send_response(404)
+        self.end_headers()
+
+    def do_DELETE(self):
+        # Check Authorization header
+        auth_header = self.headers.get("Authorization")
+        if auth_header != "Bearer mock_access_token_123":
+            self.send_response(401)
+            self.end_headers()
+            return
+
+        # DELETE /v3/cases/attachments/deleteFile/{caseNumber}/{attachmentId}
+        match_del = re.search(r"/attachments/deleteFile/([^/]+)/([^/]+)$", self.path)
+        if match_del:
+            self.send_response(204)
+            self.end_headers()
+            return
+
+        # DELETE /v3/cases/attachments/upload/abort
+        if "/attachments/upload/abort" in self.path:
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"status": "aborted"}).encode())
+            return
+
+        self.send_response(404)
+        self.end_headers()
+
+    def do_HEAD(self):
+        auth_header = self.headers.get("Authorization")
+        if auth_header != "Bearer mock_access_token_123":
+            self.send_response(401)
+            self.end_headers()
+            return
+
+        match_head = re.search(r"/cases/([^/]+)/attachments/([^/]+)$", self.path)
+        if match_head:
+            self.send_response(200)
+            self.end_headers()
+            return
         self.send_response(404)
         self.end_headers()
 
@@ -365,6 +985,8 @@ class TestRhSupportCli(unittest.TestCase):
         self.env = os.environ.copy()
         self.env["RH_API_URL"] = self.base_url
         self.env["RH_SSO_URL"] = self.sso_url
+        self.env["RH_GRAPHQL_URL"] = f"{self.base_url}/graphql"
+        self.env["RH_ATTACHMENT_API_URL"] = self.base_url
         self.env["REDHAT_SUPPORT_OFFLINE_TOKEN"] = "mock_offline_token"
         self.env["FORCE_COLOR"] = "1"
 
@@ -1426,7 +2048,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         self.assertEqual(result.returncode, 0)
         # Check for debug logs in stderr
         # Note: requests uses lowercase methods internally often
-        self.assertIn("DEBUG: Request: get", result.stderr)
+        self.assertIn("DEBUG: Request:", result.stderr)
         self.assertIn("DEBUG: Response Status: 200", result.stderr)
 
     def test_debug_file_logging(self):
@@ -1450,12 +2072,10 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             with open(log_file, "r") as f:
                 content = f.read()
 
-            self.assertIn("DEBUG: Request: get", content)
+            self.assertIn("DEBUG: Request:", content)
             self.assertIn("DEBUG: Response Status: 200", content)
             # Ensure it didn't print to stderr (since we redirected to file)
-            # Wait, logging.basicConfig with filename DISABLES the default StreamHandler (stderr).
-            # So stderr should NOT contain debug logs.
-            self.assertNotIn("DEBUG: Request: get", result.stderr)
+            self.assertNotIn("DEBUG: Request:", result.stderr)
 
         finally:
             if os.path.exists(log_file):
@@ -1484,10 +2104,10 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             with open(log_file, "r") as f:
                 content = f.read()
 
-            self.assertIn("DEBUG: Request: get", content)
+            self.assertIn("DEBUG: Request:", content)
             self.assertIn("DEBUG: Response Status: 200", content)
             # Ensure it didn't print to stderr
-            self.assertNotIn("DEBUG: Request: get", result.stderr)
+            self.assertNotIn("DEBUG: Request:", result.stderr)
 
         finally:
             if os.path.exists(log_file):
@@ -1842,9 +2462,11 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         import rh_support_lib.tui.app
         from rh_support_lib.tui.app import SupportApp
 
-        # Temporarily route API_URL in the parent process to our mock HTTP server
-        orig_tui_url = rh_support_lib.tui.app.API_URL
-        rh_support_lib.tui.app.API_URL = self.base_url
+        # Route GraphQL and API URLs to our mock HTTP server
+        orig_gql_url = rh_support_lib.constants.GRAPHQL_URL
+        orig_api_url = rh_support_lib.constants.API_URL
+        rh_support_lib.constants.GRAPHQL_URL = f"{self.base_url}/graphql"
+        rh_support_lib.constants.API_URL = self.base_url
 
         async def run_headless():
             app = SupportApp(token="mock_access_token_123", config={})
@@ -1951,7 +2573,8 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         try:
             asyncio.run(run_headless())
         finally:
-            rh_support_lib.tui.app.API_URL = orig_tui_url
+            rh_support_lib.constants.GRAPHQL_URL = orig_gql_url
+            rh_support_lib.constants.API_URL = orig_api_url
 
     def test_tui_config_handling(self):
         """Test that TUI correctly processes default_bookmark and default_create_template from config"""
@@ -2010,7 +2633,6 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
     def test_mock_mode_list_and_show(self):
         """Test that --mock runs the CLI offline against the in-process synthetic corpus"""
-        import io
         from unittest import mock
 
         from rh_support_lib.main import main
@@ -2070,7 +2692,6 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
     def test_mock_mode_create_and_comment(self):
         """Test that creating cases and writing comments in --mock mode mutates state correctly"""
-        import io
         import shutil
         import tempfile
         from unittest import mock
@@ -2173,6 +2794,127 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
         finally:
             shutil.rmtree(temp_corpus)
+
+    def test_attachment_subcommands_list_and_status(self):
+        """Test attachment list and status subcommands via CLI"""
+        # Rich list
+        result_list = self.run_cli(["attachment", "-c", "12345", "list"])
+        self.assertEqual(result_list.returncode, 0)
+        self.assertIn("Attachments for Case #12345", result_list.stdout)
+        self.assertIn("att_1001_uuid", result_list.stdout)
+
+        # Simple output list
+        result_simple = self.run_cli(
+            ["--simple-output", "attachment", "-c", "12345", "list"]
+        )
+        self.assertEqual(result_simple.returncode, 0)
+        self.assertIn("Attachments for Case #12345:", result_simple.stdout)
+        self.assertIn("test_attachment.log", result_simple.stdout)
+
+        # Status
+        result_status = self.run_cli(["attachment", "-c", "12345", "status"])
+        self.assertEqual(result_status.returncode, 0)
+        self.assertIn("test_attachment.log", result_status.stdout)
+        self.assertIn("COMPLETED", result_status.stdout)
+
+    def test_attachment_upload_download_delete_cli(self):
+        """Test uploading, downloading, and deleting an attachment via CLI"""
+        import tempfile
+
+        temp_dir = tempfile.mkdtemp()
+        try:
+            sample_file = os.path.join(temp_dir, "test_diag.log")
+            with open(sample_file, "w") as f:
+                f.write("System diagnostic log line 1\nLine 2")
+
+            # Upload
+            result_up = self.run_cli(
+                ["attachment", "-c", "12345", "upload", "-f", sample_file]
+            )
+            self.assertEqual(result_up.returncode, 0)
+            self.assertIn(
+                "Attaching 'test_diag.log' to Case #12345...", result_up.stdout
+            )
+            self.assertIn("Success: File 'test_diag.log' attached.", result_up.stdout)
+
+            # Download
+            dest_file = os.path.join(temp_dir, "downloaded.log")
+            result_down = self.run_cli(
+                [
+                    "attachment",
+                    "-c",
+                    "12345",
+                    "download",
+                    "-a",
+                    "att_test_uuid_123",
+                    "-o",
+                    dest_file,
+                ]
+            )
+            self.assertEqual(result_down.returncode, 0)
+            self.assertIn("Successfully downloaded attachment to:", result_down.stdout)
+            self.assertTrue(os.path.exists(dest_file))
+            with open(dest_file, "r") as f:
+                self.assertEqual(f.read(), "System diagnostic log line 1\nLine 2")
+
+            # Delete with -y
+            result_del = self.run_cli(
+                ["attachment", "-c", "12345", "delete", "-a", "att_test_uuid_123", "-y"]
+            )
+            self.assertEqual(result_del.returncode, 0)
+            self.assertIn(
+                "Successfully deleted attachment 'att_test_uuid_123'.",
+                result_del.stdout,
+            )
+
+        finally:
+            shutil.rmtree(temp_dir)
+
+    def test_services_direct_api(self):
+        """Test CaseService and AttachmentService directly as a library"""
+        import rh_support_lib.constants
+        from rh_support_lib.api import LegacyAPIClient
+        from rh_support_lib.services.attachments import AttachmentService
+        from rh_support_lib.services.cases import CaseService
+
+        orig_gql = rh_support_lib.constants.GRAPHQL_URL
+        rh_support_lib.constants.GRAPHQL_URL = f"{self.base_url}/graphql"
+        try:
+            api_client = LegacyAPIClient("mock_access_token_123")
+            case_service = CaseService(api_client)
+            att_service = AttachmentService(api_client, base_url=self.base_url)
+
+            # 1. CaseService list_cases
+            cases = case_service.list_cases(
+                status=["Waiting on Red Hat"], severity=["High"]
+            )
+            self.assertTrue(len(cases) >= 1)
+            self.assertTrue(cases[0].case_number in ("FILTER_TEST", "1001"))
+
+            # 2. CaseService get_case_details
+            details = case_service.get_case_details("12345")
+            self.assertIsNotNone(details)
+            self.assertEqual(details.case.case_number, "12345")
+            self.assertEqual(len(details.comments), 2)
+
+            # 3. CaseService add_comment
+            comment = case_service.add_comment(
+                "12345", "Automated test comment", is_public=True
+            )
+            self.assertEqual(comment.body, "Automated test comment")
+            self.assertTrue(comment.is_public)
+
+            # 4. CaseService get_active_products
+            products = case_service.get_active_products()
+            self.assertTrue(len(products) >= 2)
+            self.assertEqual(products[0].name, "Red Hat Enterprise Linux")
+
+            # 5. AttachmentService list_attachments
+            attachments = att_service.list_attachments("12345")
+            self.assertTrue(len(attachments) >= 1)
+            self.assertEqual(attachments[0].file_name, "test_attachment.log")
+        finally:
+            rh_support_lib.constants.GRAPHQL_URL = orig_gql
 
 
 if __name__ == "__main__":
