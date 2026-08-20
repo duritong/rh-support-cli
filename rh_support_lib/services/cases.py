@@ -1,13 +1,19 @@
 from __future__ import annotations
 
+import contextlib
+import os
+import re
 from typing import Any
 
 from rh_support_lib.constants import (
+    API_URL,
+    BACKEND_MODE,
     GRAPHQL_URL,
     SEVERITY_MAP,
     STATUS_MAP,
 )
 from rh_support_lib.models import (
+    Attachment,
     Case,
     CaseComment,
     CaseDetails,
@@ -278,11 +284,22 @@ mutation CreateCaseComment($input: RedHatSupportCaseComment__cCreateInput!) {
 
 
 class CaseService:
-    """Service to handle all support case operations exclusively via the Red Hat GraphQL API."""
+    """Service to handle all support case operations with dual v1 REST and GraphQL backend engines."""
 
-    def __init__(self, api_client, graphql_url: str | None = None):
+    def __init__(
+        self,
+        api_client,
+        backend: str | None = None,
+        rest_url: str | None = None,
+        graphql_url: str | None = None,
+    ):
         self.api_client = api_client
+        self.backend = (backend or os.environ.get("RH_BACKEND") or BACKEND_MODE).lower()
+        self.rest_url = (rest_url or API_URL).rstrip("/")
         self.graphql_url = graphql_url or GRAPHQL_URL
+        self._use_graphql = self.backend == "graphql"
+
+    # --- NORMALIZATION HELPERS ---
 
     def _normalize_case_node(self, node: dict[str, Any]) -> Case:
         """Converts a GraphQL RedHatSupportCase node to a Case domain model."""
@@ -386,6 +403,61 @@ class CaseService:
             id=str(case_id),
         )
 
+    def _normalize_case_v1(self, c: dict[str, Any]) -> Case:
+        """Converts a REST v1 case dictionary to a Case domain model."""
+        num = str(c.get("caseNumber") or c.get("id") or "")
+        title = c.get("summary") or c.get("caseSummary") or ""
+        status = c.get("status") or ""
+        severity = c.get("severity") or ""
+        product = c.get("product") or ""
+        version = c.get("version") or ""
+        account = str(c.get("accountNumberRef") or c.get("accountNumber") or "")
+        created_date = c.get("createdDate") or ""
+        last_mod_date = c.get("lastModifiedDate") or ""
+        created_by = (
+            c.get("createdById")
+            or c.get("contactName")
+            or c.get("createdBySSOName")
+            or ""
+        )
+        last_mod_by = c.get("lastModifiedById") or c.get("modifiedBy") or ""
+
+        owner_obj = c.get("owner") or c.get("contact") or {}
+        owner = ""
+        if isinstance(owner_obj, dict):
+            owner = (
+                owner_obj.get("name")
+                or owner_obj.get("fullName")
+                or owner_obj.get("ssoUsername")
+                or ""
+            )
+        elif isinstance(owner_obj, str):
+            owner = owner_obj
+        if not owner:
+            owner = c.get("ownerId") or "Unknown"
+
+        case_type = c.get("caseType") or c.get("type") or "Standard"
+        return Case(
+            case_number=num,
+            summary=title,
+            status=status,
+            severity=severity,
+            product=product,
+            version=version,
+            account_number=account,
+            created_date=created_date,
+            last_modified_date=last_mod_date,
+            created_by=str(created_by),
+            last_modified_by=str(last_mod_by),
+            owner=str(owner),
+            contact_name=c.get("contactName", ""),
+            contact_sso=c.get("contactSSOName", ""),
+            case_type=case_type,
+            id=str(c.get("id", "")),
+        )
+
+    # --- PUBLIC SERVICE METHODS ---
+
     def list_cases(
         self,
         account: str | None = None,
@@ -395,7 +467,33 @@ class CaseService:
         first: int = 100,
         after: str | None = None,
     ) -> list[Case]:
-        """Lists support cases applying dynamic GraphQL filters."""
+        """Lists support cases applying dynamic filters using selected backend."""
+        if self._use_graphql:
+            return self._list_cases_graphql(
+                account=account,
+                status=status,
+                severity=severity,
+                owner=owner,
+                first=first,
+                after=after,
+            )
+        return self._list_cases_rest_v1(
+            account=account,
+            status=status,
+            severity=severity,
+            owner=owner,
+            first=first,
+        )
+
+    def _list_cases_graphql(
+        self,
+        account: str | None = None,
+        status: list[str] | str | None = None,
+        severity: list[str] | str | None = None,
+        owner: str | None = None,
+        first: int = 100,
+        after: str | None = None,
+    ) -> list[Case]:
         where: dict[str, Any] = {}
 
         if account:
@@ -445,10 +543,58 @@ class CaseService:
                 cases.append(self._normalize_case_node(node))
         return cases
 
+    def _list_cases_rest_v1(
+        self,
+        account: str | None = None,
+        status: list[str] | str | None = None,
+        severity: list[str] | str | None = None,
+        owner: str | None = None,
+        first: int = 100,
+    ) -> list[Case]:
+        payload: dict[str, Any] = {"maxResults": first, "offset": 0}
+        if account:
+            payload["accountNumber"] = str(account)
+        if status:
+            if isinstance(status, list):
+                if len(status) == 1:
+                    payload["status"] = status[0]
+                else:
+                    payload["statuses"] = status
+            else:
+                payload["status"] = status
+        if severity:
+            if isinstance(severity, list):
+                mapped_sevs = [SEVERITY_MAP.get(s.lower(), s) for s in severity]
+                if len(mapped_sevs) == 1:
+                    payload["severity"] = mapped_sevs[0]
+                else:
+                    payload["severities"] = mapped_sevs
+            else:
+                payload["severity"] = SEVERITY_MAP.get(severity.lower(), severity)
+        if owner:
+            payload["ownerSSOName"] = str(owner)
+
+        resp = self.api_client.post(f"{self.rest_url}/cases/filter", json=payload)
+        resp.raise_for_status()
+        data = resp.json()
+        raw_cases = (
+            data
+            if isinstance(data, list)
+            else (data.get("cases") or data.get("items") or data.get("list") or [])
+        )
+        return [self._normalize_case_v1(c) for c in raw_cases]
+
     def get_case_details(
         self, case_number: str, first_comments: int = 200
     ) -> CaseDetails | None:
-        """Fetches full case details and its comments in a single GraphQL round-trip."""
+        """Fetches full case details and its comments using the selected backend."""
+        if self._use_graphql:
+            return self._get_case_details_graphql(case_number, first_comments)
+        return self._get_case_details_rest_v1(case_number)
+
+    def _get_case_details_graphql(
+        self, case_number: str, first_comments: int = 200
+    ) -> CaseDetails | None:
         variables = {
             "caseNumber": str(case_number),
             "first": first_comments,
@@ -536,6 +682,85 @@ class CaseService:
             comments=comments,
         )
 
+    def _get_case_details_rest_v1(self, case_number: str) -> CaseDetails | None:
+        resp = self.api_client.get(f"{self.rest_url}/cases/{case_number}")
+        if resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+        case_dict = resp.json()
+        if not case_dict or not isinstance(case_dict, dict):
+            return None
+
+        case_obj = self._normalize_case_v1(case_dict)
+        description = case_dict.get("description") or ""
+
+        # Fetch comments
+        comments = []
+        raw_comments = case_dict.get("comments")
+        if not raw_comments:
+            try:
+                c_resp = self.api_client.get(
+                    f"{self.rest_url}/cases/{case_number}/comments"
+                )
+                if c_resp.status_code == 200:
+                    raw_comments = c_resp.json()
+            except Exception:  # noqa: BLE001
+                raw_comments = []
+
+        if isinstance(raw_comments, dict):
+            raw_comments = (
+                raw_comments.get("comments") or raw_comments.get("items") or []
+            )
+
+        if isinstance(raw_comments, list):
+            for c in raw_comments:
+                c_id = c.get("id") or "c1"
+                c_body = c.get("commentBody") or c.get("body") or c.get("text") or ""
+                c_author = c.get("createdBy") or c.get("createdById") or "Unknown"
+                c_date = c.get("createdDate") or ""
+                c_is_pub = c.get("isPublic")
+                c_vis = c.get("visibility") or (
+                    "Public" if c_is_pub is not False else "Private"
+                )
+                comments.append(
+                    CaseComment(
+                        id=str(c_id),
+                        body=c_body or "",
+                        created_by=str(c_author),
+                        is_public=bool(c_is_pub) if c_is_pub is not None else True,
+                        visibility=str(c_vis),
+                        created_date=c_date or "",
+                    )
+                )
+
+        # Attachments
+        attachments = []
+        raw_atts = case_dict.get("attachments") or []
+        for a in raw_atts:
+            uuid_val = a.get("uuid") or a.get("id") or ""
+            size_val = a.get("size") or 0
+            attachments.append(
+                Attachment(
+                    uuid=str(uuid_val),
+                    file_name=a.get("fileName") or a.get("name") or "attachment.bin",
+                    size=int(size_val),
+                    size_kb=round(int(size_val) / 1024.0, 1),
+                    created_date=a.get("createdDate", ""),
+                    created_by=a.get("createdBy", ""),
+                    description=a.get("description", ""),
+                    download_link=a.get("link", ""),
+                    upload_status="Completed",
+                    case_number=str(case_number),
+                )
+            )
+
+        return CaseDetails(
+            case=case_obj,
+            description=description or "",
+            comments=comments,
+            attachments=attachments,
+        )
+
     def get_case_internal_id(self, case_number: str) -> str:
         """Resolves Salesforce internal record Id from a customer case number."""
         details = self.get_case_details(case_number, first_comments=1)
@@ -552,6 +777,29 @@ class CaseService:
         case_internal_id: str | None = None,
     ) -> CaseComment:
         """Adds a comment to an existing support case and optionally updates case status."""
+        if self._use_graphql:
+            return self._add_comment_graphql(
+                case_number=case_number,
+                body=body,
+                is_public=is_public,
+                status=status,
+                case_internal_id=case_internal_id,
+            )
+        return self._add_comment_rest_v1(
+            case_number=case_number,
+            body=body,
+            is_public=is_public,
+            status=status,
+        )
+
+    def _add_comment_graphql(
+        self,
+        case_number: str,
+        body: str,
+        is_public: bool = True,
+        status: str | None = None,
+        case_internal_id: str | None = None,
+    ) -> CaseComment:
         record_id = case_internal_id or self.get_case_internal_id(case_number)
 
         comment_input = {
@@ -592,6 +840,33 @@ class CaseService:
             is_customer=True,
         )
 
+    def _add_comment_rest_v1(
+        self,
+        case_number: str,
+        body: str,
+        is_public: bool = True,
+        status: str | None = None,
+    ) -> CaseComment:
+        payload = {"isPublic": is_public, "commentBody": body}
+        resp = self.api_client.post(
+            f"{self.rest_url}/cases/{case_number}/comments", json=payload
+        )
+        resp.raise_for_status()
+        data = resp.json() if resp.text else {}
+
+        if status:
+            mapped_status = STATUS_MAP.get(status.lower(), status)
+            self._update_case_rest_v1(case_number, status=mapped_status)
+
+        return CaseComment(
+            id=str(data.get("id", "c_new")),
+            body=body,
+            created_date="",
+            created_by="Customer",
+            is_public=is_public,
+            visibility="Public" if is_public else "Private",
+        )
+
     def update_case(
         self,
         case_number: str,
@@ -602,6 +877,32 @@ class CaseService:
         case_internal_id: str | None = None,
     ) -> dict:
         """Modifies specific fields of an existing support case."""
+        if self._use_graphql:
+            return self._update_case_graphql(
+                case_number=case_number,
+                status=status,
+                severity=severity,
+                summary=summary,
+                description=description,
+                case_internal_id=case_internal_id,
+            )
+        return self._update_case_rest_v1(
+            case_number=case_number,
+            status=status,
+            severity=severity,
+            summary=summary,
+            description=description,
+        )
+
+    def _update_case_graphql(
+        self,
+        case_number: str,
+        status: str | None = None,
+        severity: str | None = None,
+        summary: str | None = None,
+        description: str | None = None,
+        case_internal_id: str | None = None,
+    ) -> dict:
         record_id = case_internal_id or self.get_case_internal_id(case_number)
         patch_case: dict[str, Any] = {}
 
@@ -629,8 +930,35 @@ class CaseService:
             .get("RedHatSupportRecord", {})
         )
 
+    def _update_case_rest_v1(
+        self,
+        case_number: str,
+        status: str | None = None,
+        severity: str | None = None,
+        summary: str | None = None,
+        description: str | None = None,
+    ) -> dict:
+        updates: dict[str, Any] = {}
+        if status:
+            updates["status"] = STATUS_MAP.get(status.lower(), status)
+        if severity:
+            updates["severity"] = SEVERITY_MAP.get(severity.lower(), severity)
+        if summary:
+            updates["summary"] = summary
+        if description:
+            updates["description"] = description
+
+        resp = self.api_client.put(f"{self.rest_url}/cases/{case_number}", json=updates)
+        resp.raise_for_status()
+        return updates
+
     def get_active_products(self, first: int = 200) -> list[ProductItem]:
         """Fetches active products from the product catalog."""
+        if self._use_graphql:
+            return self._get_active_products_graphql(first)
+        return self._get_active_products_rest_v1()
+
+    def _get_active_products_graphql(self, first: int = 200) -> list[ProductItem]:
         variables = {"first": first, "after": None}
         data = self.api_client.execute_graphql(
             GQL_GET_ACTIVE_PRODUCTS, variables, url=self.graphql_url
@@ -678,6 +1006,26 @@ class CaseService:
                 )
             )
         return products
+
+    def _get_active_products_rest_v1(self) -> list[ProductItem]:
+        prod_root = re.sub(r"/v\d+$", "", self.rest_url)
+        prod_url = f"{prod_root}/v2"
+        with contextlib.suppress(Exception):
+            resp = self.api_client.get(f"{prod_url}/products")
+            if resp.status_code == 200:
+                data = resp.json()
+                if isinstance(data, list):
+                    return [
+                        ProductItem(
+                            id=p.get("code") or p.get("name", "prod"),
+                            name=p.get("name", ""),
+                        )
+                        for p in data
+                    ]
+        return [
+            ProductItem(id="RHEL", name="Red Hat Enterprise Linux"),
+            ProductItem(id="OPENSHIFT", name="Red Hat OpenShift Container Platform"),
+        ]
 
     def resolve_case_lookups(
         self,
@@ -756,7 +1104,42 @@ class CaseService:
         sso_user: str | None = None,
         extra_fields: dict[str, Any] | None = None,
     ) -> str:
-        """Creates a new Red Hat support case and returns the assigned case number."""
+        """Creates a new Red Hat support case using the selected backend."""
+        if self._use_graphql:
+            return self._create_case_graphql(
+                summary=summary,
+                description=description,
+                product_name=product_name,
+                version_name=version_name,
+                severity=severity,
+                case_type=case_type,
+                account_number=account_number,
+                sso_user=sso_user,
+                extra_fields=extra_fields,
+            )
+        return self._create_case_rest_v1(
+            summary=summary,
+            description=description,
+            product_name=product_name,
+            version_name=version_name,
+            severity=severity,
+            case_type=case_type,
+            account_number=account_number,
+            extra_fields=extra_fields,
+        )
+
+    def _create_case_graphql(
+        self,
+        summary: str,
+        description: str,
+        product_name: str = "Red Hat Enterprise Linux",
+        version_name: str = "9.0",
+        severity: str = "3 (Normal)",
+        case_type: str = "Standard",
+        account_number: str | None = None,
+        sso_user: str | None = None,
+        extra_fields: dict[str, Any] | None = None,
+    ) -> str:
         mapped_severity = SEVERITY_MAP.get(severity.lower(), severity)
         lookups = self.resolve_case_lookups(
             sso_user=sso_user,
@@ -800,4 +1183,40 @@ class CaseService:
             if isinstance(record.get("CaseNumber__c"), dict)
             else record.get("caseNumber", "")
         )
+        return str(case_num)
+
+    def _create_case_rest_v1(
+        self,
+        summary: str,
+        description: str,
+        product_name: str = "Red Hat Enterprise Linux",
+        version_name: str = "9.0",
+        severity: str = "3 (Normal)",
+        case_type: str = "Standard",
+        account_number: str | None = None,
+        extra_fields: dict[str, Any] | None = None,
+    ) -> str:
+        mapped_severity = SEVERITY_MAP.get(severity.lower(), severity)
+        payload: dict[str, Any] = {
+            "product": product_name,
+            "version": version_name,
+            "summary": summary,
+            "description": description,
+            "severity": mapped_severity,
+            "type": case_type,
+            "caseType": case_type,
+        }
+        if account_number:
+            payload["accountNumber"] = str(account_number)
+        if extra_fields:
+            for k, v in extra_fields.items():
+                if not k.startswith("_") and k not in payload:
+                    payload[k] = v
+
+        resp = self.api_client.post(f"{self.rest_url}/cases", json=payload)
+        resp.raise_for_status()
+        case_data = resp.json()
+        case_num = case_data.get("caseNumber") or case_data.get("id")
+        if not case_num and "locations" in case_data and case_data["locations"]:
+            case_num = case_data["locations"][0].rstrip("/").split("/")[-1]
         return str(case_num)

@@ -99,6 +99,16 @@ Authentication:
         help="Disable colored output and visual indicators",
     )
     parser.add_argument("--config-file", help="Path to configuration file")
+    parser.add_argument(
+        "--new-crm",
+        action="store_true",
+        help="Use the new Red Hat CRM platform (GraphQL & v3 Attachment APIs)",
+    )
+    parser.add_argument(
+        "--backend",
+        choices=["v1", "graphql"],
+        help="Select API backend: 'v1' (default active production) or 'graphql' (new CRM)",
+    )
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     parser.add_argument(
         "--debug-file",
@@ -370,10 +380,26 @@ Authentication:
         run_mock_server(corpus_dir=args.corpus, port=args.port)
         sys.exit(0)
 
+    # Resolve backend selection
+    backend = "v1"
+    if getattr(args, "new_crm", False) or getattr(args, "backend", None) == "graphql":
+        backend = "graphql"
+    elif getattr(args, "backend", None):
+        backend = args.backend
+    elif (
+        config.get("new_crm")
+        or config.get("backend") == "graphql"
+        or os.environ.get("RH_NEW_CRM") in ("1", "true", "True")
+        or os.environ.get("RH_BACKEND") == "graphql"
+    ):
+        backend = "graphql"
+
+    args.backend = backend
+    os.environ["RH_BACKEND"] = backend
+
     debug_file = args.debug_file or config.get("debug_file")
     if args.debug or debug_file:
         enable_debug_logging(log_file=debug_file)
-
     # Instantiate RedHatAPIClient before running commands
     from rh_support_lib.api import RedHatAPIClient
 

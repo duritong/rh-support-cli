@@ -203,9 +203,23 @@ rh-support-cli create \
 
 ## 5. Subcommands Usage
 
-### Attachment Management (`attachment` / `attachments`)
-Manage file attachments on Red Hat support cases using the dedicated Attachment Service API (supporting files up to 5 TB with direct storage transfers):
+### Switching to the Upcoming CRM Platform (`--new-crm` / `--backend`)
+By default, the CLI communicates with Red Hat's active production API (REST v1). For users who are enabled or testing against Red Hat's new upcoming CRM platform (GraphQL & v3 Attachment Service), pass the global `--new-crm` flag (or `--backend graphql`):
 
+```bash
+# Run any command with the new CRM platform (GraphQL)
+rh-support-cli --new-crm list
+rh-support-cli --new-crm show -c 12345678
+rh-support-cli --new-crm tui
+```
+
+You can also persist this choice in your `~/.config/rh-support-cli/config.yaml`:
+```yaml
+backend: graphql  # or: new_crm: true
+```
+Or export the environment variable: `export RH_NEW_CRM=1` / `export RH_BACKEND=graphql`.
+
+### Attachment Management (`attachment` / `attachments`)
 *   **List Attachments**:
     ```bash
     rh-support-cli attachment -c 12345678 list [--include-deleted]

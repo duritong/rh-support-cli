@@ -904,6 +904,15 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                     "contact": {"name": "Test Owner"},
                     "status": "Waiting on Red Hat",
                     "severity": "High",
+                    "attachments": [
+                        {
+                            "id": "att_1001_uuid",
+                            "name": "test_attachment.log",
+                            "size": 2048,
+                            "createdDate": "2026-07-10T16:20:00Z",
+                            "createdBy": "Jane Developer",
+                        }
+                    ],
                 }
                 self.wfile.write(json.dumps(case).encode())
                 return
@@ -2826,10 +2835,8 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             sample_file = os.path.join(temp_dir, "test_diag.log")
             with open(sample_file, "w") as f:
                 f.write("System diagnostic log line 1\nLine 2")
-
-            # Upload
             result_up = self.run_cli(
-                ["attachment", "-c", "12345", "upload", "-f", sample_file]
+                ["--new-crm", "attachment", "-c", "12345", "upload", "-f", sample_file]
             )
             self.assertEqual(result_up.returncode, 0)
             self.assertIn(
@@ -2841,6 +2848,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             dest_file = os.path.join(temp_dir, "downloaded.log")
             result_down = self.run_cli(
                 [
+                    "--new-crm",
                     "attachment",
                     "-c",
                     "12345",
@@ -2859,7 +2867,16 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
             # Delete with -y
             result_del = self.run_cli(
-                ["attachment", "-c", "12345", "delete", "-a", "att_test_uuid_123", "-y"]
+                [
+                    "--new-crm",
+                    "attachment",
+                    "-c",
+                    "12345",
+                    "delete",
+                    "-a",
+                    "att_test_uuid_123",
+                    "-y",
+                ]
             )
             self.assertEqual(result_del.returncode, 0)
             self.assertIn(
@@ -2882,9 +2899,11 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         try:
             api_client = LegacyAPIClient("mock_access_token_123")
             case_service = CaseService(
-                api_client, graphql_url=f"{self.base_url}/graphql"
+                api_client, backend="graphql", graphql_url=f"{self.base_url}/graphql"
             )
-            att_service = AttachmentService(api_client, base_url=self.base_url)
+            att_service = AttachmentService(
+                api_client, backend="graphql", base_url=self.base_url
+            )
 
             # 1. CaseService list_cases
             cases = case_service.list_cases(
@@ -2917,6 +2936,89 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             self.assertEqual(attachments[0].file_name, "test_attachment.log")
         finally:
             rh_support_lib.constants.GRAPHQL_URL = orig_gql
+
+    def test_new_crm_flag_cli(self):
+        """Test running CLI commands with --new-crm (GraphQL and v3 APIs)"""
+        import tempfile
+
+        temp_dir = tempfile.mkdtemp()
+        try:
+            # 1. List with --new-crm
+            result_list = self.run_cli(["--new-crm", "list"])
+            self.assertEqual(result_list.returncode, 0)
+            self.assertIn("FILTER_TEST", result_list.stdout)
+
+            # 2. Show with --new-crm
+            result_show = self.run_cli(
+                ["--new-crm", "show", "-c", "12345", "--no-pager"]
+            )
+            self.assertEqual(result_show.returncode, 0)
+            self.assertIn("CASE: 12345", result_show.stdout)
+            self.assertIn("Test Case Details", result_show.stdout)
+
+            # 3. Comment with --backend graphql
+            comment_file = os.path.join(temp_dir, "comment.txt")
+            with open(comment_file, "w") as f:
+                f.write("New CRM comment text")
+            result_comment = self.run_cli(
+                ["--backend", "graphql", "comment", "-c", "12345", "-f", comment_file]
+            )
+            self.assertEqual(result_comment.returncode, 0)
+            self.assertIn("Success: Comment added.", result_comment.stdout)
+
+            # 4. Attachment list with --new-crm
+            result_att_list = self.run_cli(
+                ["--new-crm", "attachment", "-c", "12345", "list"]
+            )
+            self.assertEqual(result_att_list.returncode, 0)
+            self.assertIn("Attachments for Case #12345", result_att_list.stdout)
+
+            # 5. Attachment upload, download, delete with --new-crm
+            sample_file = os.path.join(temp_dir, "sample.txt")
+            with open(sample_file, "w") as f:
+                f.write("Sample content")
+            result_up = self.run_cli(
+                ["--new-crm", "attachment", "-c", "12345", "upload", "-f", sample_file]
+            )
+            self.assertEqual(result_up.returncode, 0)
+            self.assertIn("Success: File 'sample.txt' attached.", result_up.stdout)
+
+            dest_file = os.path.join(temp_dir, "down.txt")
+            result_down = self.run_cli(
+                [
+                    "--new-crm",
+                    "attachment",
+                    "-c",
+                    "12345",
+                    "download",
+                    "-a",
+                    "att_test_uuid_123",
+                    "-o",
+                    dest_file,
+                ]
+            )
+            self.assertEqual(result_down.returncode, 0)
+            self.assertTrue(os.path.exists(dest_file))
+
+            result_del = self.run_cli(
+                [
+                    "--new-crm",
+                    "attachment",
+                    "-c",
+                    "12345",
+                    "delete",
+                    "-a",
+                    "att_test_uuid_123",
+                    "-y",
+                ]
+            )
+            self.assertEqual(result_del.returncode, 0)
+            self.assertIn(
+                "Successfully deleted attachment 'att_test_uuid_123'.",
+                result_del.stdout,
+            )
+        finally:
+            shutil.rmtree(temp_dir)
 
 
 if __name__ == "__main__":
