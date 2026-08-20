@@ -2,8 +2,17 @@ from __future__ import annotations
 
 from typing import Any
 
-from rh_support_lib.constants import SEVERITY_MAP, STATUS_MAP
-from rh_support_lib.models import Case, CaseComment, CaseDetails, ProductItem
+from rh_support_lib.constants import (
+    GRAPHQL_URL,
+    SEVERITY_MAP,
+    STATUS_MAP,
+)
+from rh_support_lib.models import (
+    Case,
+    CaseComment,
+    CaseDetails,
+    ProductItem,
+)
 
 # --- GRAPHQL QUERIES & MUTATIONS ---
 
@@ -269,10 +278,11 @@ mutation CreateCaseComment($input: RedHatSupportCaseComment__cCreateInput!) {
 
 
 class CaseService:
-    """Service to handle all support case operations via Red Hat GraphQL API."""
+    """Service to handle all support case operations exclusively via the Red Hat GraphQL API."""
 
-    def __init__(self, api_client):
+    def __init__(self, api_client, graphql_url: str | None = None):
         self.api_client = api_client
+        self.graphql_url = graphql_url or GRAPHQL_URL
 
     def _normalize_case_node(self, node: dict[str, Any]) -> Case:
         """Converts a GraphQL RedHatSupportCase node to a Case domain model."""
@@ -420,7 +430,9 @@ class CaseService:
             "after": after,
         }
 
-        data = self.api_client.execute_graphql(GQL_GET_CASES_BY_FILTERS, variables)
+        data = self.api_client.execute_graphql(
+            GQL_GET_CASES_BY_FILTERS, variables, url=self.graphql_url
+        )
         uiapi = data.get("redhat_support_uiapi") or {}
         query_data = uiapi.get("query") or {}
         case_container = query_data.get("RedHatSupportCase") or {}
@@ -443,7 +455,9 @@ class CaseService:
             "after": None,
         }
 
-        data = self.api_client.execute_graphql(GQL_GET_CASE_AND_COMMENTS, variables)
+        data = self.api_client.execute_graphql(
+            GQL_GET_CASE_AND_COMMENTS, variables, url=self.graphql_url
+        )
         uiapi = data.get("redhat_support_uiapi") or {}
         query_data = uiapi.get("query") or {}
         case_container = query_data.get("RedHatSupportCase") or {}
@@ -500,6 +514,7 @@ class CaseService:
             is_pub = c_node.get("isPublic")
             if is_pub is None:
                 is_pub = not (c_vis and str(c_vis).lower() != "public")
+
             comments.append(
                 CaseComment(
                     id=str(c_id),
@@ -546,7 +561,9 @@ class CaseService:
         }
 
         variables = {"input": {"RedHatSupportCaseComment__c": comment_input}}
-        data = self.api_client.execute_graphql(GQL_CREATE_CASE_COMMENT, variables)
+        data = self.api_client.execute_graphql(
+            GQL_CREATE_CASE_COMMENT, variables, url=self.graphql_url
+        )
 
         record = (
             data.get("redhat_support_uiapi", {})
@@ -603,7 +620,9 @@ class CaseService:
         }
 
         variables = {"input": input_payload}
-        data = self.api_client.execute_graphql(GQL_UPDATE_CASE, variables)
+        data = self.api_client.execute_graphql(
+            GQL_UPDATE_CASE, variables, url=self.graphql_url
+        )
         return (
             data.get("redhat_support_uiapi", {})
             .get("CaseUpdate", {})
@@ -613,7 +632,9 @@ class CaseService:
     def get_active_products(self, first: int = 200) -> list[ProductItem]:
         """Fetches active products from the product catalog."""
         variables = {"first": first, "after": None}
-        data = self.api_client.execute_graphql(GQL_GET_ACTIVE_PRODUCTS, variables)
+        data = self.api_client.execute_graphql(
+            GQL_GET_ACTIVE_PRODUCTS, variables, url=self.graphql_url
+        )
 
         edges = (
             data.get("redhat_support_uiapi", {})
@@ -672,7 +693,9 @@ class CaseService:
             "productName": product_name,
             "versionName": version_name,
         }
-        data = self.api_client.execute_graphql(GQL_RESOLVE_CASE_LOOKUP_DATA, variables)
+        data = self.api_client.execute_graphql(
+            GQL_RESOLVE_CASE_LOOKUP_DATA, variables, url=self.graphql_url
+        )
         uiapi = data.get("redhat_support_uiapi") or {}
 
         contact_id = ""
@@ -763,7 +786,9 @@ class CaseService:
                     case_input[k] = v
 
         variables = {"input": {"RedHatSupportCase": case_input}}
-        data = self.api_client.execute_graphql(GQL_CREATE_NEW_CASE, variables)
+        data = self.api_client.execute_graphql(
+            GQL_CREATE_NEW_CASE, variables, url=self.graphql_url
+        )
         record = (
             data.get("redhat_support_uiapi", {})
             .get("CaseCreate", {})

@@ -136,7 +136,7 @@ class AttachmentService:
         progress_callback: Callable[[int, int], None] | None = None,
     ) -> Attachment:
         """
-        Uploads a local file to a support case using the presigned URL flow.
+        Uploads a local file to a support case using the v3 presigned URL flow.
         Handles both SINGLE_PUT (<= 5 GB) and MULTIPART (> 5 GB) strategies automatically.
         """
         if not os.path.isfile(file_path):
@@ -155,7 +155,6 @@ class AttachmentService:
             "description": description,
         }
         if file_size > 5368709120:  # > 5 GB
-            # Calculate 5GB chunks
             chunk_size = 5368709120
             total_chunks = (file_size + chunk_size - 1) // chunk_size
             payload["totalChunks"] = total_chunks
@@ -178,7 +177,10 @@ class AttachmentService:
             with open(file_path, "rb") as f:
                 put_headers = {"Content-Type": "application/octet-stream"}
                 put_resp = requests.put(
-                    presigned_url, data=f, headers=put_headers, timeout=(30, 3600)
+                    presigned_url,
+                    data=f,
+                    headers=put_headers,
+                    timeout=(30, 3600),
                 )
                 put_resp.raise_for_status()
                 if progress_callback:

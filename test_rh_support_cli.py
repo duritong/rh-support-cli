@@ -2881,7 +2881,9 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         rh_support_lib.constants.GRAPHQL_URL = f"{self.base_url}/graphql"
         try:
             api_client = LegacyAPIClient("mock_access_token_123")
-            case_service = CaseService(api_client)
+            case_service = CaseService(
+                api_client, graphql_url=f"{self.base_url}/graphql"
+            )
             att_service = AttachmentService(api_client, base_url=self.base_url)
 
             # 1. CaseService list_cases
