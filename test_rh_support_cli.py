@@ -2836,7 +2836,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             with open(sample_file, "w") as f:
                 f.write("System diagnostic log line 1\nLine 2")
             result_up = self.run_cli(
-                ["--new-crm", "attachment", "-c", "12345", "upload", "-f", sample_file]
+                ["--graphql", "attachment", "-c", "12345", "upload", "-f", sample_file]
             )
             self.assertEqual(result_up.returncode, 0)
             self.assertIn(
@@ -2848,7 +2848,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             dest_file = os.path.join(temp_dir, "downloaded.log")
             result_down = self.run_cli(
                 [
-                    "--new-crm",
+                    "--graphql",
                     "attachment",
                     "-c",
                     "12345",
@@ -2868,7 +2868,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             # Delete with -y
             result_del = self.run_cli(
                 [
-                    "--new-crm",
+                    "--graphql",
                     "attachment",
                     "-c",
                     "12345",
@@ -2937,20 +2937,20 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         finally:
             rh_support_lib.constants.GRAPHQL_URL = orig_gql
 
-    def test_new_crm_flag_cli(self):
-        """Test running CLI commands with --new-crm (GraphQL and v3 APIs)"""
+    def test_graphql_flag_cli(self):
+        """Test running CLI commands with --graphql (GraphQL and v3 APIs)"""
         import tempfile
 
         temp_dir = tempfile.mkdtemp()
         try:
-            # 1. List with --new-crm
-            result_list = self.run_cli(["--new-crm", "list"])
+            # 1. List with --graphql
+            result_list = self.run_cli(["--graphql", "list"])
             self.assertEqual(result_list.returncode, 0)
             self.assertIn("FILTER_TEST", result_list.stdout)
 
-            # 2. Show with --new-crm
+            # 2. Show with --graphql
             result_show = self.run_cli(
-                ["--new-crm", "show", "-c", "12345", "--no-pager"]
+                ["--graphql", "show", "-c", "12345", "--no-pager"]
             )
             self.assertEqual(result_show.returncode, 0)
             self.assertIn("CASE: 12345", result_show.stdout)
@@ -2966,19 +2966,19 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             self.assertEqual(result_comment.returncode, 0)
             self.assertIn("Success: Comment added.", result_comment.stdout)
 
-            # 4. Attachment list with --new-crm
+            # 4. Attachment list with --graphql
             result_att_list = self.run_cli(
-                ["--new-crm", "attachment", "-c", "12345", "list"]
+                ["--graphql", "attachment", "-c", "12345", "list"]
             )
             self.assertEqual(result_att_list.returncode, 0)
             self.assertIn("Attachments for Case #12345", result_att_list.stdout)
 
-            # 5. Attachment upload, download, delete with --new-crm
+            # 5. Attachment upload, download, delete with --graphql
             sample_file = os.path.join(temp_dir, "sample.txt")
             with open(sample_file, "w") as f:
                 f.write("Sample content")
             result_up = self.run_cli(
-                ["--new-crm", "attachment", "-c", "12345", "upload", "-f", sample_file]
+                ["--graphql", "attachment", "-c", "12345", "upload", "-f", sample_file]
             )
             self.assertEqual(result_up.returncode, 0)
             self.assertIn("Success: File 'sample.txt' attached.", result_up.stdout)
@@ -2986,7 +2986,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             dest_file = os.path.join(temp_dir, "down.txt")
             result_down = self.run_cli(
                 [
-                    "--new-crm",
+                    "--graphql",
                     "attachment",
                     "-c",
                     "12345",
@@ -3002,7 +3002,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
             result_del = self.run_cli(
                 [
-                    "--new-crm",
+                    "--graphql",
                     "attachment",
                     "-c",
                     "12345",

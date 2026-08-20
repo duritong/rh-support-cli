@@ -100,9 +100,9 @@ Authentication:
     )
     parser.add_argument("--config-file", help="Path to configuration file")
     parser.add_argument(
-        "--new-crm",
+        "--graphql",
         action="store_true",
-        help="Use the new Red Hat CRM platform (GraphQL & v3 Attachment APIs)",
+        help="Use the new Red Hat GraphQL & v3 Attachment APIs",
     )
     parser.add_argument(
         "--backend",
@@ -382,14 +382,14 @@ Authentication:
 
     # Resolve backend selection
     backend = "v1"
-    if getattr(args, "new_crm", False) or getattr(args, "backend", None) == "graphql":
+    if getattr(args, "graphql", False) or getattr(args, "backend", None) == "graphql":
         backend = "graphql"
     elif getattr(args, "backend", None):
         backend = args.backend
     elif (
-        config.get("new_crm")
+        config.get("graphql")
         or config.get("backend") == "graphql"
-        or os.environ.get("RH_NEW_CRM") in ("1", "true", "True")
+        or os.environ.get("RH_GRAPHQL") in ("1", "true", "True")
         or os.environ.get("RH_BACKEND") == "graphql"
     ):
         backend = "graphql"

@@ -203,21 +203,21 @@ rh-support-cli create \
 
 ## 5. Subcommands Usage
 
-### Switching to the Upcoming CRM Platform (`--new-crm` / `--backend`)
-By default, the CLI communicates with Red Hat's active production API (REST v1). For users who are enabled or testing against Red Hat's new upcoming CRM platform (GraphQL & v3 Attachment Service), pass the global `--new-crm` flag (or `--backend graphql`):
+### Switching to the Upcoming CRM Platform (`--graphql` / `--backend`)
+By default, the CLI communicates with Red Hat's active production API (REST v1). For users who are enabled or testing against Red Hat's new upcoming CRM platform (GraphQL & v3 Attachment Service), pass the global `--graphql` flag (or `--backend graphql`):
 
 ```bash
 # Run any command with the new CRM platform (GraphQL)
-rh-support-cli --new-crm list
-rh-support-cli --new-crm show -c 12345678
-rh-support-cli --new-crm tui
+rh-support-cli --graphql list
+rh-support-cli --graphql show -c 12345678
+rh-support-cli --graphql tui
 ```
 
 You can also persist this choice in your `~/.config/rh-support-cli/config.yaml`:
 ```yaml
-backend: graphql  # or: new_crm: true
+backend: graphql  # or: graphql: true
 ```
-Or export the environment variable: `export RH_NEW_CRM=1` / `export RH_BACKEND=graphql`.
+Or export the environment variable: `export RH_GRAPHQL=1` / `export RH_BACKEND=graphql`.
 
 ### Attachment Management (`attachment` / `attachments`)
 *   **List Attachments**:
