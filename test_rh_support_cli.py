@@ -581,12 +581,24 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                 self.send_response(201)
                 self.send_header("Content-type", "application/json")
                 self.end_headers()
-                self.wfile.write(json.dumps({"caseNumber": "20230001"}).encode())
+                if data.get("summary") == "Location Singular Test":
+                    self.wfile.write(
+                        json.dumps(
+                            {
+                                "location": [
+                                    "https://access.redhat.com/hydra/rest/v1/cases/04525091"
+                                ]
+                            }
+                        ).encode()
+                    )
+                else:
+                    self.wfile.write(json.dumps({"caseNumber": "20230001"}).encode())
+                return
             else:
                 self.send_response(400)
                 self.end_headers()
                 self.wfile.write(b"Missing required fields")
-            return
+                return
 
         # Legacy List Cases Endpoint: /cases/filter
         if self.path == "/cases/filter":
@@ -1026,11 +1038,16 @@ class TestRhSupportCli(unittest.TestCase):
         if os.path.exists(self.test_cache_dir):
             shutil.rmtree(self.test_cache_dir)
 
-    def run_cli(self, args):
+    def run_cli(self, args, input=None):
         """Helper to run the CLI script as a subprocess"""
         cmd = [sys.executable, self.cli_path] + args
         return subprocess.run(
-            cmd, env=self.env, capture_output=True, text=True, check=False
+            cmd,
+            env=self.env,
+            capture_output=True,
+            text=True,
+            input=input,
+            check=False,
         )
 
     def test_auth_failure_missing_token(self):
@@ -1254,6 +1271,36 @@ class TestRhSupportCli(unittest.TestCase):
             for f in ["desc.txt", "att1.txt", "att2.txt"]:
                 if os.path.exists(f):
                     os.remove(f)
+
+    def test_create_case_location_singular_response(self):
+        """Test creating a case when server returns location list instead of caseNumber"""
+        with open("desc_loc.txt", "w") as f:
+            f.write("Location test description")
+
+        try:
+            result = self.run_cli(
+                [
+                    "create",
+                    "--product",
+                    "RHEL",
+                    "--version",
+                    "9.0",
+                    "--summary",
+                    "Location Singular Test",
+                    "--description-file",
+                    "desc_loc.txt",
+                    "--severity",
+                    "Low",
+                    "--type",
+                    "Standard",
+                ],
+                input="y\n",
+            )
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Success: Case #04525091 created.", result.stdout)
+        finally:
+            if os.path.exists("desc_loc.txt"):
+                os.remove("desc_loc.txt")
 
     def test_create_case_default_template(self):
         """Test creating a case using default_create_template"""

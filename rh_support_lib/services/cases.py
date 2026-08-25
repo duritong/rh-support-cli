@@ -1216,10 +1216,19 @@ class CaseService:
 
         resp = self.api_client.post(f"{self.rest_url}/cases", json=payload)
         resp.raise_for_status()
-        case_data = resp.json()
+        case_data = resp.json() if resp.text else {}
         case_num = case_data.get("caseNumber") or case_data.get("id")
-        if not case_num and "locations" in case_data and case_data["locations"]:
-            case_num = case_data["locations"][0].rstrip("/").split("/")[-1]
+
+        if not case_num:
+            loc = case_data.get("location") or case_data.get("locations")
+            if isinstance(loc, list) and loc:
+                case_num = str(loc[0]).rstrip("/").split("/")[-1]
+            elif isinstance(loc, str) and loc:
+                case_num = loc.rstrip("/").split("/")[-1]
+
+        if not case_num and "Location" in resp.headers:
+            case_num = resp.headers["Location"].rstrip("/").split("/")[-1]
+
         return str(case_num)
 
     def get_current_user(self) -> str:
