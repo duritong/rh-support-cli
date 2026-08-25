@@ -26,8 +26,8 @@ The project is structured as a Python CLI wrapper around the Red Hat Support Cas
     │   ├── attachments.py  # attachment subcommand group (list, upload, download, delete, status)
     │   ├── create_case.py  # create subcommand
     │   ├── list_cases.py   # list subcommand (Rich Table based)
-    │   └── show_case.py    # show subcommand (Rich Panels/Markdown based)
-    ├── services/           # Decoupled domain service layer
+    │   ├── show_case.py    # show subcommand (Rich Panels/Markdown based)
+    │   └── watchers.py     # follow, unfollow subcommands
     │   ├── attachments.py  # AttachmentService (v3 presigned upload, download, delete, status)
     │   └── cases.py        # CaseService (GraphQL queries, mutations, case lookups)
     ├── synthetic_corpus/   # Local stateful mock portal and synthetic generator

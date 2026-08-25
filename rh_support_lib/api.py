@@ -243,6 +243,29 @@ def get_json(url, token):
         return []
 
 
+def extract_jwt_username(token: str | None) -> str | None:
+    if not token or token.count(".") < 2:
+        return None
+    import base64
+    import contextlib
+    import json
+
+    with contextlib.suppress(Exception):
+        payload_part = token.split(".")[1]
+        padded = payload_part + "=" * ((4 - len(payload_part) % 4) % 4)
+        claims = json.loads(
+            base64.urlsafe_b64decode(padded.encode("utf-8")).decode("utf-8")
+        )
+        if isinstance(claims, dict):
+            return (
+                claims.get("preferred_username")
+                or claims.get("username")
+                or claims.get("email")
+                or claims.get("sub")
+            )
+    return None
+
+
 class RedHatAPIClient:
     """OIDC Client for Red Hat Support Case API with transparent token refreshing."""
 

@@ -5,6 +5,7 @@ import os
 import re
 from typing import Any
 
+from rh_support_lib.api import extract_jwt_username
 from rh_support_lib.constants import (
     API_URL,
     BACKEND_MODE,
@@ -1220,3 +1221,68 @@ class CaseService:
         if not case_num and "locations" in case_data and case_data["locations"]:
             case_num = case_data["locations"][0].rstrip("/").split("/")[-1]
         return str(case_num)
+
+    def get_current_user(self) -> str:
+        """Determines the current user's SSO username from config, env, JWT token, or system user."""
+        for env_var in (
+            "REDHAT_SUPPORT_USERNAME",
+            "RH_SSO_USERNAME",
+            "RH_USERNAME",
+        ):
+            val = os.environ.get(env_var)
+            if val and val.strip():
+                return val.strip()
+
+        token = self.api_client.get_token()
+        jwt_user = extract_jwt_username(token)
+        if jwt_user:
+            return jwt_user
+
+        return os.environ.get("USER", "jdeveloper")
+
+    def follow_case(
+        self, case_numbers: list[str] | str, username: str | None = None
+    ) -> list[str]:
+        """Attaches the specified username (defaults to current user) as a watcher on one or more cases.
+        Returns list of successfully followed case numbers."""
+        user = username or self.get_current_user()
+        if not isinstance(case_numbers, list):
+            case_numbers = [case_numbers]
+
+        followed = []
+        for c_num in case_numbers:
+            c_str = str(c_num).strip()
+            if not c_str:
+                continue
+            payload = {"user": [{"ssoUsername": user}]}
+            url = f"{self.rest_url}/cases/{c_str}/notifiedusers"
+            resp = self.api_client.post(url, json=payload)
+            if resp.status_code in (200, 201, 204):
+                followed.append(c_str)
+            else:
+                resp.raise_for_status()
+                followed.append(c_str)
+        return followed
+
+    def unfollow_case(
+        self, case_numbers: list[str] | str, username: str | None = None
+    ) -> list[str]:
+        """Removes the specified username (defaults to current user) from watchers on one or more cases.
+        Returns list of successfully unfollowed case numbers."""
+        user = username or self.get_current_user()
+        if not isinstance(case_numbers, list):
+            case_numbers = [case_numbers]
+
+        unfollowed = []
+        for c_num in case_numbers:
+            c_str = str(c_num).strip()
+            if not c_str:
+                continue
+            url = f"{self.rest_url}/cases/{c_str}/notifiedusers/{user}"
+            resp = self.api_client.delete(url)
+            if resp.status_code in (200, 204, 404):
+                unfollowed.append(c_str)
+            else:
+                resp.raise_for_status()
+                unfollowed.append(c_str)
+        return unfollowed

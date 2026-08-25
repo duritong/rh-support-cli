@@ -742,11 +742,41 @@ class StatefulMockHandler(http.server.BaseHTTPRequestHandler):
                 self._send_error("Case not found", 404)
             return
 
+        match_users = re.search(r"/cases/(\d+)/notifiedusers$", self.path)
+        if match_users:
+            case_num = match_users.group(1)
+            case_file = corpus_path / "cases" / f"{case_num}.json"
+            if not case_file.exists():
+                self._send_error(f"Case {case_num} not found", 404)
+                return
+            try:
+                payload = json.loads(body.decode("utf-8")) if body else {}
+            except json.JSONDecodeError:
+                payload = {}
+            users_list = payload.get("user") or []
+            with open(case_file, "r") as f:
+                case_data = json.load(f)
+            existing = case_data.setdefault("notifiedusers", [])
+            existing_ssos = {
+                (u.get("ssoUsername", "") if isinstance(u, dict) else str(u)).lower()
+                for u in existing
+            }
+            for u in users_list:
+                sso = u.get("ssoUsername") if isinstance(u, dict) else str(u)
+                if sso and sso.lower() not in existing_ssos:
+                    existing.append({"ssoUsername": sso})
+            case_data["lastModifiedDate"] = datetime.now(timezone.utc).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
+            with open(case_file, "w") as f:
+                json.dump(case_data, f, indent=2)
+            self._send_json({"status": "success"}, status_code=201)
+            return
+
         match_attach = re.search(r"/cases/(\d+)/attachments$", self.path)
         if match_attach:
             self._send_json({"id": "a_mock"}, status_code=201)
             return
-        self._send_error("Endpoint not found", 404)
 
     def do_GET(self):
         corpus_path = self._get_corpus_path()
@@ -976,11 +1006,39 @@ class StatefulMockHandler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             return
 
-        # 2. Attachment Abort: DELETE /v3/cases/attachments/upload/abort
+        match_del_user = re.search(
+            r"/cases/(\d+)/notifiedusers(?:/([^/]+))?$", self.path
+        )
+        if match_del_user:
+            case_num = match_del_user.group(1)
+            target_user = match_del_user.group(2)
+            corpus_path = self._get_corpus_path()
+            case_file = corpus_path / "cases" / f"{case_num}.json"
+            if case_file.exists():
+                with open(case_file, "r") as f:
+                    case_data = json.load(f)
+                existing = case_data.get("notifiedusers", [])
+                if target_user:
+                    case_data["notifiedusers"] = [
+                        u
+                        for u in existing
+                        if (
+                            u.get("ssoUsername", "") if isinstance(u, dict) else str(u)
+                        ).lower()
+                        != target_user.lower()
+                    ]
+                else:
+                    case_data["notifiedusers"] = []
+                with open(case_file, "w") as f:
+                    json.dump(case_data, f, indent=2)
+            self.send_response(204)
+            self.end_headers()
+            return
+
+        # 3. Attachment Abort: DELETE /v3/cases/attachments/upload/abort
         if "/attachments/upload/abort" in self.path:
             self._send_json({"status": "aborted"})
             return
-
         self._send_error("Endpoint not found", 404)
 
     def do_HEAD(self):

@@ -242,6 +242,29 @@ Or export the environment variable: `export RH_GRAPHQL=1` / `export RH_BACKEND=g
     ```bash
     rh-support-cli attachment -c 12345678 status [-a <ATTACHMENT_UUID>]
     ```
+### Following & Unfollowing Cases (`follow` / `unfollow`)
+Attach or remove yourself (or a specific SSO user) as a watcher on one or multiple support cases:
+
+*   **Follow a single case**:
+    ```bash
+    rh-support-cli follow 12345678
+    # or:
+    rh-support-cli follow -c 12345678
+    ```
+*   **Follow multiple cases at once**:
+    ```bash
+    rh-support-cli follow 12345678 23456789 34567890
+    ```
+*   **Follow on behalf of another user**:
+    ```bash
+    rh-support-cli follow 12345678 --user alice
+    ```
+*   **Unfollow single or multiple cases**:
+    ```bash
+    rh-support-cli unfollow 12345678
+    rh-support-cli unfollow 12345678 23456789
+    rh-support-cli unfollow 12345678 --user alice
+    ```
 
 ### Listing local templates
 List all configured local templates, including their private descriptions, target fields, and watchers. This command runs **completely offline**:

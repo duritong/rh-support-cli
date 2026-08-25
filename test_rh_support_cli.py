@@ -21,6 +21,8 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
     last_case_payload = None
     last_comment_payload = None
     last_update_payload = None
+    last_notifiedusers_payload = None
+    last_deleted_notifieduser = None
     mock_storage: ClassVar[dict] = {}
 
     def log_message(self, format, *args):
@@ -935,6 +937,12 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             return
 
+        if "/notifiedusers" in self.path:
+            MockRedHatHandler.last_deleted_notifieduser = self.path
+            self.send_response(204)
+            self.end_headers()
+            return
+
         # DELETE /v3/cases/attachments/upload/abort
         if "/attachments/upload/abort" in self.path:
             self.send_response(200)
@@ -942,7 +950,6 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({"status": "aborted"}).encode())
             return
-
         self.send_response(404)
         self.end_headers()
 
@@ -3019,6 +3026,68 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             )
         finally:
             shutil.rmtree(temp_dir)
+
+    def test_follow_and_unfollow_commands(self):
+        """Test follow and unfollow CLI commands for single and multiple cases"""
+        expected_user = self.env.get("REDHAT_SUPPORT_USERNAME") or self.env.get(
+            "USER", "jdeveloper"
+        )
+        # 1. Follow single case via flag
+        result_follow1 = self.run_cli(["follow", "-c", "12345"])
+        self.assertEqual(result_follow1.returncode, 0)
+        self.assertIn(
+            f"Success: Added '{expected_user}' as watcher to Case #12345.",
+            result_follow1.stdout,
+        )
+        # 2. Follow multiple cases via positional args and custom user
+        result_follow_multi = self.run_cli(
+            ["follow", "1001", "1002", "--user", "custom_user"]
+        )
+        self.assertEqual(result_follow_multi.returncode, 0)
+        self.assertIn(
+            "Adding 'custom_user' as watcher on 2 case(s)...",
+            result_follow_multi.stdout,
+        )
+        self.assertIn(
+            "Success: Added 'custom_user' as watcher to Case #1001.",
+            result_follow_multi.stdout,
+        )
+        self.assertIn(
+            "Success: Added 'custom_user' as watcher to Case #1002.",
+            result_follow_multi.stdout,
+        )
+
+        # 3. Unfollow single case
+        result_unfollow1 = self.run_cli(["unfollow", "-c", "12345"])
+        self.assertEqual(result_unfollow1.returncode, 0)
+        self.assertIn(
+            f"Success: Removed '{expected_user}' from watchers on Case #12345.",
+            result_unfollow1.stdout,
+        )
+        # 4. Unfollow multiple cases via positional args
+        result_unfollow_multi = self.run_cli(
+            ["unfollow", "1001", "1002", "--user", "custom_user"]
+        )
+        self.assertEqual(result_unfollow_multi.returncode, 0)
+        self.assertIn(
+            "Removing 'custom_user' from watchers on 2 case(s)...",
+            result_unfollow_multi.stdout,
+        )
+        self.assertIn(
+            "Success: Removed 'custom_user' from watchers on Case #1001.",
+            result_unfollow_multi.stdout,
+        )
+        self.assertIn(
+            "Success: Removed 'custom_user' from watchers on Case #1002.",
+            result_unfollow_multi.stdout,
+        )
+
+        # 5. Follow with no arguments fails gracefully
+        result_err = self.run_cli(["follow"])
+        self.assertNotEqual(result_err.returncode, 0)
+        self.assertIn(
+            "Error: Please specify at least one case number", result_err.stderr
+        )
 
 
 if __name__ == "__main__":

@@ -14,6 +14,7 @@ from rh_support_lib.commands.attachments import cmd_attachment
 from rh_support_lib.commands.create_case import cmd_create
 from rh_support_lib.commands.list_cases import cmd_list
 from rh_support_lib.commands.show_case import cmd_show
+from rh_support_lib.commands.watchers import cmd_follow, cmd_unfollow
 from rh_support_lib.config import load_config
 from rh_support_lib.tui.app import cmd_tui
 
@@ -321,6 +322,41 @@ Authentication:
         help="Show what changes would be applied without making them",
     )
 
+    # Follow Subcommand
+    parser_follow = subparsers.add_parser(
+        "follow", help="Attach myself (or specified user) to support case(s) as watcher"
+    )
+    parser_follow.add_argument("cases", nargs="*", help="Case number(s) to follow")
+    parser_follow.add_argument(
+        "-c",
+        "--case",
+        action="append",
+        help="Case number to follow (can be used multiple times)",
+    )
+    parser_follow.add_argument(
+        "-u",
+        "--user",
+        help="SSO username to add as watcher (defaults to myself/current authenticated user)",
+    )
+
+    # Unfollow Subcommand
+    parser_unfollow = subparsers.add_parser(
+        "unfollow",
+        help="Remove myself (or specified user) from support case(s) watchers",
+    )
+    parser_unfollow.add_argument("cases", nargs="*", help="Case number(s) to unfollow")
+    parser_unfollow.add_argument(
+        "-c",
+        "--case",
+        action="append",
+        help="Case number to unfollow (can be used multiple times)",
+    )
+    parser_unfollow.add_argument(
+        "-u",
+        "--user",
+        help="SSO username to remove from watchers (defaults to myself/current authenticated user)",
+    )
+
     # List Templates Subcommand
     subparsers.add_parser(
         "list-templates", help="List all local templates and their details"
@@ -421,6 +457,10 @@ Authentication:
         cmd_show(args, api_client)
     elif args.command == "apply":
         cmd_apply(args, api_client, config)
+    elif args.command == "follow":
+        cmd_follow(args, api_client)
+    elif args.command == "unfollow":
+        cmd_unfollow(args, api_client)
     elif args.command == "tui":
         cmd_tui(args, api_client, config)
 
