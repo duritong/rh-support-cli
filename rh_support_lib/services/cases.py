@@ -677,7 +677,7 @@ class CaseService:
                     is_public=bool(is_pub),
                     visibility=str(c_vis)
                     if c_vis
-                    else ("Public" if is_pub else "Private"),
+                    else ("Public" if is_pub is not False else "Private"),
                     created_date=c_date or "",
                 )
             )
@@ -686,6 +686,8 @@ class CaseService:
             case=case_obj,
             description=description or "",
             comments=comments,
+            attachments=[],
+            notified_users=[],
         )
 
     def _get_case_details_rest_v1(self, case_number: str) -> CaseDetails | None:
@@ -760,11 +762,37 @@ class CaseService:
                 )
             )
 
+        # Notified Users / Watchers
+        notified_users = []
+        raw_users = (
+            case_dict.get("notifiedUsers")
+            or case_dict.get("notifiedusers")
+            or case_dict.get("watchers")
+            or case_dict.get("notified_users")
+            or []
+        )
+        if isinstance(raw_users, dict):
+            raw_users = raw_users.get("user") or raw_users.get("users") or []
+        for u in raw_users:
+            if isinstance(u, str):
+                notified_users.append(u)
+            elif isinstance(u, dict):
+                sso = (
+                    u.get("ssoUsername")
+                    or u.get("userSSOName")
+                    or u.get("sso")
+                    or u.get("name")
+                    or ""
+                )
+                if sso:
+                    notified_users.append(sso)
+
         return CaseDetails(
             case=case_obj,
             description=description or "",
             comments=comments,
             attachments=attachments,
+            notified_users=notified_users,
         )
 
     def get_case_internal_id(self, case_number: str) -> str:
@@ -1305,20 +1333,34 @@ class CaseService:
                 self.state_service.remove_followed_case(c_str, user)
         return unfollowed
 
+    @staticmethod
+    def _match_user(target: str, user_list: list[str]) -> bool:
+        """Matches username against a list of users, handling both exact matches and email prefixes."""
+        t_clean = target.strip().lower()
+        t_short = t_clean.split("@")[0]
+        for u in user_list:
+            u_clean = str(u).strip().lower()
+            u_short = u_clean.split("@")[0]
+            if t_clean == u_clean or t_short == u_short:
+                return True
+        return False
+
     def get_notified_users(self, case_number: str) -> list[str]:
         """Fetches the list of notified user SSO usernames for a given case."""
         with contextlib.suppress(Exception):
-            resp = self.api_client.get(
-                f"{self.rest_url}/cases/{case_number}/notifiedusers"
-            )
+            resp = self.api_client.get(f"{self.rest_url}/cases/{case_number}")
             if resp.status_code == 200:
-                data = resp.json()
+                data = resp.json() if resp.text else {}
                 users = []
                 raw_users = (
-                    data
-                    if isinstance(data, list)
-                    else (data.get("user") or data.get("users") or [])
+                    data.get("notifiedUsers")
+                    or data.get("notifiedusers")
+                    or data.get("watchers")
+                    or data.get("notified_users")
+                    or []
                 )
+                if isinstance(raw_users, dict):
+                    raw_users = raw_users.get("user") or raw_users.get("users") or []
                 for u in raw_users:
                     if isinstance(u, str):
                         users.append(u)
@@ -1326,6 +1368,7 @@ class CaseService:
                         sso = (
                             u.get("ssoUsername")
                             or u.get("userSSOName")
+                            or u.get("sso")
                             or u.get("name")
                             or ""
                         )
@@ -1349,7 +1392,7 @@ class CaseService:
         def check_case(c: Case) -> str | None:
             with contextlib.suppress(Exception):
                 users = self.get_notified_users(c.case_number)
-                if user.lower() in [u.lower() for u in users]:
+                if self._match_user(user, users):
                     self.state_service.add_followed_case(
                         c.case_number,
                         user,

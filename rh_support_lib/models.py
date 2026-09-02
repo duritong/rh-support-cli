@@ -63,6 +63,7 @@ class CaseDetails:
     description: str
     comments: list[CaseComment] = field(default_factory=list)
     attachments: list[Attachment] = field(default_factory=list)
+    notified_users: list[str] = field(default_factory=list)
 
 
 @dataclass
