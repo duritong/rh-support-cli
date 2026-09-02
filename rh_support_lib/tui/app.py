@@ -99,6 +99,8 @@ def build_filter_payload(
     own = filters.get("owner") or filters.get("ownerSSOName")
     if own:
         payload["ownerSSOName"] = str(own)
+    if filters.get("following"):
+        payload["following"] = True
 
     return payload
 
@@ -115,6 +117,7 @@ def build_filter_params(
         "status": stat if isinstance(stat, list) else ([stat] if stat else None),
         "severity": sev if isinstance(sev, list) else ([sev] if sev else None),
         "owner": payload.get("ownerSSOName"),
+        "following": bool(payload.get("following")),
     }
 
 
@@ -578,7 +581,13 @@ class SupportApp(App):
             params = build_filter_params(
                 self.config, self.active_bookmark, self.no_default_bookmark
             )
-            self.cases = self.case_service.list_cases(**params)
+            if params.get("following"):
+                self.cases = self.case_service.list_followed_cases(
+                    account=params.get("account")
+                )
+            else:
+                list_kwargs = {k: v for k, v in params.items() if k != "following"}
+                self.cases = self.case_service.list_cases(**list_kwargs)
             self.call_from_thread(self.populate_cases_table)
         except Exception as e:  # noqa: BLE001
             self.call_from_thread(self.show_error, f"Network Error: {e}")

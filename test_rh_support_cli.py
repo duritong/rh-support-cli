@@ -875,6 +875,14 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(json.dumps(types).encode())
             return
 
+        # GET /cases/{id}/notifiedusers
+        if "/notifiedusers" in self.path and "/cases/" in self.path:
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps([{"ssoUsername": "jdeveloper"}]).encode())
+            return
+
         # GET /cases/{id}/comments
         if "/comments" in self.path and "/cases/" in self.path:
             self.send_response(200)
@@ -3086,7 +3094,16 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             f"Success: Added '{expected_user}' as watcher to Case #12345.",
             result_follow1.stdout,
         )
-        # 2. Follow multiple cases via positional args and custom user
+
+        # 2. Query following via 'following' and 'list --following'
+        res_following = self.run_cli(["following"])
+        self.assertEqual(res_following.returncode, 0)
+        self.assertIn("12345", res_following.stdout)
+        res_list_following = self.run_cli(["list", "--following"])
+        self.assertEqual(res_list_following.returncode, 0)
+        self.assertIn("12345", res_list_following.stdout)
+
+        # 3. Follow multiple cases via positional args and custom user
         result_follow_multi = self.run_cli(
             ["follow", "1001", "1002", "--user", "custom_user"]
         )
@@ -3104,14 +3121,26 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             result_follow_multi.stdout,
         )
 
-        # 3. Unfollow single case
+        # 4. Query custom user following
+        res_custom_following = self.run_cli(["following", "--user", "custom_user"])
+        self.assertEqual(res_custom_following.returncode, 0)
+        self.assertIn("1001", res_custom_following.stdout)
+        self.assertIn("1002", res_custom_following.stdout)
+
+        # 5. Unfollow single case
         result_unfollow1 = self.run_cli(["unfollow", "-c", "12345"])
         self.assertEqual(result_unfollow1.returncode, 0)
         self.assertIn(
             f"Success: Removed '{expected_user}' from watchers on Case #12345.",
             result_unfollow1.stdout,
         )
-        # 4. Unfollow multiple cases via positional args
+
+        # 6. Verify 12345 is no longer followed
+        res_after_unfollow = self.run_cli(["following"])
+        self.assertEqual(res_after_unfollow.returncode, 0)
+        self.assertIn("No cases found.", res_after_unfollow.stdout)
+
+        # 7. Unfollow multiple cases via positional args
         result_unfollow_multi = self.run_cli(
             ["unfollow", "1001", "1002", "--user", "custom_user"]
         )
@@ -3129,12 +3158,108 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             result_unfollow_multi.stdout,
         )
 
-        # 5. Follow with no arguments fails gracefully
+        # 8. Follow with no arguments fails gracefully
         result_err = self.run_cli(["follow"])
         self.assertNotEqual(result_err.returncode, 0)
         self.assertIn(
-            "Error: Please specify at least one case number", result_err.stderr
+            "Please specify at least one case number",
+            result_err.stderr,
         )
+
+    def test_state_service_direct(self):
+        """Test StateService directly for atomic persistence, following, sync, pinned, tags, and recent"""
+        import shutil
+        import tempfile
+
+        from rh_support_lib.services.state import StateService
+
+        temp_dir = tempfile.mkdtemp()
+        try:
+            state_file = os.path.join(temp_dir, "state.yaml")
+            svc = StateService(state_file=state_file)
+
+            # 1. Followed Cases
+            self.assertFalse(svc.is_following("12345", "testuser"))
+            svc.add_followed_case(
+                "12345", "testuser", summary="Test Case", account_number="9999"
+            )
+            self.assertTrue(svc.is_following("12345", "testuser"))
+
+            followed = svc.get_followed_cases("testuser")
+            self.assertEqual(len(followed), 1)
+            self.assertEqual(followed["12345"].summary, "Test Case")
+            self.assertEqual(followed["12345"].account_number, "9999")
+
+            # Remove
+            self.assertTrue(svc.remove_followed_case("12345", "testuser"))
+            self.assertFalse(svc.is_following("12345", "testuser"))
+            self.assertFalse(svc.remove_followed_case("12345", "testuser"))
+
+            # 2. Sync Checkpoints
+            svc.update_sync_info("testuser", "9999", "2026-08-27T10:00:00Z", 15)
+            sync_info = svc.get_sync_info("testuser", "9999")
+            self.assertEqual(sync_info.get("last_synced_at"), "2026-08-27T10:00:00Z")
+            self.assertEqual(sync_info.get("last_scanned_case_count"), 15)
+
+            # 3. Pinned Cases
+            svc.set_pinned_cases("testuser", ["1001", "1002"])
+            self.assertEqual(svc.get_pinned_cases("testuser"), ["1001", "1002"])
+
+            # 4. Recent Cases
+            svc.add_recent_case("testuser", "1001", {"summary": "Recent 1"})
+            recent = svc.get_recent_cases("testuser")
+            self.assertEqual(len(recent), 1)
+            self.assertEqual(recent[0]["case_number"], "1001")
+
+            # 5. Tags
+            svc.set_tags("testuser", "1001", ["ocp", "prod"])
+            self.assertEqual(svc.get_tags("testuser", "1001"), ["ocp", "prod"])
+        finally:
+            shutil.rmtree(temp_dir)
+
+    def test_following_bookmark_and_sync(self):
+        """Test using following bookmark in config and follow --sync command"""
+        import shutil
+        import tempfile
+
+        import yaml
+
+        temp_home = tempfile.mkdtemp()
+        orig_home = self.env.get("HOME")
+        self.env["HOME"] = temp_home
+        try:
+            config_dir = os.path.join(temp_home, ".config", "rh-support-cli")
+            os.makedirs(config_dir, exist_ok=True)
+            config_file = os.path.join(config_dir, "config.yaml")
+            with open(config_file, "w") as f:
+                yaml.dump(
+                    {
+                        "bookmarks": {
+                            "my-watched": {
+                                "following": True,
+                            }
+                        }
+                    },
+                    f,
+                )
+
+            # 1. Follow a case
+            res_f = self.run_cli(["follow", "12345"])
+            self.assertEqual(res_f.returncode, 0)
+
+            # 2. Query list using bookmark
+            res_bk = self.run_cli(["list", "-b", "my-watched"])
+            self.assertEqual(res_bk.returncode, 0)
+            self.assertIn("12345", res_bk.stdout)
+
+            # 3. Test follow --sync command
+            res_sync = self.run_cli(["follow", "--sync"])
+            self.assertEqual(res_sync.returncode, 0)
+            self.assertIn("Sync complete.", res_sync.stdout)
+        finally:
+            if orig_home:
+                self.env["HOME"] = orig_home
+            shutil.rmtree(temp_home)
 
 
 if __name__ == "__main__":

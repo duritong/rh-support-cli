@@ -27,9 +27,11 @@ The project is structured as a Python CLI wrapper around the Red Hat Support Cas
     │   ├── create_case.py  # create subcommand
     │   ├── list_cases.py   # list subcommand (Rich Table based)
     │   ├── show_case.py    # show subcommand (Rich Panels/Markdown based)
-    │   └── watchers.py     # follow, unfollow subcommands
+    │   └── watchers.py     # follow, unfollow, following subcommands
+    ├── services/           # Decoupled domain service layer
     │   ├── attachments.py  # AttachmentService (v3 presigned upload, download, delete, status)
-    │   └── cases.py        # CaseService (GraphQL queries, mutations, case lookups)
+    │   ├── cases.py        # CaseService (GraphQL queries, mutations, case lookups)
+    │   └── state.py        # StateService (Generic operational state, atomic YAML persistence)
     ├── synthetic_corpus/   # Local stateful mock portal and synthetic generator
     │   ├── generator.py    # Synthetic corpus generator
     │   └── server.py       # Stateful loopback mock HTTP and GraphQL server
@@ -38,7 +40,8 @@ The project is structured as a Python CLI wrapper around the Red Hat Support Cas
 ```
 
 ### Key Design Decoupling
-*   **Library-First Domain Services**: Core domain logic is encapsulated within `rh_support_lib/services/` (`CaseService` and `AttachmentService`). Both CLI subcommands (`commands/`) and the interactive dashboard (`tui/`) act as presentation-only consumers of normalized domain models (`models.py`), ensuring complete separation of concerns and zero API leakages into UI code.
+*   **Library-First Domain Services**: Core domain logic is encapsulated within `rh_support_lib/services/` (`CaseService`, `AttachmentService`, and `StateService`). Both CLI subcommands (`commands/`) and the interactive dashboard (`tui/`) act as presentation-only consumers of normalized domain models (`models.py`), ensuring complete separation of concerns and zero API/state leakages into UI code.
+*   **Generic State & Cache Decoupling**: Persistent operational metadata (e.g. followed cases registry, sync checkpoints, pinned tickets, local tags) is managed via `StateService` (`state.yaml`) with atomic file writes and per-identity user scoping.
 *   **Dual Backend Engines**: `CaseService` and `AttachmentService` transparently support both Red Hat's active production v1 REST API (default) and the new upcoming CRM platform (`--graphql` / GraphQL `https://graphql.redhat.com` and v3 Attachment Service).
 *   **Presigned Direct Transfer Attachments**: Under the new CRM mode, large files up to 5 TB bypass intermediate API gateways via `AttachmentService`, using single PUT ($\le 5\text{ GB}$) or multipart parallel chunks (> $5\text{ GB}$) with automatic completion verification.
 *   **No-Auth Execution Paths**: Commands that only inspect local resources (like `list-templates` and `completion`) are routed before OIDC token fetching in `main.py`, providing fast, completely offline execution.

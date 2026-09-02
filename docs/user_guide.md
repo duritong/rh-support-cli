@@ -242,8 +242,8 @@ Or export the environment variable: `export RH_GRAPHQL=1` / `export RH_BACKEND=g
     ```bash
     rh-support-cli attachment -c 12345678 status [-a <ATTACHMENT_UUID>]
     ```
-### Following & Unfollowing Cases (`follow` / `unfollow`)
-Attach or remove yourself (or a specific SSO user) as a watcher on one or multiple support cases:
+### Following & Unfollowing Cases (`follow` / `unfollow` / `following`)
+Attach or remove yourself (or a specific SSO user) as a watcher on one or multiple support cases, or query cases you are currently following:
 
 *   **Follow a single case**:
     ```bash
@@ -259,12 +259,36 @@ Attach or remove yourself (or a specific SSO user) as a watcher on one or multip
     ```bash
     rh-support-cli follow 12345678 --user alice
     ```
+*   **List all followed cases**:
+    ```bash
+    rh-support-cli following
+    # or with standard list filter:
+    rh-support-cli list --following
+    ```
+*   **Sync followed cases from account**:
+    ```bash
+    rh-support-cli follow --sync
+    # or while listing:
+    rh-support-cli following --sync
+    ```
+*   **Filter followed cases via config bookmark**:
+    ```yaml
+    bookmarks:
+      my-watched:
+        following: true
+    ```
+    ```bash
+    rh-support-cli list -b my-watched
+    ```
 *   **Unfollow single or multiple cases**:
     ```bash
     rh-support-cli unfollow 12345678
     rh-support-cli unfollow 12345678 23456789
     rh-support-cli unfollow 12345678 --user alice
     ```
+
+### Local State & Cache Management (`state.yaml`)
+Operational state (such as followed cases, sync checkpoints, pinned tickets, and local tags) is managed in `~/.config/rh-support-cli/state.yaml` (or via `RH_SUPPORT_STATE` / `XDG_CONFIG_HOME`). It uses safe atomic file operations and scopes metadata per SSO identity.
 
 ### Listing local templates
 List all configured local templates, including their private descriptions, target fields, and watchers. This command runs **completely offline**:

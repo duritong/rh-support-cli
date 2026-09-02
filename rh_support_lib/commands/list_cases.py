@@ -19,7 +19,7 @@ def cmd_list(args, api_client, config=None):
 
     # Default Bookmark
     default_bk = config.get("default_bookmark")
-    if default_bk and not args.no_default_bookmark:
+    if default_bk and not getattr(args, "no_default_bookmark", False):
         bks = default_bk if isinstance(default_bk, list) else [default_bk]
         for bk_name in bks:
             bk_data = config.get("bookmarks", {}).get(bk_name)
@@ -29,23 +29,24 @@ def cmd_list(args, api_client, config=None):
                 print(f"Warning: Default bookmark '{bk_name}' not found.")
 
     # Explicit Bookmarks
-    if args.bookmark:
+    if getattr(args, "bookmark", None):
         for bk_name in args.bookmark:
             bk_data = config.get("bookmarks", {}).get(bk_name)
             if bk_data:
                 filters.update(bk_data)
             else:
                 print(f"Warning: Bookmark '{bk_name}' not found.")
-
     # CLI Overrides (only if explicitly provided)
-    if args.account:
+    if getattr(args, "account", None):
         filters["account"] = args.account
-    if args.status:
+    if getattr(args, "status", None):
         filters["status"] = args.status
-    if args.severity:
+    if getattr(args, "severity", None):
         filters["severity"] = args.severity
-    if args.owner:
+    if getattr(args, "owner", None):
         filters["owner"] = args.owner
+    if getattr(args, "following", False):
+        filters["following"] = True
 
     # 2. Build parameters for CaseService
     acc = filters.get("account") or filters.get("accountNumber")
@@ -70,19 +71,30 @@ def cmd_list(args, api_client, config=None):
             mapped_sevs.append(SEVERITY_MAP.get(str(s).lower(), s))
 
     own = filters.get("owner") or filters.get("ownerSSOName")
+    is_following = bool(filters.get("following"))
+    sync_flag = bool(getattr(args, "sync", False))
+    user_override = getattr(args, "user", None) or filters.get("user")
+    backend = getattr(args, "backend", None)
 
-    print("Fetching cases...")
-    service = CaseService(api_client)
+    service = CaseService(api_client, backend=backend)
     try:
-        cases = service.list_cases(
-            account=str(acc) if acc else None,
-            status=mapped_statuses,
-            severity=mapped_sevs,
-            owner=str(own) if own else None,
-        )
+        if is_following:
+            print("Fetching followed cases...")
+            cases = service.list_followed_cases(
+                username=user_override,
+                sync=sync_flag,
+                account=str(acc) if acc else None,
+            )
+        else:
+            print("Fetching cases...")
+            cases = service.list_cases(
+                account=str(acc) if acc else None,
+                status=mapped_statuses,
+                severity=mapped_sevs,
+                owner=str(own) if own else None,
+            )
     except Exception as e:  # noqa: BLE001
         sys.exit(f"Network Error: {e}")
-
     if not cases:
         print("No cases found.")
         return

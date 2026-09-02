@@ -31,16 +31,25 @@ def _gather_cases(args) -> list[str]:
 
 
 def cmd_follow(args, api_client):
-    """Attaches current user (or specified user) as watcher to one or more support cases."""
-    case_numbers = _gather_cases(args)
-    if not case_numbers:
-        sys.exit(
-            "Error: Please specify at least one case number (e.g. follow 12345678 or -c 12345678)."
-        )
-
+    """Attaches current user (or specified user) as watcher to one or more support cases.
+    If --sync is specified without case numbers, syncs followed cases from account."""
     backend = getattr(args, "backend", None)
     case_service = CaseService(api_client, backend=backend)
     user = getattr(args, "user", None) or case_service.get_current_user()
+
+    case_numbers = _gather_cases(args)
+    if not case_numbers:
+        if getattr(args, "sync", False):
+            acc = getattr(args, "account", None)
+            print(f"Scanning account cases to sync watchers for '{user}'...")
+            synced = case_service.sync_followed_cases(username=user, account=acc)
+            print(
+                f"Sync complete. Found {len(synced)} followed case(s): {', '.join(synced) if synced else 'None'}."
+            )
+            return
+        sys.exit(
+            "Error: Please specify at least one case number (e.g. follow 12345678 or -c 12345678) or use --sync."
+        )
 
     print(f"Adding '{user}' as watcher on {len(case_numbers)} case(s)...")
     has_error = False
@@ -54,6 +63,14 @@ def cmd_follow(args, api_client):
 
     if has_error:
         sys.exit(1)
+
+
+def cmd_following(args, api_client, config=None):
+    """Lists cases currently followed by the user."""
+    from rh_support_lib.commands.list_cases import cmd_list
+
+    args.following = True
+    cmd_list(args, api_client, config=config)
 
 
 def cmd_unfollow(args, api_client):

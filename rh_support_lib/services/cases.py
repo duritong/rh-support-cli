@@ -3,6 +3,8 @@ from __future__ import annotations
 import contextlib
 import os
 import re
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 from typing import Any
 
 from rh_support_lib.api import extract_jwt_username
@@ -20,6 +22,7 @@ from rh_support_lib.models import (
     CaseDetails,
     ProductItem,
 )
+from rh_support_lib.services.state import StateService
 
 # --- GRAPHQL QUERIES & MUTATIONS ---
 
@@ -293,12 +296,14 @@ class CaseService:
         backend: str | None = None,
         rest_url: str | None = None,
         graphql_url: str | None = None,
+        state_service: StateService | None = None,
     ):
         self.api_client = api_client
         self.backend = (backend or os.environ.get("RH_BACKEND") or BACKEND_MODE).lower()
         self.rest_url = (rest_url or API_URL).rstrip("/")
         self.graphql_url = graphql_url or GRAPHQL_URL
         self._use_graphql = self.backend == "graphql"
+        self.state_service = state_service or StateService()
 
     # --- NORMALIZATION HELPERS ---
 
@@ -1253,7 +1258,7 @@ class CaseService:
         self, case_numbers: list[str] | str, username: str | None = None
     ) -> list[str]:
         """Attaches the specified username (defaults to current user) as a watcher on one or more cases.
-        Returns list of successfully followed case numbers."""
+        Updates the local state and returns list of successfully followed case numbers."""
         user = username or self.get_current_user()
         if not isinstance(case_numbers, list):
             case_numbers = [case_numbers]
@@ -1268,16 +1273,18 @@ class CaseService:
             resp = self.api_client.post(url, json=payload)
             if resp.status_code in (200, 201, 204):
                 followed.append(c_str)
+                self.state_service.add_followed_case(c_str, user, source="cli")
             else:
                 resp.raise_for_status()
                 followed.append(c_str)
+                self.state_service.add_followed_case(c_str, user, source="cli")
         return followed
 
     def unfollow_case(
         self, case_numbers: list[str] | str, username: str | None = None
     ) -> list[str]:
         """Removes the specified username (defaults to current user) from watchers on one or more cases.
-        Returns list of successfully unfollowed case numbers."""
+        Updates the local state and returns list of successfully unfollowed case numbers."""
         user = username or self.get_current_user()
         if not isinstance(case_numbers, list):
             case_numbers = [case_numbers]
@@ -1291,7 +1298,138 @@ class CaseService:
             resp = self.api_client.delete(url)
             if resp.status_code in (200, 204, 404):
                 unfollowed.append(c_str)
+                self.state_service.remove_followed_case(c_str, user)
             else:
                 resp.raise_for_status()
                 unfollowed.append(c_str)
+                self.state_service.remove_followed_case(c_str, user)
         return unfollowed
+
+    def get_notified_users(self, case_number: str) -> list[str]:
+        """Fetches the list of notified user SSO usernames for a given case."""
+        with contextlib.suppress(Exception):
+            resp = self.api_client.get(
+                f"{self.rest_url}/cases/{case_number}/notifiedusers"
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                users = []
+                raw_users = (
+                    data
+                    if isinstance(data, list)
+                    else (data.get("user") or data.get("users") or [])
+                )
+                for u in raw_users:
+                    if isinstance(u, str):
+                        users.append(u)
+                    elif isinstance(u, dict):
+                        sso = (
+                            u.get("ssoUsername")
+                            or u.get("userSSOName")
+                            or u.get("name")
+                            or ""
+                        )
+                        if sso:
+                            users.append(sso)
+                return users
+        return []
+
+    def sync_followed_cases(
+        self, username: str | None = None, account: str | None = None
+    ) -> list[str]:
+        """Scans active cases for the account in parallel to discover cases where the user is a watcher,
+        reconciles them into local state, and returns the list of followed case numbers."""
+        user = username or self.get_current_user()
+        active_cases = self.list_cases(
+            account=account, status=["Waiting on Red Hat", "Waiting on Customer"]
+        )
+        if not active_cases:
+            return []
+
+        def check_case(c: Case) -> str | None:
+            with contextlib.suppress(Exception):
+                users = self.get_notified_users(c.case_number)
+                if user.lower() in [u.lower() for u in users]:
+                    self.state_service.add_followed_case(
+                        c.case_number,
+                        user,
+                        summary=c.summary,
+                        account_number=c.account_number,
+                        source="sync",
+                    )
+                    return c.case_number
+            return None
+
+        with ThreadPoolExecutor(
+            max_workers=min(10, max(1, len(active_cases)))
+        ) as executor:
+            results = list(executor.map(check_case, active_cases))
+
+        synced = [r for r in results if r]
+        if account:
+            now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            self.state_service.update_sync_info(
+                user, account, now_str, len(active_cases)
+            )
+        return synced
+
+    def list_followed_cases(
+        self,
+        username: str | None = None,
+        sync: bool = False,
+        account: str | None = None,
+        fetch_live: bool = True,
+    ) -> list[Case]:
+        """Returns the list of followed cases for the user. If sync is True, reconciles with the remote account first.
+        Fetches live case details for all followed cases."""
+        user = username or self.get_current_user()
+        if sync:
+            self.sync_followed_cases(username=user, account=account)
+
+        followed_map = self.state_service.get_followed_cases(user)
+        if not followed_map:
+            return []
+
+        case_numbers = list(followed_map.keys())
+
+        if not fetch_live:
+            return [
+                Case(
+                    case_number=c_num,
+                    summary=f_info.summary or "Followed Case",
+                    status="Followed",
+                    severity="",
+                    account_number=f_info.account_number,
+                )
+                for c_num, f_info in followed_map.items()
+            ]
+
+        # Fetch live case objects in parallel
+        def fetch_one(c_num: str) -> Case | None:
+            with contextlib.suppress(Exception):
+                details = self.get_case_details(c_num)
+                if details and details.case:
+                    # Update cached summary
+                    if details.case.summary:
+                        self.state_service.add_followed_case(
+                            c_num,
+                            user,
+                            summary=details.case.summary,
+                            account_number=details.case.account_number,
+                            source=followed_map[c_num].source,
+                        )
+                    return details.case
+            # Fallback to local representation if individual fetch fails
+            f_info = followed_map.get(c_num)
+            return Case(
+                case_number=c_num,
+                summary=f_info.summary if f_info else "Followed Case",
+                status="Unknown",
+                severity="",
+                account_number=f_info.account_number if f_info else "",
+            )
+
+        with ThreadPoolExecutor(max_workers=min(10, len(case_numbers))) as executor:
+            cases = list(executor.map(fetch_one, case_numbers))
+
+        return [c for c in cases if c is not None]

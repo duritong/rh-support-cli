@@ -14,7 +14,11 @@ from rh_support_lib.commands.attachments import cmd_attachment
 from rh_support_lib.commands.create_case import cmd_create
 from rh_support_lib.commands.list_cases import cmd_list
 from rh_support_lib.commands.show_case import cmd_show
-from rh_support_lib.commands.watchers import cmd_follow, cmd_unfollow
+from rh_support_lib.commands.watchers import (
+    cmd_follow,
+    cmd_following,
+    cmd_unfollow,
+)
 from rh_support_lib.config import load_config
 from rh_support_lib.tui.app import cmd_tui
 
@@ -143,6 +147,23 @@ Authentication:
     )
     parser_list.add_argument("--owner", help="Filter by owner")
     parser_list.add_argument(
+        "--following",
+        "--watched",
+        action="store_true",
+        help="Filter to cases followed/watched by myself (or specified user)",
+    )
+    parser_list.add_argument(
+        "--sync",
+        action="store_true",
+        help="Sync followed cases from account before listing",
+    )
+    parser_list.add_argument(
+        "-u",
+        "--user",
+        help="Filter by specific SSO user when viewing followed cases (defaults to myself)",
+    )
+    parser_list.add_argument(
+        "-b",
         "--bookmark",
         action="append",
         help="Use a filter bookmark from config (can be used multiple times)",
@@ -338,6 +359,40 @@ Authentication:
         "--user",
         help="SSO username to add as watcher (defaults to myself/current authenticated user)",
     )
+    parser_follow.add_argument(
+        "--sync",
+        action="store_true",
+        help="Scan and sync followed cases from account",
+    )
+    parser_follow.add_argument("--account", help="Account number to sync from")
+
+    # Following Subcommand
+    parser_following = subparsers.add_parser(
+        "following",
+        help="List support cases currently followed by myself (or specified user)",
+    )
+    parser_following.add_argument("--account", help="Account Number")
+    parser_following.add_argument(
+        "--sync",
+        action="store_true",
+        help="Sync followed cases from account before listing",
+    )
+    parser_following.add_argument(
+        "-u",
+        "--user",
+        help="SSO username (defaults to myself/current authenticated user)",
+    )
+    parser_following.add_argument(
+        "-b",
+        "--bookmark",
+        action="append",
+        help="Use a filter bookmark from config (can be used multiple times)",
+    )
+    parser_following.add_argument(
+        "--no-default-bookmark",
+        action="store_true",
+        help="Ignore default bookmark from config",
+    )
 
     # Unfollow Subcommand
     parser_unfollow = subparsers.add_parser(
@@ -459,6 +514,8 @@ Authentication:
         cmd_apply(args, api_client, config)
     elif args.command == "follow":
         cmd_follow(args, api_client)
+    elif args.command == "following":
+        cmd_following(args, api_client, config)
     elif args.command == "unfollow":
         cmd_unfollow(args, api_client)
     elif args.command == "tui":

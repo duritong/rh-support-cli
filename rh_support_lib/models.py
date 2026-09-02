@@ -74,3 +74,14 @@ class ProductItem:
     version_name: str = ""
     family: str = ""
     parent_id: str | None = None
+
+
+@dataclass
+class FollowedCase:
+    """Represents a followed/watched support case in local state."""
+
+    case_number: str
+    added_at: str = ""
+    source: str = "cli"  # "cli" | "sync"
+    summary: str = ""
+    account_number: str = ""

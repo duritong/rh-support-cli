@@ -909,6 +909,17 @@ class StatefulMockHandler(http.server.BaseHTTPRequestHandler):
         if "/values/caseType" in self.path:
             self._send_json([{"name": "Standard"}, {"name": "Bug"}])
             return
+        match_notified = re.search(r"/cases/(\d+)/notifiedusers$", self.path)
+        if match_notified:
+            case_num = match_notified.group(1)
+            case_file = corpus_path / "cases" / f"{case_num}.json"
+            if case_file.exists():
+                with open(case_file, "r") as f:
+                    case_data = json.load(f)
+                    self._send_json(case_data.get("notifiedusers", []))
+            else:
+                self._send_error("Case not found", 404)
+            return
         match_comments = re.search(r"/cases/(\d+)/comments$", self.path)
         if match_comments:
             case_num = match_comments.group(1)
