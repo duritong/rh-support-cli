@@ -226,6 +226,20 @@ backend: graphql  # default, or: v1
 ```
 Or export the environment variable: `export RH_BACKEND=graphql` / `export RH_BACKEND=v1`.
 
+### Closing a Case (`close`)
+The `close` subcommand operates identically to `comment`, but automatically sets the case status to `closed`:
+
+```bash
+# Interactively draft a closing comment in $EDITOR:
+rh-support-cli close -c 12345678
+
+# Close a case with a comment from a file:
+rh-support-cli close -c 12345678 -f resolution.txt
+
+# Close a case using a template:
+rh-support-cli close -c 12345678 -t close_case
+```
+
 ### Attachment Management (`attachment` / `attachments`)
 *   **List Attachments**:
     ```bash

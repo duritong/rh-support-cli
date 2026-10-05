@@ -138,6 +138,12 @@ def cmd_comment(args, api_client):
         sys.exit(f"Network Error: {e}")
 
 
+def cmd_close(args, api_client):
+    """Closes a support case with a comment, explicitly setting status to 'closed'."""
+    args.status = "closed"
+    return cmd_comment(args, api_client)
+
+
 def cmd_link(args):
     url = f"https://access.redhat.com/support/cases/{args.case}"
     print(url)

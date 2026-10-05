@@ -177,7 +177,30 @@ rh-support-cli comment -c 12345678 -f response.txt
 rh-support-cli comment -c 12345678 -s closed
 ```
 
-### 7. Apply Template & Watchers (`apply`)
+### 7. Close a Case (`close`)
+
+Closes an existing support case with a comment. Works identically to `comment`, but automatically sets the status to `closed`.
+
+**Options:**
+- `-c`, `--case`: The Case Number (required)
+- `-f`, `--file`: Path to a file containing the closing comment. If omitted, opens `$EDITOR`.
+- `-t`, `--template`: Name of local template to apply (optional)
+- `--include-previous-comments`: Include the last N comments in the editor header (default: 1)
+- `--edit`: Open editor to edit the content from `--file` before submitting
+
+**Examples:**
+
+*Close a case with an interactive editor prompt:*
+```bash
+rh-support-cli close -c 12345678
+```
+
+*Close a case with comment from a file:*
+```bash
+rh-support-cli close -c 12345678 -f resolution.txt
+```
+
+### 8. Apply Template & Watchers (`apply`)
 
 Applies a local YAML template over an existing support case. It compares the template fields and watchers/notified users with the case's current values, and performs the minimal required API requests to bring the case to the target state.
 
@@ -199,7 +222,7 @@ rh-support-cli apply -c 12345678 -t default-watchers --dry-run
 rh-support-cli apply -c 12345678 -t project-team --template-var team_lead=alice
 ```
 
-### 8. List Local Templates (`list-templates` / `list-template`)
+### 9. List Local Templates (`list-templates` / `list-template`)
 
 Lists all local templates stored in `~/.config/rh-support-cli/templates/` along with details like their description, fields they configure, parent templates they include, and watchers they would add. **Note:** This command runs completely offline and bypasses authentication.
 
@@ -208,7 +231,7 @@ Lists all local templates stored in `~/.config/rh-support-cli/templates/` along 
 rh-support-cli list-templates
 ```
 
-### 9. Interactive Terminal User Interface (`tui`)
+### 10. Interactive Terminal User Interface (`tui`)
 
 Launches a beautiful, interactive Terminal User Interface (TUI) to browse and manage your Red Hat support cases directly inside your terminal session.
 

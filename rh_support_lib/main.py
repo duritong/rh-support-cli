@@ -5,6 +5,7 @@ import sys
 from rh_support_lib.api import enable_debug_logging
 from rh_support_lib.commands.actions import (
     cmd_attach,
+    cmd_close,
     cmd_comment,
     cmd_completion,
     cmd_link,
@@ -322,6 +323,37 @@ Authentication:
         help="Open editor to edit the content from --file before submitting",
     )
 
+    # Close Subcommand
+    parser_close = subparsers.add_parser(
+        "close", help="Close a support case with a comment"
+    )
+    parser_close.add_argument("-c", "--case", required=True, help="Case Number")
+    parser_close.add_argument(
+        "-f", "--file", help="File path containing closing comment (optional)"
+    )
+    parser_close.add_argument(
+        "-t",
+        "--template",
+        action="append",
+        help="Use a template (can be used multiple times)",
+    )
+    parser_close.add_argument(
+        "--template-var", action="append", help="Variable for template (key=value)"
+    )
+    parser_close.add_argument(
+        "--include-previous-comments",
+        type=int,
+        nargs="?",
+        const=1,
+        default=1,
+        help="Include the last N comments in the editor header (default: 1)",
+    )
+    parser_close.add_argument(
+        "--edit",
+        action="store_true",
+        help="Open editor to edit the content from --file before submitting",
+    )
+
     # Apply Subcommand
     parser_apply = subparsers.add_parser(
         "apply", help="Apply template values and watchers to a support case"
@@ -506,6 +538,8 @@ Authentication:
         cmd_create(args, api_client, config)
     elif args.command == "comment":
         cmd_comment(args, api_client)
+    elif args.command == "close":
+        cmd_close(args, api_client)
     elif args.command == "list":
         cmd_list(args, api_client, config)
     elif args.command == "show":

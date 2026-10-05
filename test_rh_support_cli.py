@@ -1167,6 +1167,21 @@ class TestRhSupportCli(unittest.TestCase):
             if os.path.exists("status_update.txt"):
                 os.remove("status_update.txt")
 
+    def test_close_case_command(self):
+        """Test close subcommand: posts closing comment and sets status to Closed"""
+        with open("close_comment.txt", "w") as f:
+            f.write("Closing case, issue is resolved.")
+        try:
+            result = self.run_cli(
+                ["close", "-c", "01234567", "-f", "close_comment.txt"]
+            )
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Success: Comment added.", result.stdout)
+            self.assertIn("Success: Case status updated to 'Closed'.", result.stdout)
+        finally:
+            if os.path.exists("close_comment.txt"):
+                os.remove("close_comment.txt")
+
     def test_comment_from_template(self):
         """Test posting a comment using a template with dynamic variables and status overrides"""
         import shutil
