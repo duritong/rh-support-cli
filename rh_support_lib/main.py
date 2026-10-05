@@ -108,12 +108,7 @@ Authentication:
     parser.add_argument(
         "--graphql",
         action="store_true",
-        help="Use the new Red Hat GraphQL & v3 Attachment APIs (enabled by default)",
-    )
-    parser.add_argument(
-        "--backend",
-        choices=["graphql", "v1"],
-        help="Select API backend: 'graphql' (default) or 'v1' (legacy REST)",
+        help="Use Red Hat GraphQL & v3 Attachment APIs (default)",
     )
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     parser.add_argument(
@@ -503,22 +498,8 @@ Authentication:
         run_mock_server(corpus_dir=args.corpus, port=args.port)
         sys.exit(0)
 
-    # Resolve backend selection
-    backend = "graphql"
-    if getattr(args, "backend", None):
-        backend = args.backend
-    elif config.get("backend"):
-        backend = config.get("backend")
-    elif os.environ.get("RH_BACKEND"):
-        backend = os.environ.get("RH_BACKEND")
-    elif config.get("graphql") is False or os.environ.get("RH_GRAPHQL") in (
-        "0",
-        "false",
-        "False",
-    ):
-        backend = "v1"
-    args.backend = backend
-    os.environ["RH_BACKEND"] = backend
+    args.backend = "graphql"
+    os.environ["RH_BACKEND"] = "graphql"
 
     debug_file = args.debug_file or config.get("debug_file")
     if args.debug or debug_file:

@@ -203,28 +203,17 @@ rh-support-cli create \
 
 ## 5. Subcommands Usage
 
-### Backend Selection (`--backend` / `--graphql`)
-By default, the CLI communicates with Red Hat's CRM platform via GraphQL and the v3 Attachment Service (`https://graphql.redhat.com`).
+### API Backend (GraphQL & v3 Attachment Service)
+The CLI communicates natively with Red Hat's CRM platform via GraphQL (`https://graphql.redhat.com`) and the v3 Attachment Service.
 
 ```bash
-# Commands use the GraphQL backend by default:
+# Commands use the GraphQL backend natively:
 rh-support-cli list
 rh-support-cli show -c 12345678
 rh-support-cli tui
 ```
 
-The `--graphql` flag remains supported for convenience. To explicitly choose a backend or use the legacy REST v1 API for older environments:
-```bash
-# Select backend explicitly
-rh-support-cli --backend graphql list
-rh-support-cli --backend v1 list
-```
-
-You can also persist this choice in your `~/.config/rh-support-cli/config.yaml`:
-```yaml
-backend: graphql  # default, or: v1
-```
-Or export the environment variable: `export RH_BACKEND=graphql` / `export RH_BACKEND=v1`.
+The `--graphql` flag remains supported as an optional alias. Custom endpoint URLs can be configured via environment variables `RH_GRAPHQL_URL` and `RH_ATTACHMENT_API_URL`.
 
 ### Closing a Case (`close`)
 The `close` subcommand operates identically to `comment`, but automatically sets the case status to `closed`:

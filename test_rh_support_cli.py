@@ -1295,38 +1295,6 @@ class TestRhSupportCli(unittest.TestCase):
                 if os.path.exists(f):
                     os.remove(f)
 
-    def test_create_case_location_singular_response(self):
-        """Test creating a case when server returns location list instead of caseNumber"""
-        with open("desc_loc.txt", "w") as f:
-            f.write("Location test description")
-
-        try:
-            result = self.run_cli(
-                [
-                    "--backend",
-                    "v1",
-                    "create",
-                    "--product",
-                    "RHEL",
-                    "--version",
-                    "9.0",
-                    "--summary",
-                    "Location Singular Test",
-                    "--description-file",
-                    "desc_loc.txt",
-                    "--severity",
-                    "Low",
-                    "--type",
-                    "Standard",
-                ],
-                input="y\n",
-            )
-            self.assertEqual(result.returncode, 0)
-            self.assertIn("Success: Case #04525091 created.", result.stdout)
-        finally:
-            if os.path.exists("desc_loc.txt"):
-                os.remove("desc_loc.txt")
-
     def test_create_case_default_template(self):
         """Test creating a case using default_create_template"""
         import shutil
@@ -3035,12 +3003,12 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             self.assertIn("CASE: 12345", result_show.stdout)
             self.assertIn("Test Case Details", result_show.stdout)
 
-            # 3. Comment with --backend graphql
+            # 3. Comment with --graphql
             comment_file = os.path.join(temp_dir, "comment.txt")
             with open(comment_file, "w") as f:
                 f.write("New CRM comment text")
             result_comment = self.run_cli(
-                ["--backend", "graphql", "comment", "-c", "12345", "-f", comment_file]
+                ["--graphql", "comment", "-c", "12345", "-f", comment_file]
             )
             self.assertEqual(result_comment.returncode, 0)
             self.assertIn("Success: Comment added.", result_comment.stdout)
@@ -3101,7 +3069,6 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
     def test_graphql_default_backend(self):
         """Test that GraphQL is the default backend across library services and CLI commands"""
-        import tempfile
 
         from rh_support_lib.api import LegacyAPIClient
         from rh_support_lib.services.attachments import AttachmentService
@@ -3115,31 +3082,16 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
         att_service = AttachmentService(api_client)
         self.assertEqual(att_service.backend, "graphql")
-        self.assertTrue(att_service._use_v3)
 
-        # 2. CLI commands default to graphql without --graphql or --backend flags
+        # 2. CLI commands default to graphql without --graphql flags
         result_default = self.run_cli(["list"])
         self.assertEqual(result_default.returncode, 0)
         self.assertIn("FILTER_TEST", result_default.stdout)
 
-        # 3. Explicit --backend v1 is still respected
-        result_v1 = self.run_cli(["--backend", "v1", "list"])
-        self.assertEqual(result_v1.returncode, 0)
-        self.assertIn("FILTER_TEST", result_v1.stdout)
-
-        # 4. Config file with backend: v1 is respected
-        temp_home = tempfile.mkdtemp()
-        try:
-            config_file = os.path.join(temp_home, "config.yaml")
-            with open(config_file, "w") as f:
-                f.write("backend: v1\n")
-            result_cfg = self.run_cli(["--config-file", config_file, "list"])
-            self.assertEqual(result_cfg.returncode, 0)
-            self.assertIn("FILTER_TEST", result_cfg.stdout)
-        finally:
-            import shutil
-
-            shutil.rmtree(temp_home)
+        # 3. --graphql flag is also accepted as a compatible option
+        result_gql = self.run_cli(["--graphql", "list"])
+        self.assertEqual(result_gql.returncode, 0)
+        self.assertIn("FILTER_TEST", result_gql.stdout)
 
     def test_status_filter_map_new_crm(self):
         """Test that STATUS_FILTER_MAP maps open, customer, and redhat to new CRM GraphQL statuses"""

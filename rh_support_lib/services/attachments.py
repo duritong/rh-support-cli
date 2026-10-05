@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import contextlib
 import os
-import re
 from collections.abc import Callable
 
 import requests
@@ -12,7 +10,7 @@ from rh_support_lib.models import Attachment
 
 
 class AttachmentService:
-    """Service to handle all support case file attachment operations with dual v1 and v3 engines."""
+    """Service to handle all support case file attachment operations via the v3 Attachment API."""
 
     def __init__(
         self,
@@ -23,7 +21,6 @@ class AttachmentService:
         self.api_client = api_client
         self.backend = (backend or os.environ.get("RH_BACKEND") or BACKEND_MODE).lower()
         self.base_url = (base_url or ATTACHMENT_API_URL).rstrip("/")
-        self._use_v3 = self.backend == "graphql"
 
     def list_attachments(
         self,
@@ -33,22 +30,6 @@ class AttachmentService:
         sort_by: str | None = None,
     ) -> list[Attachment]:
         """Lists all attachments for a specific support case."""
-        if self._use_v3:
-            return self._list_attachments_v3(
-                case_number=case_number,
-                include_deleted=include_deleted,
-                sorting_field=sorting_field,
-                sort_by=sort_by,
-            )
-        return self._list_attachments_v1(case_number)
-
-    def _list_attachments_v3(
-        self,
-        case_number: str,
-        include_deleted: bool = False,
-        sorting_field: str | None = None,
-        sort_by: str | None = None,
-    ) -> list[Attachment]:
         url = f"{self.base_url}/v3/cases/{case_number}/attachments"
         params = {}
         if include_deleted:
@@ -87,37 +68,6 @@ class AttachmentService:
                 )
             )
         return attachments
-
-    def _list_attachments_v1(self, case_number: str) -> list[Attachment]:
-        base_root = re.sub(r"/v\d+$", "", self.base_url)
-        v1_url = f"{base_root}/v1/cases/{case_number}"
-        with contextlib.suppress(Exception):
-            resp = self.api_client.get(v1_url)
-            if resp.status_code == 200:
-                data = resp.json()
-                raw_atts = data.get("attachments") or []
-                attachments = []
-                for a in raw_atts:
-                    uuid_val = a.get("uuid") or a.get("id") or ""
-                    size_val = a.get("size") or 0
-                    attachments.append(
-                        Attachment(
-                            uuid=str(uuid_val),
-                            file_name=a.get("fileName")
-                            or a.get("name")
-                            or "attachment.bin",
-                            size=int(size_val),
-                            size_kb=round(int(size_val) / 1024.0, 1),
-                            created_date=a.get("createdDate", ""),
-                            created_by=a.get("createdBy", ""),
-                            description=a.get("description", ""),
-                            download_link=a.get("link", ""),
-                            upload_status="Completed",
-                            case_number=str(case_number),
-                        )
-                    )
-                return attachments
-        return []
 
     def get_attachment_status(
         self, case_number: str, attachment_id: str | None = None
@@ -191,34 +141,10 @@ class AttachmentService:
         client_id: str = "rh-support-cli",
         progress_callback: Callable[[int, int], None] | None = None,
     ) -> Attachment:
-        """
-        Uploads a local file to a support case using either v3 presigned URLs or v1 multipart streaming.
-        """
+        """Uploads a local file to a support case using v3 presigned URLs."""
         if not os.path.isfile(file_path):
             raise FileNotFoundError(f"File '{file_path}' does not exist.")
 
-        if self._use_v3:
-            return self._upload_attachment_v3(
-                case_number=case_number,
-                file_path=file_path,
-                description=description,
-                client_id=client_id,
-                progress_callback=progress_callback,
-            )
-        return self._upload_attachment_v1(
-            case_number=case_number,
-            file_path=file_path,
-            description=description,
-        )
-
-    def _upload_attachment_v3(
-        self,
-        case_number: str,
-        file_path: str,
-        description: str = "",
-        client_id: str = "rh-support-cli",
-        progress_callback: Callable[[int, int], None] | None = None,
-    ) -> Attachment:
         file_size = os.path.getsize(file_path)
         file_name = os.path.basename(file_path)
 
@@ -310,46 +236,6 @@ class AttachmentService:
         size_kb = round(file_size / 1024.0, 1)
         return Attachment(
             uuid=attachment_id,
-            file_name=file_name,
-            size=file_size,
-            size_kb=size_kb,
-            created_date="",
-            description=description,
-            upload_status="Completed",
-            case_number=str(case_number),
-        )
-
-    def _upload_attachment_v1(
-        self,
-        case_number: str,
-        file_path: str,
-        description: str = "",
-    ) -> Attachment:
-        file_size = os.path.getsize(file_path)
-        file_name = os.path.basename(file_path)
-
-        base_root = re.sub(r"/v\d+$", "", self.base_url)
-        v1_url = f"{base_root}/v1/cases/{case_number}/attachments"
-
-        try:
-            from requests_toolbelt.multipart.encoder import MultipartEncoder
-
-            with open(file_path, "rb") as f:
-                m = MultipartEncoder(fields={"file": (file_name, f)})
-                headers = {"Content-Type": m.content_type}
-                resp = self.api_client.post(
-                    v1_url, data=m, headers=headers, timeout=(30, 3600)
-                )
-                resp.raise_for_status()
-        except ImportError:
-            with open(file_path, "rb") as f:
-                files = {"file": (file_name, f)}
-                resp = self.api_client.post(v1_url, files=files, timeout=(30, 3600))
-                resp.raise_for_status()
-
-        size_kb = round(file_size / 1024.0, 1)
-        return Attachment(
-            uuid="a1",
             file_name=file_name,
             size=file_size,
             size_kb=size_kb,

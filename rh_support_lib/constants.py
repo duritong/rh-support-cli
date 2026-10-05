@@ -1,14 +1,13 @@
 import os
 
 # --- CONFIGURATION ---
-DEFAULT_REST_URL = "https://api.access.redhat.com/support/v1"
 DEFAULT_GRAPHQL_URL = "https://graphql.redhat.com"
 DEFAULT_ATTACHMENT_URL = "https://api.access.redhat.com/support"
 
-API_URL = os.environ.get("RH_API_URL", DEFAULT_REST_URL)
 GRAPHQL_URL = os.environ.get("RH_GRAPHQL_URL", DEFAULT_GRAPHQL_URL)
+API_URL = os.environ.get("RH_API_URL", GRAPHQL_URL)
 ATTACHMENT_API_URL = os.environ.get("RH_ATTACHMENT_API_URL", DEFAULT_ATTACHMENT_URL)
-BACKEND_MODE = os.environ.get("RH_BACKEND", "graphql")
+BACKEND_MODE = "graphql"
 SSO_URL = os.environ.get(
     "RH_SSO_URL",
     "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token",
