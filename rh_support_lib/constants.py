@@ -8,7 +8,7 @@ DEFAULT_ATTACHMENT_URL = "https://api.access.redhat.com/support"
 API_URL = os.environ.get("RH_API_URL", DEFAULT_REST_URL)
 GRAPHQL_URL = os.environ.get("RH_GRAPHQL_URL", DEFAULT_GRAPHQL_URL)
 ATTACHMENT_API_URL = os.environ.get("RH_ATTACHMENT_API_URL", DEFAULT_ATTACHMENT_URL)
-BACKEND_MODE = os.environ.get("RH_BACKEND", "v1")
+BACKEND_MODE = os.environ.get("RH_BACKEND", "graphql")
 SSO_URL = os.environ.get(
     "RH_SSO_URL",
     "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token",
@@ -33,10 +33,16 @@ SEVERITY_MAP = {
 }
 
 STATUS_FILTER_MAP = {
-    "customer": "Waiting on Customer",
-    "redhat": "Waiting on Red Hat",
+    "customer": "Waiting on Customer,Waiting on Customer Action Required",
+    "redhat": "Waiting on Red Hat,In Progress,Waiting on Engineering,Needs New Owner",
     "closed": "Closed",
-    "open": "Waiting on Red Hat,Waiting on Customer",
+    "open": "Waiting on Red Hat,Waiting on Customer,Waiting on Customer Action Required,In Progress,Waiting on Engineering,Needs New Owner",
+    "in_progress": "In Progress",
+    "inprogress": "In Progress",
+    "engineering": "Waiting on Engineering",
+    "needs_owner": "Needs New Owner",
+    "needs_new_owner": "Needs New Owner",
+    "action_required": "Waiting on Customer Action Required",
 }
 
 

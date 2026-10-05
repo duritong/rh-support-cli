@@ -107,12 +107,12 @@ Authentication:
     parser.add_argument(
         "--graphql",
         action="store_true",
-        help="Use the new Red Hat GraphQL & v3 Attachment APIs",
+        help="Use the new Red Hat GraphQL & v3 Attachment APIs (enabled by default)",
     )
     parser.add_argument(
         "--backend",
-        choices=["v1", "graphql"],
-        help="Select API backend: 'v1' (default active production) or 'graphql' (new CRM)",
+        choices=["graphql", "v1"],
+        help="Select API backend: 'graphql' (default) or 'v1' (legacy REST)",
     )
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     parser.add_argument(
@@ -472,19 +472,19 @@ Authentication:
         sys.exit(0)
 
     # Resolve backend selection
-    backend = "v1"
-    if getattr(args, "graphql", False) or getattr(args, "backend", None) == "graphql":
-        backend = "graphql"
-    elif getattr(args, "backend", None):
+    backend = "graphql"
+    if getattr(args, "backend", None):
         backend = args.backend
-    elif (
-        config.get("graphql")
-        or config.get("backend") == "graphql"
-        or os.environ.get("RH_GRAPHQL") in ("1", "true", "True")
-        or os.environ.get("RH_BACKEND") == "graphql"
+    elif config.get("backend"):
+        backend = config.get("backend")
+    elif os.environ.get("RH_BACKEND"):
+        backend = os.environ.get("RH_BACKEND")
+    elif config.get("graphql") is False or os.environ.get("RH_GRAPHQL") in (
+        "0",
+        "false",
+        "False",
     ):
-        backend = "graphql"
-
+        backend = "v1"
     args.backend = backend
     os.environ["RH_BACKEND"] = backend
 

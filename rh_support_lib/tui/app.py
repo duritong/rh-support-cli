@@ -27,7 +27,12 @@ from textual.widgets import (
     TextArea,
 )
 
-from rh_support_lib.constants import API_URL, SEVERITY_MAP, STATUS_FILTER_MAP
+from rh_support_lib.constants import (
+    API_URL,
+    BACKEND_MODE,
+    SEVERITY_MAP,
+    STATUS_FILTER_MAP,
+)
 from rh_support_lib.models import Attachment, Case, CaseDetails
 from rh_support_lib.services.attachments import AttachmentService
 from rh_support_lib.services.cases import CaseService
@@ -539,7 +544,7 @@ class SupportApp(App):
         self.no_default_bookmark = no_default_bookmark
         self.cases: list[Case] = []
         self.selected_case_id: str | None = None
-        self.backend = os.environ.get("RH_BACKEND", "v1")
+        self.backend = os.environ.get("RH_BACKEND", BACKEND_MODE)
         self.case_service = CaseService(self.api_client, backend=self.backend)
         self.attachment_service = AttachmentService(
             self.api_client, backend=self.backend

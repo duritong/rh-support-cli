@@ -42,7 +42,7 @@ The project is structured as a Python CLI wrapper around the Red Hat Support Cas
 ### Key Design Decoupling
 *   **Library-First Domain Services**: Core domain logic is encapsulated within `rh_support_lib/services/` (`CaseService`, `AttachmentService`, and `StateService`). Both CLI subcommands (`commands/`) and the interactive dashboard (`tui/`) act as presentation-only consumers of normalized domain models (`models.py`), ensuring complete separation of concerns and zero API/state leakages into UI code.
 *   **Generic State & Cache Decoupling**: Persistent operational metadata (e.g. followed cases registry, sync checkpoints, pinned tickets, local tags) is managed via `StateService` (`state.yaml`) with atomic file writes and per-identity user scoping.
-*   **Dual Backend Engines**: `CaseService` and `AttachmentService` transparently support both Red Hat's active production v1 REST API (default) and the new upcoming CRM platform (`--graphql` / GraphQL `https://graphql.redhat.com` and v3 Attachment Service).
+*   **Dual Backend Engines**: `CaseService` and `AttachmentService` transparently support both Red Hat's CRM platform backend by default (`graphql` / GraphQL `https://graphql.redhat.com` and v3 Attachment Service) and the legacy v1 REST API (`--backend v1`).
 *   **Presigned Direct Transfer Attachments**: Under the new CRM mode, large files up to 5 TB bypass intermediate API gateways via `AttachmentService`, using single PUT ($\le 5\text{ GB}$) or multipart parallel chunks (> $5\text{ GB}$) with automatic completion verification.
 *   **No-Auth Execution Paths**: Commands that only inspect local resources (like `list-templates` and `completion`) are routed before OIDC token fetching in `main.py`, providing fast, completely offline execution.
 

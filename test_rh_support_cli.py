@@ -1288,6 +1288,8 @@ class TestRhSupportCli(unittest.TestCase):
         try:
             result = self.run_cli(
                 [
+                    "--backend",
+                    "v1",
                     "create",
                     "--product",
                     "RHEL",
@@ -3081,6 +3083,104 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             )
         finally:
             shutil.rmtree(temp_dir)
+
+    def test_graphql_default_backend(self):
+        """Test that GraphQL is the default backend across library services and CLI commands"""
+        import tempfile
+
+        from rh_support_lib.api import LegacyAPIClient
+        from rh_support_lib.services.attachments import AttachmentService
+        from rh_support_lib.services.cases import CaseService
+
+        # 1. Direct library instantiation defaults to graphql
+        api_client = LegacyAPIClient("mock_access_token_123")
+        case_service = CaseService(api_client)
+        self.assertEqual(case_service.backend, "graphql")
+        self.assertTrue(case_service._use_graphql)
+
+        att_service = AttachmentService(api_client)
+        self.assertEqual(att_service.backend, "graphql")
+        self.assertTrue(att_service._use_v3)
+
+        # 2. CLI commands default to graphql without --graphql or --backend flags
+        result_default = self.run_cli(["list"])
+        self.assertEqual(result_default.returncode, 0)
+        self.assertIn("FILTER_TEST", result_default.stdout)
+
+        # 3. Explicit --backend v1 is still respected
+        result_v1 = self.run_cli(["--backend", "v1", "list"])
+        self.assertEqual(result_v1.returncode, 0)
+        self.assertIn("FILTER_TEST", result_v1.stdout)
+
+        # 4. Config file with backend: v1 is respected
+        temp_home = tempfile.mkdtemp()
+        try:
+            config_file = os.path.join(temp_home, "config.yaml")
+            with open(config_file, "w") as f:
+                f.write("backend: v1\n")
+            result_cfg = self.run_cli(["--config-file", config_file, "list"])
+            self.assertEqual(result_cfg.returncode, 0)
+            self.assertIn("FILTER_TEST", result_cfg.stdout)
+        finally:
+            import shutil
+
+            shutil.rmtree(temp_home)
+
+    def test_status_filter_map_new_crm(self):
+        """Test that STATUS_FILTER_MAP maps open, customer, and redhat to new CRM GraphQL statuses"""
+        import tempfile
+
+        from rh_support_lib.constants import STATUS_FILTER_MAP
+
+        # 1. Verify mapping entries contain new CRM statuses
+        open_statuses = [s.strip() for s in STATUS_FILTER_MAP["open"].split(",")]
+        self.assertIn("Waiting on Customer Action Required", open_statuses)
+        self.assertIn("In Progress", open_statuses)
+        self.assertIn("Waiting on Engineering", open_statuses)
+        self.assertIn("Needs New Owner", open_statuses)
+
+        customer_statuses = [
+            s.strip() for s in STATUS_FILTER_MAP["customer"].split(",")
+        ]
+        self.assertIn("Waiting on Customer Action Required", customer_statuses)
+
+        redhat_statuses = [s.strip() for s in STATUS_FILTER_MAP["redhat"].split(",")]
+        self.assertIn("In Progress", redhat_statuses)
+        self.assertIn("Waiting on Engineering", redhat_statuses)
+        self.assertIn("Needs New Owner", redhat_statuses)
+
+        # 2. Test CLI list with --status open transmits new CRM statuses in filter
+        self.env["COLUMNS"] = "400"
+        result_open = self.run_cli(["list", "--status", "open"])
+        self.assertEqual(result_open.returncode, 0)
+        self.assertIn("Waiting on Customer Action Required", result_open.stdout)
+        self.assertIn("In Progress", result_open.stdout)
+        # 3. Test config bookmark with status: ["open"]
+        temp_home = tempfile.mkdtemp()
+        try:
+            config_file = os.path.join(temp_home, "config.yaml")
+            with open(config_file, "w") as f:
+                f.write(
+                    'bookmarks:\n  sample_open:\n    account: "999999"\n    status: ["open"]\n'
+                )
+            result_bm = self.run_cli(
+                [
+                    "--config-file",
+                    config_file,
+                    "list",
+                    "--bookmark",
+                    "sample_open",
+                    "--no-default-bookmark",
+                ]
+            )
+            self.assertEqual(result_bm.returncode, 0)
+            self.assertIn("ACC=999999", result_bm.stdout)
+            self.assertIn("Waiting on Customer Action Required", result_bm.stdout)
+            self.assertIn("In Progress", result_bm.stdout)
+        finally:
+            import shutil
+
+            shutil.rmtree(temp_home)
 
     def test_follow_and_unfollow_commands(self):
         """Test follow and unfollow CLI commands for single and multiple cases"""
