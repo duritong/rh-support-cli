@@ -543,7 +543,6 @@ class SupportApp(App):
         self.no_default_bookmark = no_default_bookmark
         self.cases: list[Case] = []
         self.selected_case_id: str | None = None
-        self.backend = "graphql"
         self.case_service = CaseService(self.api_client)
         self.attachment_service = AttachmentService(self.api_client)
 

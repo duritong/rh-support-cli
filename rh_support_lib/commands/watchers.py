@@ -33,8 +33,7 @@ def _gather_cases(args) -> list[str]:
 def cmd_follow(args, api_client):
     """Attaches current user (or specified user) as watcher to one or more support cases.
     If --sync is specified without case numbers, syncs followed cases from account."""
-    backend = getattr(args, "backend", None)
-    case_service = CaseService(api_client, backend=backend)
+    case_service = CaseService(api_client)
     user = getattr(args, "user", None) or case_service.get_current_user()
 
     case_numbers = _gather_cases(args)
@@ -81,8 +80,7 @@ def cmd_unfollow(args, api_client):
             "Error: Please specify at least one case number (e.g. unfollow 12345678 or -c 12345678)."
         )
 
-    backend = getattr(args, "backend", None)
-    case_service = CaseService(api_client, backend=backend)
+    case_service = CaseService(api_client)
     user = getattr(args, "user", None) or case_service.get_current_user()
 
     print(f"Removing '{user}' from watchers on {len(case_numbers)} case(s)...")

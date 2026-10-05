@@ -2946,11 +2946,9 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         try:
             api_client = LegacyAPIClient("mock_access_token_123")
             case_service = CaseService(
-                api_client, backend="graphql", graphql_url=f"{self.base_url}/graphql"
+                api_client, graphql_url=f"{self.base_url}/graphql"
             )
-            att_service = AttachmentService(
-                api_client, backend="graphql", base_url=self.base_url
-            )
+            att_service = AttachmentService(api_client, base_url=self.base_url)
 
             # 1. CaseService list_cases
             cases = case_service.list_cases(
@@ -3067,22 +3065,18 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         finally:
             shutil.rmtree(temp_dir)
 
-    def test_graphql_default_backend(self):
-        """Test that GraphQL is the default backend across library services and CLI commands"""
-
+    def test_graphql_cli(self):
+        """Test running CLI commands with and without --graphql"""
         from rh_support_lib.api import LegacyAPIClient
         from rh_support_lib.services.attachments import AttachmentService
         from rh_support_lib.services.cases import CaseService
 
-        # 1. Direct library instantiation defaults to graphql
+        # 1. Direct library instantiation
         api_client = LegacyAPIClient("mock_access_token_123")
         case_service = CaseService(api_client)
-        self.assertEqual(case_service.backend, "graphql")
-        self.assertTrue(case_service._use_graphql)
-
+        self.assertIsNotNone(case_service)
         att_service = AttachmentService(api_client)
-        self.assertEqual(att_service.backend, "graphql")
-
+        self.assertIsNotNone(att_service)
         # 2. CLI commands default to graphql without --graphql flags
         result_default = self.run_cli(["list"])
         self.assertEqual(result_default.returncode, 0)
@@ -3191,9 +3185,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
         # 2. Private comment detection in CaseService
         api_client = LegacyAPIClient("mock_access_token_123")
-        case_service = CaseService(
-            api_client, backend="graphql", graphql_url=f"{self.base_url}/graphql"
-        )
+        case_service = CaseService(api_client, graphql_url=f"{self.base_url}/graphql")
 
         # CaseService._get_case_details_graphql with internal note markers
         mock_gql_data = {

@@ -5,7 +5,7 @@ from collections.abc import Callable
 
 import requests
 
-from rh_support_lib.constants import ATTACHMENT_API_URL, BACKEND_MODE
+from rh_support_lib.constants import ATTACHMENT_API_URL
 from rh_support_lib.models import Attachment
 
 
@@ -15,11 +15,9 @@ class AttachmentService:
     def __init__(
         self,
         api_client,
-        backend: str | None = None,
         base_url: str | None = None,
     ):
         self.api_client = api_client
-        self.backend = (backend or os.environ.get("RH_BACKEND") or BACKEND_MODE).lower()
         self.base_url = (base_url or ATTACHMENT_API_URL).rstrip("/")
 
     def list_attachments(

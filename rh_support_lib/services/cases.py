@@ -348,14 +348,11 @@ class CaseService:
     def __init__(
         self,
         api_client,
-        backend: str | None = None,
         rest_url: str | None = None,
         graphql_url: str | None = None,
         state_service: StateService | None = None,
     ):
         self.api_client = api_client
-        self.backend = "graphql"
-        self._use_graphql = True
         self.graphql_url = graphql_url or GRAPHQL_URL
         self.rest_url = (rest_url or os.environ.get("RH_API_URL") or API_URL).rstrip(
             "/"
@@ -915,7 +912,7 @@ class CaseService:
         sso_user: str | None = None,
         extra_fields: dict[str, Any] | None = None,
     ) -> str:
-        """Creates a new Red Hat support case using the selected backend."""
+        """Creates a new Red Hat support case using the GraphQL API."""
         return self._create_case_graphql(
             summary=summary,
             description=description,

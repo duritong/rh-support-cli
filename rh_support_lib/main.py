@@ -498,9 +498,6 @@ Authentication:
         run_mock_server(corpus_dir=args.corpus, port=args.port)
         sys.exit(0)
 
-    args.backend = "graphql"
-    os.environ["RH_BACKEND"] = "graphql"
-
     debug_file = args.debug_file or config.get("debug_file")
     if args.debug or debug_file:
         enable_debug_logging(log_file=debug_file)

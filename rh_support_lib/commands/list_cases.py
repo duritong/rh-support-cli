@@ -74,9 +74,7 @@ def cmd_list(args, api_client, config=None):
     is_following = bool(filters.get("following"))
     sync_flag = bool(getattr(args, "sync", False))
     user_override = getattr(args, "user", None) or filters.get("user")
-    backend = getattr(args, "backend", None)
-
-    service = CaseService(api_client, backend=backend)
+    service = CaseService(api_client)
     try:
         if is_following:
             print("Fetching followed cases...")
