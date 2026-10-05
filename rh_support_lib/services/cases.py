@@ -23,6 +23,7 @@ from rh_support_lib.models import (
     ProductItem,
 )
 from rh_support_lib.services.state import StateService
+from rh_support_lib.utils import clean_comment_body
 
 # --- GRAPHQL QUERIES & MUTATIONS ---
 
@@ -633,11 +634,12 @@ class CaseService:
         for c_edge in comment_edges:
             c_node = c_edge.get("node") or {}
             c_id = c_node.get("Id", "")
-            c_body = (
+            c_raw_body = (
                 c_node.get("Body__c", {}).get("value", "")
                 if isinstance(c_node.get("Body__c"), dict)
                 else c_node.get("body", "")
             )
+            c_body = clean_comment_body(c_raw_body)
             c_author = (
                 c_node.get("LastModifiedByName__c", {}).get("value", "")
                 if isinstance(c_node.get("LastModifiedByName__c"), dict)
@@ -665,7 +667,14 @@ class CaseService:
             )
             is_pub = c_node.get("isPublic")
             if is_pub is None:
-                is_pub = not (c_vis and str(c_vis).lower() != "public")
+                is_pub = not (c_vis and str(c_vis).lower() not in ("public", ""))
+
+            # Detect private comments by content markers (e.g. legacy migrated internal notes)
+            upper_body = c_body.lstrip().upper()
+            if upper_body.startswith(("/* INTERNAL", "[INTERNAL", "INTERNAL NOTE")):
+                is_pub = False
+                if not c_vis or str(c_vis).lower() == "public":
+                    c_vis = "Internal"
 
             comments.append(
                 CaseComment(
@@ -723,13 +732,22 @@ class CaseService:
         if isinstance(raw_comments, list):
             for c in raw_comments:
                 c_id = c.get("id") or "c1"
-                c_body = c.get("commentBody") or c.get("body") or c.get("text") or ""
+                c_raw_body = (
+                    c.get("commentBody") or c.get("body") or c.get("text") or ""
+                )
+                c_body = clean_comment_body(c_raw_body)
                 c_author = c.get("createdBy") or c.get("createdById") or "Unknown"
                 c_date = c.get("createdDate") or ""
                 c_is_pub = c.get("isPublic")
                 c_vis = c.get("visibility") or (
                     "Public" if c_is_pub is not False else "Private"
                 )
+                upper_body = c_body.lstrip().upper()
+                if upper_body.startswith(("/* INTERNAL", "[INTERNAL", "INTERNAL NOTE")):
+                    c_is_pub = False
+                    if not c_vis or str(c_vis).lower() == "public":
+                        c_vis = "Internal"
+
                 comments.append(
                     CaseComment(
                         id=str(c_id),

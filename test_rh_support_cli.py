@@ -3182,6 +3182,142 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
             shutil.rmtree(temp_home)
 
+    def test_clean_comment_body_and_private_detection(self):
+        """Test cleaning wrapping legacy divs, HTML to markdown, and private comment detection"""
+        from rh_support_lib.api import LegacyAPIClient
+        from rh_support_lib.services.cases import CaseService
+        from rh_support_lib.utils import clean_comment_body
+
+        # 1. Direct clean_comment_body tests
+        # Plaintext in legacy-comment div
+        c1 = '<div class="legacy-comment legacy-comment-plaintext">NetworkPolicy: https://access.redhat.com/solutions/7101361</div>'
+        self.assertEqual(
+            clean_comment_body(c1),
+            "NetworkPolicy: https://access.redhat.com/solutions/7101361",
+        )
+
+        # Arbitrary div classes and attributes
+        c2 = '<div class="custom-note extra" id="c99">Important information</div>'
+        self.assertEqual(clean_comment_body(c2), "Important information")
+
+        # HTML formatted legacy comment (like Case 999888 Comment 1)
+        c3 = (
+            "&lt;div class=&quot;legacy-comment legacy-comment-markdown&quot;&gt;"
+            "&lt;h2 id=&quot;consultant-engaged&quot;&gt;Consultant Engaged&lt;/h2&gt;\n"
+            "&lt;p&gt;This case has been flagged with Consulting Engagement.&lt;/p&gt;\n"
+            "&lt;h3&gt;Contact:&lt;/h3&gt;\n"
+            "&lt;p&gt;&lt;strong&gt;Name:&lt;/strong&gt; Jane Consultant&lt;br&gt;"
+            "&lt;a href=&quot;mailto:consultant@example.com&quot;&gt;consultant@example.com&lt;/a&gt;&lt;/p&gt;\n"
+            "&lt;/div&gt;"
+        )
+        cleaned3 = clean_comment_body(c3)
+        self.assertNotIn("<div", cleaned3)
+        self.assertNotIn("</div>", cleaned3)
+        self.assertIn("## Consultant Engaged", cleaned3)
+        self.assertIn("### Contact:", cleaned3)
+        self.assertIn("**Name:**", cleaned3)
+        self.assertIn("consultant@example.com", cleaned3)
+
+        # Double-escaped entities
+        c4 = "&lt;div class=&quot;legacy-comment legacy-comment-plaintext&quot;&gt;&amp;gt; quoted text&lt;/div&gt;"
+        self.assertEqual(clean_comment_body(c4), "> quoted text")
+
+        # 2. Private comment detection in CaseService
+        api_client = LegacyAPIClient("mock_access_token_123")
+        case_service = CaseService(
+            api_client, backend="graphql", graphql_url=f"{self.base_url}/graphql"
+        )
+
+        # CaseService._get_case_details_graphql with internal note markers
+        mock_gql_data = {
+            "redhat_support_uiapi": {
+                "query": {
+                    "RedHatSupportCase": {
+                        "edges": [
+                            {
+                                "node": {
+                                    "Id": "500TestGql",
+                                    "CaseNumber__c": {"value": "998877"},
+                                    "Subject": {"value": "GQL Comment Privacy Test"},
+                                    "CaseComments__r": {
+                                        "edges": [
+                                            {
+                                                "node": {
+                                                    "Id": "c_pub",
+                                                    "Body__c": {
+                                                        "value": '<div class="legacy-comment legacy-comment-plaintext">Hello customer</div>'
+                                                    },
+                                                    "LastModifiedByName__c": {
+                                                        "value": "Support"
+                                                    },
+                                                    "CreatedDate": {
+                                                        "value": "2026-01-01T10:00:00Z"
+                                                    },
+                                                }
+                                            },
+                                            {
+                                                "node": {
+                                                    "Id": "c_priv_marker",
+                                                    "Body__c": {
+                                                        "value": '<div class="legacy-comment legacy-comment-plaintext">/* INTERNAL NOTE */\n\nTaking ownership</div>'
+                                                    },
+                                                    "LastModifiedByName__c": {
+                                                        "value": "Alex Support"
+                                                    },
+                                                    "CreatedDate": {
+                                                        "value": "2026-01-01T11:00:00Z"
+                                                    },
+                                                }
+                                            },
+                                            {
+                                                "node": {
+                                                    "Id": "c_priv_field",
+                                                    "Body__c": {
+                                                        "value": "Another private comment"
+                                                    },
+                                                    "Visibility__c": {
+                                                        "value": "Internal"
+                                                    },
+                                                    "LastModifiedByName__c": {
+                                                        "value": "Support"
+                                                    },
+                                                    "CreatedDate": {
+                                                        "value": "2026-01-01T12:00:00Z"
+                                                    },
+                                                }
+                                            },
+                                        ]
+                                    },
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+
+        from unittest.mock import patch
+
+        with patch.object(api_client, "execute_graphql", return_value=mock_gql_data):
+            details = case_service.get_case_details("998877")
+            self.assertIsNotNone(details)
+            self.assertEqual(len(details.comments), 3)
+
+            # Comment 1: Public, stripped div
+            self.assertTrue(details.comments[0].is_public)
+            self.assertEqual(details.comments[0].body, "Hello customer")
+            self.assertEqual(details.comments[0].visibility, "Public")
+
+            # Comment 2: Private via /* INTERNAL NOTE */ marker
+            self.assertFalse(details.comments[1].is_public)
+            self.assertEqual(details.comments[1].visibility, "Internal")
+            self.assertNotIn("<div", details.comments[1].body)
+            self.assertIn("Taking ownership", details.comments[1].body)
+
+            # Comment 3: Private via Visibility__c field
+            self.assertFalse(details.comments[2].is_public)
+            self.assertEqual(details.comments[2].visibility, "Internal")
+
     def test_follow_and_unfollow_commands(self):
         """Test follow and unfollow CLI commands for single and multiple cases"""
         expected_user = self.env.get("REDHAT_SUPPORT_USERNAME") or self.env.get(
