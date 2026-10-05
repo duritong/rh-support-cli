@@ -133,9 +133,16 @@ query GetCaseAndComments($caseNumber: String, $first: Int, $after: String) {
                 node {
                   Id
                   Body__c { value }
+                  CreatedBy {
+                    Name { value }
+                  }
                   LastModifiedByName__c { value }
                   IsAssociate__c { value }
                   IsCustomer__c { value }
+                  Visibility__c {
+                    value
+                    displayValue
+                  }
                   CreatedDate { value }
                 }
                 cursor
@@ -146,6 +153,56 @@ query GetCaseAndComments($caseNumber: String, $first: Int, $after: String) {
               }
             }
           }
+        }
+      }
+    }
+  }
+}
+"""
+
+GQL_GET_CASE_COMMENTS = """
+query GetCaseComments($filter: RedHatSupportCaseComment__c_Filter!, $orderBy: RedHatSupportCaseComment__c_OrderBy, $first: Int, $after: String) {
+  redhat_support_uiapi {
+    query {
+      RedHatSupportCaseComment__c(
+        where: $filter
+        orderBy: $orderBy
+        first: $first
+        after: $after
+      ) {
+        edges {
+          node {
+            Id
+            Body__c {
+              value
+            }
+            CreatedBy {
+              Name {
+                value
+              }
+            }
+            IsCustomer__c {
+              value
+            }
+            IsAssociate__c {
+              value
+            }
+            Visibility__c {
+              value
+              displayValue
+            }
+            LastModifiedByName__c {
+              value
+            }
+            CreatedDate {
+              value
+            }
+          }
+          cursor
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
         }
       }
     }
@@ -307,6 +364,71 @@ class CaseService:
         self.state_service = state_service or StateService()
 
     # --- NORMALIZATION HELPERS ---
+
+    def _normalize_comment_node(self, c_node: dict[str, Any]) -> CaseComment:
+        """Converts a GraphQL RedHatSupportCaseComment__c node to a CaseComment domain model."""
+        c_id = c_node.get("Id", "")
+        c_raw_body = (
+            c_node.get("Body__c", {}).get("value", "")
+            if isinstance(c_node.get("Body__c"), dict)
+            else c_node.get("body", "")
+        )
+        c_body = clean_comment_body(c_raw_body)
+
+        created_by_obj = c_node.get("CreatedBy") or {}
+        created_by_name = (
+            created_by_obj.get("Name", {}).get("value")
+            if isinstance(created_by_obj, dict)
+            and isinstance(created_by_obj.get("Name"), dict)
+            else ""
+        )
+        last_mod_name = (
+            c_node.get("LastModifiedByName__c", {}).get("value")
+            if isinstance(c_node.get("LastModifiedByName__c"), dict)
+            else c_node.get("createdBy", "User")
+        )
+        c_author = created_by_name or last_mod_name or "User"
+
+        c_is_assoc = (
+            c_node.get("IsAssociate__c", {}).get("value", False)
+            if isinstance(c_node.get("IsAssociate__c"), dict)
+            else False
+        )
+        c_is_cust = (
+            c_node.get("IsCustomer__c", {}).get("value", False)
+            if isinstance(c_node.get("IsCustomer__c"), dict)
+            else False
+        )
+        c_date = (
+            c_node.get("CreatedDate", {}).get("value", "")
+            if isinstance(c_node.get("CreatedDate"), dict)
+            else c_node.get("createdDate", "")
+        )
+
+        vis_obj = c_node.get("Visibility__c")
+        if isinstance(vis_obj, dict):
+            c_vis = vis_obj.get("value") or vis_obj.get("displayValue") or ""
+        else:
+            c_vis = str(vis_obj) if vis_obj else ""
+
+        is_pub = c_node.get("isPublic")
+        if c_vis:
+            is_pub = str(c_vis).lower() == "public"
+        elif is_pub is not None:
+            is_pub = bool(is_pub)
+        else:
+            is_pub = True
+
+        return CaseComment(
+            id=str(c_id),
+            body=c_body or "",
+            created_by=c_author,
+            is_associate=bool(c_is_assoc),
+            is_customer=bool(c_is_cust),
+            is_public=bool(is_pub),
+            visibility=str(c_vis) if c_vis else ("Public" if is_pub else "Private"),
+            created_date=c_date or "",
+        )
 
     def _normalize_case_node(self, node: dict[str, Any]) -> Case:
         """Converts a GraphQL RedHatSupportCase node to a Case domain model."""
@@ -633,63 +755,7 @@ class CaseService:
 
         for c_edge in comment_edges:
             c_node = c_edge.get("node") or {}
-            c_id = c_node.get("Id", "")
-            c_raw_body = (
-                c_node.get("Body__c", {}).get("value", "")
-                if isinstance(c_node.get("Body__c"), dict)
-                else c_node.get("body", "")
-            )
-            c_body = clean_comment_body(c_raw_body)
-            c_author = (
-                c_node.get("LastModifiedByName__c", {}).get("value", "")
-                if isinstance(c_node.get("LastModifiedByName__c"), dict)
-                else c_node.get("createdBy", "User")
-            )
-            c_is_assoc = (
-                c_node.get("IsAssociate__c", {}).get("value", False)
-                if isinstance(c_node.get("IsAssociate__c"), dict)
-                else False
-            )
-            c_is_cust = (
-                c_node.get("IsCustomer__c", {}).get("value", False)
-                if isinstance(c_node.get("IsCustomer__c"), dict)
-                else False
-            )
-            c_date = (
-                c_node.get("CreatedDate", {}).get("value", "")
-                if isinstance(c_node.get("CreatedDate"), dict)
-                else c_node.get("createdDate", "")
-            )
-            c_vis = (
-                c_node.get("Visibility__c", {}).get("value")
-                if isinstance(c_node.get("Visibility__c"), dict)
-                else c_node.get("visibility", "")
-            )
-            is_pub = c_node.get("isPublic")
-            if is_pub is None:
-                is_pub = not (c_vis and str(c_vis).lower() not in ("public", ""))
-
-            # Detect private comments by content markers (e.g. legacy migrated internal notes)
-            upper_body = c_body.lstrip().upper()
-            if upper_body.startswith(("/* INTERNAL", "[INTERNAL", "INTERNAL NOTE")):
-                is_pub = False
-                if not c_vis or str(c_vis).lower() == "public":
-                    c_vis = "Internal"
-
-            comments.append(
-                CaseComment(
-                    id=str(c_id),
-                    body=c_body or "",
-                    created_by=c_author or "User",
-                    is_associate=bool(c_is_assoc),
-                    is_customer=bool(c_is_cust),
-                    is_public=bool(is_pub),
-                    visibility=str(c_vis)
-                    if c_vis
-                    else ("Public" if is_pub is not False else "Private"),
-                    created_date=c_date or "",
-                )
-            )
+            comments.append(self._normalize_comment_node(c_node))
 
         return CaseDetails(
             case=case_obj,
@@ -742,12 +808,12 @@ class CaseService:
                 c_vis = c.get("visibility") or (
                     "Public" if c_is_pub is not False else "Private"
                 )
-                upper_body = c_body.lstrip().upper()
-                if upper_body.startswith(("/* INTERNAL", "[INTERNAL", "INTERNAL NOTE")):
-                    c_is_pub = False
-                    if not c_vis or str(c_vis).lower() == "public":
-                        c_vis = "Internal"
-
+                if c_vis:
+                    c_is_pub = str(c_vis).lower() == "public"
+                elif c_is_pub is not None:
+                    c_is_pub = bool(c_is_pub)
+                else:
+                    c_is_pub = True
                 comments.append(
                     CaseComment(
                         id=str(c_id),

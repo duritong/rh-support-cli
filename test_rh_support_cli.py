@@ -3247,8 +3247,14 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                                                     "Body__c": {
                                                         "value": '<div class="legacy-comment legacy-comment-plaintext">Hello customer</div>'
                                                     },
-                                                    "LastModifiedByName__c": {
-                                                        "value": "Support"
+                                                    "Visibility__c": {
+                                                        "value": "Public",
+                                                        "displayValue": "Public",
+                                                    },
+                                                    "CreatedBy": {
+                                                        "Name": {
+                                                            "value": "Support Specialist"
+                                                        }
                                                     },
                                                     "CreatedDate": {
                                                         "value": "2026-01-01T10:00:00Z"
@@ -3261,8 +3267,14 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                                                     "Body__c": {
                                                         "value": '<div class="legacy-comment legacy-comment-plaintext">/* INTERNAL NOTE */\n\nTaking ownership</div>'
                                                     },
-                                                    "LastModifiedByName__c": {
-                                                        "value": "Alex Support"
+                                                    "Visibility__c": {
+                                                        "value": "Private",
+                                                        "displayValue": "Private",
+                                                    },
+                                                    "CreatedBy": {
+                                                        "Name": {
+                                                            "value": "Alex Support"
+                                                        }
                                                     },
                                                     "CreatedDate": {
                                                         "value": "2026-01-01T11:00:00Z"
@@ -3271,15 +3283,18 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                                             },
                                             {
                                                 "node": {
-                                                    "Id": "c_priv_field",
+                                                    "Id": "c_priv_no_marker",
                                                     "Body__c": {
-                                                        "value": "Another private comment"
+                                                        "value": '<div class="legacy-comment legacy-comment-plaintext">NetworkPolicy: https://access.redhat.com/solutions/7101361</div>'
                                                     },
                                                     "Visibility__c": {
-                                                        "value": "Internal"
+                                                        "value": "Private",
+                                                        "displayValue": "Private",
                                                     },
-                                                    "LastModifiedByName__c": {
-                                                        "value": "Support"
+                                                    "CreatedBy": {
+                                                        "Name": {
+                                                            "value": "Jane Consultant"
+                                                        }
                                                     },
                                                     "CreatedDate": {
                                                         "value": "2026-01-01T12:00:00Z"
@@ -3303,20 +3318,27 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             self.assertIsNotNone(details)
             self.assertEqual(len(details.comments), 3)
 
-            # Comment 1: Public, stripped div
+            # Comment 1: Public, stripped div, author from CreatedBy
             self.assertTrue(details.comments[0].is_public)
+            self.assertEqual(details.comments[0].created_by, "Support Specialist")
             self.assertEqual(details.comments[0].body, "Hello customer")
             self.assertEqual(details.comments[0].visibility, "Public")
 
-            # Comment 2: Private via /* INTERNAL NOTE */ marker
+            # Comment 2: Private via Visibility__c field
             self.assertFalse(details.comments[1].is_public)
-            self.assertEqual(details.comments[1].visibility, "Internal")
+            self.assertEqual(details.comments[1].created_by, "Alex Support")
+            self.assertEqual(details.comments[1].visibility, "Private")
             self.assertNotIn("<div", details.comments[1].body)
             self.assertIn("Taking ownership", details.comments[1].body)
 
-            # Comment 3: Private via Visibility__c field
+            # Comment 3: Private via Visibility__c even with NO internal marker in text
             self.assertFalse(details.comments[2].is_public)
-            self.assertEqual(details.comments[2].visibility, "Internal")
+            self.assertEqual(details.comments[2].created_by, "Jane Consultant")
+            self.assertEqual(details.comments[2].visibility, "Private")
+            self.assertEqual(
+                details.comments[2].body,
+                "NetworkPolicy: https://access.redhat.com/solutions/7101361",
+            )
 
     def test_follow_and_unfollow_commands(self):
         """Test follow and unfollow CLI commands for single and multiple cases"""
