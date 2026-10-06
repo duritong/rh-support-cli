@@ -653,95 +653,6 @@ class StatefulMockHandler(http.server.BaseHTTPRequestHandler):
             )
             return
 
-        # Legacy endpoints fallback for existing tests / backward-compatibility
-        if self.path == "/cases/filter" or self.path.endswith("/cases/filter"):
-            try:
-                payload = json.loads(body.decode("utf-8")) if body else {}
-            except json.JSONDecodeError:
-                self._send_error("Invalid JSON payload")
-                return
-            cases = self._load_all_cases(corpus_path)
-            self._send_json({"cases": cases})
-            return
-
-        if self.path == "/cases" or self.path.endswith("/cases"):
-            try:
-                payload = json.loads(body.decode("utf-8"))
-            except json.JSONDecodeError:
-                self._send_error("Invalid JSON payload")
-                return
-            cases = self._load_all_cases(corpus_path)
-            existing_numbers = [
-                int(c["caseNumber"])
-                for c in cases
-                if str(c.get("caseNumber", "")).isdigit()
-            ]
-            next_num = max(existing_numbers) + 1 if existing_numbers else 1001
-            case_num_str = str(next_num)
-            now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-            new_case = {
-                "caseNumber": case_num_str,
-                "summary": payload.get("summary", ""),
-                "description": payload.get("description", ""),
-                "product": payload.get("product", "RHEL"),
-                "version": payload.get("version", "9.0"),
-                "accountNumber": "123456",
-                "status": "Waiting on Red Hat",
-                "severity": payload.get("severity", "Normal"),
-                "caseType": "Standard",
-                "createdDate": now_str,
-                "contact": {"name": "Jane Developer", "ssoUsername": "jdeveloper"},
-                "owner": {
-                    "name": "Red Hat Support Specialist",
-                    "ssoUsername": "rh_spec",
-                },
-                "lastModifiedBy": "Jane Developer",
-                "lastModifiedDate": now_str,
-                "comments": [],
-                "attachments": [],
-                "notifiedusers": [],
-            }
-            with open(corpus_path / "cases" / f"{case_num_str}.json", "w") as f:
-                json.dump(new_case, f, indent=2)
-            self._send_json({"caseNumber": case_num_str}, status_code=201)
-            return
-
-        match_comment = re.search(r"/cases/(\d+)/comments$", self.path)
-        if match_comment:
-            case_num = match_comment.group(1)
-            case_file = corpus_path / "cases" / f"{case_num}.json"
-            if case_file.exists():
-                try:
-                    payload = json.loads(body.decode("utf-8"))
-                except json.JSONDecodeError:
-                    payload = {}
-                c_body = (
-                    payload.get("body")
-                    or payload.get("commentBody")
-                    or payload.get("text")
-                    or ""
-                )
-                with open(case_file, "r") as f:
-                    case_data = json.load(f)
-                now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-                comment_id = f"c_{len(case_data.get('comments', [])) + 1}"
-                case_data.setdefault("comments", []).append(
-                    {
-                        "id": comment_id,
-                        "createdDate": now_str,
-                        "createdBy": "Jane Developer",
-                        "isPublic": True,
-                        "body": c_body,
-                    }
-                )
-                case_data["lastModifiedDate"] = now_str
-                with open(case_file, "w") as f:
-                    json.dump(case_data, f, indent=2)
-                self._send_json({"id": comment_id}, status_code=201)
-            else:
-                self._send_error("Case not found", 404)
-            return
-
         match_users = re.search(r"/cases/(\d+)/notifiedusers$", self.path)
         if match_users:
             case_num = match_users.group(1)
@@ -887,28 +798,6 @@ class StatefulMockHandler(http.server.BaseHTTPRequestHandler):
             self._send_json(attachments)
             return
 
-        # Legacy metadata fallbacks
-        if self.path == "/products" or self.path.endswith("/products"):
-            with open(corpus_path / "metadata" / "products.json", "r") as f:
-                self._send_json(json.load(f))
-            return
-        match_versions = re.search(r"/products/([^/]+)/versions$", self.path)
-        if match_versions:
-            self._send_json([{"name": "9.0"}, {"name": "9.1"}])
-            return
-        if "/values/severity" in self.path:
-            self._send_json(
-                [
-                    {"name": "1 (Urgent)"},
-                    {"name": "2 (High)"},
-                    {"name": "3 (Normal)"},
-                    {"name": "4 (Low)"},
-                ]
-            )
-            return
-        if "/values/caseType" in self.path:
-            self._send_json([{"name": "Standard"}, {"name": "Bug"}])
-            return
         match_notified = re.search(r"/cases/(\d+)/notifiedusers$", self.path)
         if match_notified:
             case_num = match_notified.group(1)
@@ -917,16 +806,6 @@ class StatefulMockHandler(http.server.BaseHTTPRequestHandler):
                 with open(case_file, "r") as f:
                     case_data = json.load(f)
                     self._send_json(case_data.get("notifiedusers", []))
-            else:
-                self._send_error("Case not found", 404)
-            return
-        match_comments = re.search(r"/cases/(\d+)/comments$", self.path)
-        if match_comments:
-            case_num = match_comments.group(1)
-            case_file = corpus_path / "cases" / f"{case_num}.json"
-            if case_file.exists():
-                with open(case_file, "r") as f:
-                    self._send_json(json.load(f).get("comments", []))
             else:
                 self._send_error("Case not found", 404)
             return

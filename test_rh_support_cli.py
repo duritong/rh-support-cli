@@ -571,121 +571,6 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                 ).encode()
             )
             return
-
-        # Legacy Create Case Endpoint: /cases
-        if self.path == "/cases":
-            data = json.loads(body.decode())
-            MockRedHatHandler.last_case_payload = data
-            required = ["product", "version", "summary", "description"]
-            if all(k in data for k in required):
-                self.send_response(201)
-                self.send_header("Content-type", "application/json")
-                self.end_headers()
-                if data.get("summary") == "Location Singular Test":
-                    self.wfile.write(
-                        json.dumps(
-                            {
-                                "location": [
-                                    "https://access.redhat.com/hydra/rest/v1/cases/04525091"
-                                ]
-                            }
-                        ).encode()
-                    )
-                else:
-                    self.wfile.write(json.dumps({"caseNumber": "20230001"}).encode())
-                return
-            else:
-                self.send_response(400)
-                self.end_headers()
-                self.wfile.write(b"Missing required fields")
-                return
-
-        # Legacy List Cases Endpoint: /cases/filter
-        if self.path == "/cases/filter":
-            try:
-                data = json.loads(body.decode())
-                if "maxResults" not in data:
-                    self.send_response(400)
-                    self.end_headers()
-                    self.wfile.write(b"Missing maxResults")
-                    return
-            except json.JSONDecodeError:
-                self.send_response(400)
-                self.end_headers()
-                self.wfile.write(b"Invalid JSON")
-                return
-
-            auth = self.headers.get("Authorization")
-            source = "unknown"
-            if auth == "Bearer access_from_cli":
-                source = "CLI"
-            elif auth == "Bearer access_from_env":
-                source = "ENV"
-            elif auth == "Bearer access_from_file":
-                source = "FILE"
-            elif auth == "Bearer mock_access_token_123":
-                source = "DEFAULT"
-
-            filters_received = [f"AUTH={source}"]
-            if "accountNumber" in data:
-                filters_received.append(f"ACC={data['accountNumber']}")
-            if "status" in data:
-                filters_received.append(f"STAT={data['status']}")
-            elif "statuses" in data:
-                filters_received.append(f"STAT={','.join(data['statuses'])}")
-            if "severity" in data:
-                filters_received.append(f"SEV={data['severity']}")
-            elif "severities" in data:
-                filters_received.append(f"SEV={','.join(data['severities'])}")
-            if "ownerSSOName" in data:
-                filters_received.append(f"OWN={data['ownerSSOName']}")
-
-            summary_str = "Filters: " + "|".join(filters_received)
-            self.send_response(200)
-            self.send_header("Content-type", "application/json")
-            self.end_headers()
-            cases_list = [
-                {
-                    "caseNumber": "FILTER_TEST",
-                    "summary": summary_str,
-                    "contact": {"name": "Test User"},
-                    "lastModifiedBy": "Red Hat Support",
-                    "severity": "High",
-                    "status": "Waiting on Red Hat",
-                }
-            ]
-            self.wfile.write(json.dumps({"cases": cases_list}).encode())
-            return
-
-        # Legacy Attachments Endpoint: /cases/{case}/attachments
-        if "/attachments" in self.path:
-            self.send_response(201)
-            self.send_header("Location", "http://mock/attachment/1")
-            self.end_headers()
-            return
-
-        # Legacy Comments Endpoint: /cases/{case}/comments
-        if "/comments" in self.path:
-            if "FAIL_COMMENT" in self.path:
-                self.send_response(500)
-                self.end_headers()
-                self.wfile.write(b"Simulated Server Error")
-                return
-
-            data = json.loads(body.decode())
-            c_body = data.get("body") or data.get("commentBody")
-            if c_body:
-                MockRedHatHandler.last_comment_payload = data
-                self.send_response(201)
-                self.send_header("Content-type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"id": "comment_1"}).encode())
-            else:
-                self.send_response(400)
-                self.end_headers()
-                self.wfile.write(b"Missing body")
-            return
-
         # Notified Users Endpoint: /cases/{case}/notifiedusers
         if "/notifiedusers" in self.path:
             data = json.loads(body.decode())
@@ -722,24 +607,6 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             return
 
-        # Legacy Status/Case Update Endpoint: /cases/{case}
-        if (
-            "/cases/" in self.path
-            and "/comments" not in self.path
-            and "/attachments" not in self.path
-            and "/notifiedusers" not in self.path
-        ):
-            data = json.loads(body.decode())
-            if data:
-                self.send_response(200)
-                self.end_headers()
-            else:
-                self.send_response(400)
-                self.end_headers()
-                self.wfile.write(b"Empty update body")
-            return
-
-        self.send_response(404)
         self.end_headers()
 
     def do_GET(self):
@@ -834,76 +701,12 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                 ).encode()
             )
             return
-
-        if self.path == "/products":
-            self.send_response(200)
-            self.send_header("Content-type", "application/json")
-            self.end_headers()
-            products = [
-                {"code": "RHEL", "name": "Red Hat Enterprise Linux"},
-                {"code": "OPENSHIFT", "name": "Red Hat OpenShift Container Platform"},
-            ]
-            self.wfile.write(json.dumps(products).encode())
-            return
-
-        if "/versions" in self.path:
-            self.send_response(200)
-            self.send_header("Content-type", "application/json")
-            self.end_headers()
-            versions = [{"name": "8.0"}, {"name": "9.0"}]
-            self.wfile.write(json.dumps(versions).encode())
-            return
-
-        if "/values/severity" in self.path:
-            self.send_response(200)
-            self.send_header("Content-type", "application/json")
-            self.end_headers()
-            sevs = [
-                {"name": "Low"},
-                {"name": "Normal"},
-                {"name": "High"},
-                {"name": "Urgent"},
-            ]
-            self.wfile.write(json.dumps(sevs).encode())
-            return
-
-        if "/values/caseType" in self.path:
-            self.send_response(200)
-            self.send_header("Content-type", "application/json")
-            self.end_headers()
-            types = [{"name": "Standard"}, {"name": "Bug"}]
-            self.wfile.write(json.dumps(types).encode())
-            return
-
         # GET /cases/{id}/notifiedusers
         if "/notifiedusers" in self.path and "/cases/" in self.path:
             self.send_response(200)
             self.send_header("Content-type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps([{"ssoUsername": "jdeveloper"}]).encode())
-            return
-
-        # GET /cases/{id}/comments
-        if "/comments" in self.path and "/cases/" in self.path:
-            self.send_response(200)
-            self.send_header("Content-type", "application/json")
-            self.end_headers()
-            comments = [
-                {
-                    "createdDate": "2023-01-02T10:00:00Z",
-                    "createdBy": "Red Hat Support",
-                    "isPublic": True,
-                    "body": "Comment 1",
-                },
-                {
-                    "createdDate": "2023-01-03T10:00:00Z",
-                    "createdBy": "Customer",
-                    "isPublic": False,
-                    "visibility": "Internal",
-                    "text": "Comment 2",
-                },
-            ]
-            self.wfile.write(json.dumps(comments).encode())
             return
 
         # GET /cases/{id}
@@ -977,12 +780,6 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
         auth_header = self.headers.get("Authorization")
         if auth_header != "Bearer mock_access_token_123":
             self.send_response(401)
-            self.end_headers()
-            return
-
-        match_head = re.search(r"/cases/([^/]+)/attachments/([^/]+)$", self.path)
-        if match_head:
-            self.send_response(200)
             self.end_headers()
             return
         self.send_response(404)
