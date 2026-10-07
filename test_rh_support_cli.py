@@ -2411,6 +2411,34 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 self.assertFalse(app.screen.has_class("commenting"))
                 self.assertEqual(textarea.text, "")
 
+                # Test activating comment pane when case status is 'Waiting on Customer Action Required'
+                from rh_support_lib.models import Case
+
+                app.cases.append(
+                    Case(
+                        case_number="99999",
+                        summary="Test Action Required Case",
+                        status="Waiting on Customer Action Required",
+                        severity="High",
+                        product="RHEL",
+                        version="9.0",
+                        account_number="123456",
+                        created_date="2026-10-01",
+                        last_modified_date="2026-10-02",
+                        created_by="User",
+                        last_modified_by="User",
+                        owner="User",
+                        id="99999",
+                    )
+                )
+                app.selected_case_id = "99999"
+                app.action_add_comment()
+                await pilot.pause()
+                self.assertTrue(app.screen.has_class("commenting"))
+                select_status2 = app.query_one("#tui-comment-status-select", Select)
+                self.assertIsNotNone(select_status2)
+                self.assertEqual(select_status2.value, "Waiting on Red Hat")
+                app.screen.remove_class("commenting")
                 # 6. Test activating the file attachment modal
                 app.action_add_attachment()
                 await pilot.pause()

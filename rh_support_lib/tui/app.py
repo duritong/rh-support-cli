@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import os
 import pathlib
 import time
@@ -897,7 +898,8 @@ class SupportApp(App):
 
         # Focus on the newly mounted TextArea after the refresh cycle
         def focus_textarea() -> None:
-            self.query_one("#tui-comment-textarea", TextArea).focus()
+            with contextlib.suppress(Exception):
+                self.query_one("#tui-comment-textarea", TextArea).focus()
 
         self.call_after_refresh(focus_textarea)
 
@@ -907,12 +909,18 @@ class SupportApp(App):
             self.update_comment_status_dropdown()
             return
 
-        status_choices = [
+        base_choices = [
             ("Waiting on Red Hat", "Waiting on Red Hat"),
+            (
+                "Waiting on Customer Action Required",
+                "Waiting on Customer Action Required",
+            ),
             ("Waiting on Customer", "Waiting on Customer"),
+            ("In Progress", "In Progress"),
             ("Closed", "Closed"),
             ("Reopened", "Reopened"),
         ]
+        status_choices = list(base_choices)
 
         # Resolve initial value before mounting to prevent child-widget race conditions inside SelectCurrent
         target_status = "Waiting on Red Hat"
@@ -925,12 +933,19 @@ class SupportApp(App):
                 ),
                 None,
             )
-            if case:
-                current_status = case.status or "Waiting on Red Hat"
-                if current_status == "Waiting on Customer":
+            if case and case.status:
+                current_status = case.status
+                if current_status in (
+                    "Waiting on Customer",
+                    "Waiting on Customer Action Required",
+                ):
                     target_status = "Waiting on Red Hat"
+                elif current_status == "Closed":
+                    target_status = "Closed"
                 else:
                     target_status = current_status
+                    if not any(target_status == val for _, val in status_choices):
+                        status_choices.append((target_status, target_status))
         container.mount(
             Vertical(
                 Label("[bold cyan]Drafting Comment...[/]", id="tui-comment-pane-title"),
@@ -965,17 +980,25 @@ class SupportApp(App):
         )
         current_status = case.status if case else None
         target_status = "Waiting on Red Hat"
-        if current_status == "Waiting on Red Hat":
-            target_status = "Waiting on Customer"
-        elif current_status == "Waiting on Customer":
+        if current_status in (
+            "Waiting on Customer",
+            "Waiting on Customer Action Required",
+        ):
             target_status = "Waiting on Red Hat"
+        elif current_status in ("Waiting on Red Hat", "In Progress"):
+            target_status = "Waiting on Customer Action Required"
         elif current_status == "Closed":
             target_status = "Closed"
-        else:
+        elif current_status:
             target_status = current_status
 
-        select = self.query_one("#tui-comment-status-select", Select)
-        select.value = target_status
+        with contextlib.suppress(Exception):
+            select = self.query_one("#tui-comment-status-select", Select)
+            valid_values = [val for _, val in select._options]
+            if target_status not in valid_values:
+                new_options = list(select._options) + [(target_status, target_status)]
+                select.set_options(new_options)
+            select.value = target_status
 
     def execute_comment_submission(self, comment_body: str, target_status: str) -> None:
         def show_posting():
