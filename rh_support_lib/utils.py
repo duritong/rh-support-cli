@@ -195,19 +195,6 @@ def get_severity_color(sev_str):
     return None
 
 
-def get_status_color(stat_str):
-    if not stat_str:
-        return None
-    s = str(stat_str).lower()
-    if "red hat" in s:
-        return COLORS.YELLOW
-    if "customer" in s:
-        return COLORS.GREEN
-    if "closed" in s:
-        return COLORS.GREY
-    return None
-
-
 def select_from_list(prompt, options, key="name"):
     """
     Prompts user to select an item from a list of dicts.

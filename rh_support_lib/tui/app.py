@@ -36,6 +36,10 @@ from rh_support_lib.constants import (
 from rh_support_lib.models import Attachment, Case, CaseDetails
 from rh_support_lib.services.attachments import AttachmentService
 from rh_support_lib.services.cases import CaseService
+from rh_support_lib.statuses import (
+    determine_reply_status,
+    get_status_choices_for_case,
+)
 
 __all__ = [
     "API_URL",
@@ -909,23 +913,8 @@ class SupportApp(App):
             self.update_comment_status_dropdown()
             return
 
-        base_choices = [
-            ("Waiting on Red Hat", "Waiting on Red Hat"),
-            (
-                "Waiting on Customer Action Required",
-                "Waiting on Customer Action Required",
-            ),
-            ("Waiting on Customer", "Waiting on Customer"),
-            ("In Progress", "In Progress"),
-            ("Closed", "Closed"),
-            ("Reopened", "Reopened"),
-        ]
-        status_choices = list(base_choices)
-
-        # Resolve initial value before mounting to prevent child-widget race conditions inside SelectCurrent
-        target_status = "Waiting on Red Hat"
-        if self.selected_case_id:
-            case = next(
+        case = (
+            next(
                 (
                     c
                     for c in self.cases
@@ -933,19 +922,12 @@ class SupportApp(App):
                 ),
                 None,
             )
-            if case and case.status:
-                current_status = case.status
-                if current_status in (
-                    "Waiting on Customer",
-                    "Waiting on Customer Action Required",
-                ):
-                    target_status = "Waiting on Red Hat"
-                elif current_status == "Closed":
-                    target_status = "Closed"
-                else:
-                    target_status = current_status
-                    if not any(target_status == val for _, val in status_choices):
-                        status_choices.append((target_status, target_status))
+            if self.selected_case_id
+            else None
+        )
+        current_status = case.status if case else None
+        status_choices = get_status_choices_for_case(current_status)
+        target_status = determine_reply_status(current_status)
         container.mount(
             Vertical(
                 Label("[bold cyan]Drafting Comment...[/]", id="tui-comment-pane-title"),
@@ -972,32 +954,26 @@ class SupportApp(App):
         )
 
     def update_comment_status_dropdown(self) -> None:
-        if not self.selected_case_id:
-            return
-        case = next(
-            (c for c in self.cases if (c.case_number or c.id) == self.selected_case_id),
-            None,
+        case = (
+            next(
+                (
+                    c
+                    for c in self.cases
+                    if (c.case_number or c.id) == self.selected_case_id
+                ),
+                None,
+            )
+            if self.selected_case_id
+            else None
         )
         current_status = case.status if case else None
-        target_status = "Waiting on Red Hat"
-        if current_status in (
-            "Waiting on Customer",
-            "Waiting on Customer Action Required",
-        ):
-            target_status = "Waiting on Red Hat"
-        elif current_status in ("Waiting on Red Hat", "In Progress"):
-            target_status = "Waiting on Customer Action Required"
-        elif current_status == "Closed":
-            target_status = "Closed"
-        elif current_status:
-            target_status = current_status
+        target_status = determine_reply_status(current_status)
 
         with contextlib.suppress(Exception):
             select = self.query_one("#tui-comment-status-select", Select)
             valid_values = [val for _, val in select._options]
             if target_status not in valid_values:
-                new_options = list(select._options) + [(target_status, target_status)]
-                select.set_options(new_options)
+                select.set_options(get_status_choices_for_case(target_status))
             select.value = target_status
 
     def execute_comment_submission(self, comment_body: str, target_status: str) -> None:

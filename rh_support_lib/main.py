@@ -292,8 +292,7 @@ Authentication:
     parser_comment.add_argument(
         "-s",
         "--status",
-        choices=["redhat", "customer", "closed"],
-        help="Update case status (default: redhat)",
+        help="Update case status (e.g. redhat, customer, in_progress, closed)",
     )
     parser_comment.add_argument(
         "-t",

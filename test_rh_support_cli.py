@@ -2968,6 +2968,55 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
             shutil.rmtree(temp_home)
 
+        # 4. Test statuses module helpers (determine_reply_status, choices, colors)
+        from rh_support_lib.constants import COLORS
+        from rh_support_lib.statuses import (
+            determine_reply_status,
+            get_status_choices_for_case,
+            get_status_color,
+        )
+
+        self.assertEqual(
+            determine_reply_status("Waiting on Customer Action Required"),
+            "Waiting on Red Hat",
+        )
+        self.assertEqual(
+            determine_reply_status("Waiting on Customer"), "Waiting on Red Hat"
+        )
+        self.assertEqual(
+            determine_reply_status("Waiting on Red Hat"),
+            "Waiting on Customer Action Required",
+        )
+        self.assertEqual(determine_reply_status("Closed"), "Closed")
+        self.assertEqual(determine_reply_status(None), "Waiting on Red Hat")
+
+        # Choices for standard case
+        choices = get_status_choices_for_case("Waiting on Red Hat")
+        self.assertIn(("Waiting on Red Hat", "Waiting on Red Hat"), choices)
+        self.assertIn(
+            (
+                "Waiting on Customer Action Required",
+                "Waiting on Customer Action Required",
+            ),
+            choices,
+        )
+
+        # Choices for custom/unusual status dynamically includes it
+        custom_choices = get_status_choices_for_case("Custom Under Investigation")
+        self.assertIn(
+            ("Custom Under Investigation", "Custom Under Investigation"), custom_choices
+        )
+
+        # Colors
+        self.assertEqual(get_status_color("Waiting on Red Hat"), COLORS.YELLOW)
+        self.assertEqual(get_status_color("In Progress"), COLORS.YELLOW)
+        self.assertEqual(
+            get_status_color("Waiting on Customer Action Required"), COLORS.GREEN
+        )
+        self.assertEqual(get_status_color("Waiting on Engineering"), COLORS.MAGENTA)
+        self.assertEqual(get_status_color("Closed"), COLORS.GREY)
+        self.assertIsNone(get_status_color(None))
+
     def test_clean_comment_body_and_private_detection(self):
         """Test cleaning wrapping legacy divs, HTML to markdown, and private comment detection"""
         from rh_support_lib.api import LegacyAPIClient
