@@ -14,25 +14,25 @@ STATUS_REOPENED = "Reopened"
 
 # Canonical comment status choices presented in UI dropdowns
 COMMENT_STATUS_CHOICES: list[tuple[str, str]] = [
-    (STATUS_WAITING_ON_RED_HAT, STATUS_WAITING_ON_RED_HAT),
-    (STATUS_WAITING_ON_CUSTOMER, STATUS_WAITING_ON_CUSTOMER),
     (STATUS_IN_PROGRESS, STATUS_IN_PROGRESS),
+    (STATUS_WAITING_ON_CUSTOMER, STATUS_WAITING_ON_CUSTOMER),
     (STATUS_CLOSED, STATUS_CLOSED),
+    (STATUS_WAITING_ON_ENGINEERING, STATUS_WAITING_ON_ENGINEERING),
     (STATUS_REOPENED, STATUS_REOPENED),
 ]
 
 # Normalizes shorthand or legacy status inputs to canonical backend strings
 STATUS_MAP: dict[str, str] = {
-    "redhat": STATUS_WAITING_ON_RED_HAT,
-    "customer": STATUS_WAITING_ON_CUSTOMER_LEGACY,
+    "redhat": STATUS_IN_PROGRESS,
+    "customer": STATUS_WAITING_ON_CUSTOMER,
+    "action_required": STATUS_WAITING_ON_CUSTOMER,
     "closed": STATUS_CLOSED,
     "reopened": STATUS_REOPENED,
     "inprogress": STATUS_IN_PROGRESS,
     "in_progress": STATUS_IN_PROGRESS,
     "engineering": STATUS_WAITING_ON_ENGINEERING,
     "needs_owner": STATUS_NEEDS_NEW_OWNER,
-    "action_required": STATUS_WAITING_ON_CUSTOMER,
-    "waiting on red hat": STATUS_WAITING_ON_RED_HAT,
+    "waiting on red hat": STATUS_IN_PROGRESS,
     "waiting on customer": STATUS_WAITING_ON_CUSTOMER,
     "waiting on customer action required": STATUS_WAITING_ON_CUSTOMER,
 }
@@ -78,20 +78,20 @@ def determine_reply_status(current_status: str | None) -> str:
     - Default fallback -> Waiting on Red Hat.
     """
     if not current_status:
-        return STATUS_WAITING_ON_RED_HAT
+        return STATUS_IN_PROGRESS
 
     s_lower = current_status.strip().lower()
     if s_lower in (
         "waiting on customer",
         "waiting on customer action required",
     ):
-        return STATUS_WAITING_ON_RED_HAT
+        return STATUS_IN_PROGRESS
     if s_lower in ("waiting on red hat", "in progress"):
         return STATUS_WAITING_ON_CUSTOMER
     if s_lower == "closed":
         return STATUS_CLOSED
 
-    return STATUS_WAITING_ON_RED_HAT
+    return STATUS_IN_PROGRESS
 
 
 def get_status_color(stat_str: str | None) -> str | None:

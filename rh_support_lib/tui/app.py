@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import os
 import pathlib
+import re
 import time
 from typing import ClassVar
 
@@ -640,7 +641,8 @@ class SupportApp(App):
     def show_error(self, msg: str) -> None:
         container = self.query_one("#case-detail-container")
         container.query("*").remove()
-        container.mount(Static(f"[bold red]Error:[/] {msg}"))
+        clean_msg = re.sub(r"^(?:Error:\s*)+", "", str(msg).strip())
+        container.mount(Static(f"[bold red]Error:[/] {clean_msg}"))
 
     @on(DataTable.RowSelected)
     def on_row_selected(self, event: DataTable.RowSelected) -> None:
@@ -999,7 +1001,7 @@ class SupportApp(App):
             self.run_worker(self.fetch_cases, thread=True)
 
         except Exception as e:  # noqa: BLE001
-            self.call_from_thread(self.show_error, f"Error: {e}")
+            self.call_from_thread(self.show_error, str(e))
 
     def action_exit_commenting(self) -> None:
         """Hides the comment pane, checking for unsaved changes if needed."""

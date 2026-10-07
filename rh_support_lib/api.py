@@ -336,7 +336,12 @@ class RedHatAPIClient:
         resp.raise_for_status()
         data = resp.json()
         if data.get("errors"):
-            error_msgs = [err.get("message", str(err)) for err in data["errors"]]
+            import html
+
+            error_msgs = [
+                html.unescape(str(err.get("message", str(err))))
+                for err in data["errors"]
+            ]
             raise RuntimeError(f"GraphQL Error: {'; '.join(error_msgs)}")
         return data.get("data", {})
 
@@ -391,6 +396,11 @@ class LegacyAPIClient:
         resp.raise_for_status()
         data = resp.json()
         if data.get("errors"):
-            error_msgs = [err.get("message", str(err)) for err in data["errors"]]
+            import html
+
+            error_msgs = [
+                html.unescape(str(err.get("message", str(err))))
+                for err in data["errors"]
+            ]
             raise RuntimeError(f"GraphQL Error: {'; '.join(error_msgs)}")
         return data.get("data", {})

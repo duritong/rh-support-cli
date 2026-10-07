@@ -759,7 +759,12 @@ class CaseService:
         patch_case: dict[str, Any] = {}
 
         if status:
-            patch_case["Status"] = STATUS_MAP.get(status.lower(), status)
+            mapped_status = STATUS_MAP.get(status.lower(), status)
+            if mapped_status == "Waiting on Red Hat":
+                mapped_status = "In Progress"
+            elif mapped_status == "Waiting on Customer":
+                mapped_status = "Waiting on Customer Action Required"
+            patch_case["Status"] = mapped_status
         if severity:
             patch_case["Priority"] = SEVERITY_MAP.get(severity.lower(), severity)
         if summary:
@@ -953,7 +958,7 @@ class CaseService:
             "AccountId": lookups.get("AccountId"),
             "ContactId": lookups.get("ContactId"),
             "RecordTypeId": lookups.get("RecordTypeId"),
-            "Status": "Waiting on Red Hat",
+            "Status": "In Progress",
             "Origin": "Web",
             "Language": "en_US",
             "product": product_name,

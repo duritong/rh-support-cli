@@ -936,7 +936,8 @@ class TestRhSupportCli(unittest.TestCase):
             self.assertEqual(result.returncode, 0)
             self.assertIn("Success: Comment added.", result.stdout)
             self.assertIn(
-                "Success: Case status updated to 'Waiting on Customer'.", result.stdout
+                "Success: Case status updated to 'Waiting on Customer Action Required'.",
+                result.stdout,
             )
         finally:
             if os.path.exists("test_comment.txt"):
@@ -1026,7 +1027,8 @@ class TestRhSupportCli(unittest.TestCase):
             self.assertEqual(result.returncode, 0)
             self.assertIn("Success: Comment added.", result.stdout)
             self.assertIn(
-                "Success: Case status updated to 'Waiting on Customer'.", result.stdout
+                "Success: Case status updated to 'Waiting on Customer Action Required'.",
+                result.stdout,
             )
         finally:
             if orig_home:
@@ -2437,7 +2439,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 self.assertTrue(app.screen.has_class("commenting"))
                 select_status2 = app.query_one("#tui-comment-status-select", Select)
                 self.assertIsNotNone(select_status2)
-                self.assertEqual(select_status2.value, "Waiting on Red Hat")
+                self.assertEqual(select_status2.value, "In Progress")
                 app.screen.remove_class("commenting")
                 # 6. Test activating the file attachment modal
                 app.action_add_attachment()
@@ -2978,17 +2980,19 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
         self.assertEqual(
             determine_reply_status("Waiting on Customer Action Required"),
-            "Waiting on Red Hat",
+            "In Progress",
         )
-        self.assertEqual(
-            determine_reply_status("Waiting on Customer"), "Waiting on Red Hat"
-        )
+        self.assertEqual(determine_reply_status("Waiting on Customer"), "In Progress")
         self.assertEqual(
             determine_reply_status("Waiting on Red Hat"),
             "Waiting on Customer Action Required",
         )
+        self.assertEqual(
+            determine_reply_status("In Progress"),
+            "Waiting on Customer Action Required",
+        )
         self.assertEqual(determine_reply_status("Closed"), "Closed")
-        self.assertEqual(determine_reply_status(None), "Waiting on Red Hat")
+        self.assertEqual(determine_reply_status(None), "In Progress")
 
         # Choices for standard case
         choices = get_status_choices_for_case("Waiting on Red Hat")
