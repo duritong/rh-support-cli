@@ -90,7 +90,7 @@ Displays detailed information about a case, including description and comments. 
 **Options:**
 - `-c`, `--case`: The Case Number (required)
 - `--no-pager`: Disable the pager (print to stdout directly)
-
+- `--mark-read`: Mark this case's updates as read in local tracking
 **Example:**
 ```bash
 rh-support-cli show -c 12345678
@@ -200,9 +200,9 @@ rh-support-cli close -c 12345678
 rh-support-cli close -c 12345678 -f resolution.txt
 ```
 
-### 8. Apply Template & Watchers (`apply`)
+### 8. Apply Template (`apply`)
 
-Applies a local YAML template over an existing support case. It compares the template fields and watchers/notified users with the case's current values, and performs the minimal required API requests to bring the case to the target state.
+Applies a local YAML template over an existing support case. It compares the template fields with the case's current values, and performs the minimal required API requests to bring the case to the target state.
 
 **Options:**
 - `-c`, `--case`: The Case Number (required)
@@ -214,7 +214,7 @@ Applies a local YAML template over an existing support case. It compares the tem
 
 *Verify template application without saving (Dry Run):*
 ```bash
-rh-support-cli apply -c 12345678 -t default-watchers --dry-run
+rh-support-cli apply -c 12345678 -t prod-standard --dry-run
 ```
 
 *Apply template and interpolate template variables:*
@@ -224,23 +224,73 @@ rh-support-cli apply -c 12345678 -t project-team --template-var team_lead=alice
 
 ### 9. List Local Templates (`list-templates` / `list-template`)
 
-Lists all local templates stored in `~/.config/rh-support-cli/templates/` along with details like their description, fields they configure, parent templates they include, and watchers they would add. **Note:** This command runs completely offline and bypasses authentication.
+Lists all local templates stored in `~/.config/rh-support-cli/templates/` along with details like their description, fields they configure, and parent templates they include. **Note:** This command runs completely offline and bypasses authentication.
 
 **Example:**
 ```bash
 rh-support-cli list-templates
 ```
 
-### 10. Interactive Terminal User Interface (`tui`)
+### 10. Following & Tracking Cases Locally (`follow` / `unfollow` / `following`)
+
+Maintain a local tracking register in `~/.config/rh-support-cli/state.yaml` to monitor support tickets across CLI and TUI sessions:
+
+```bash
+# Follow one or more cases
+rh-support-cli follow 12345678
+rh-support-cli follow 12345678 23456789
+
+# List all followed cases
+rh-support-cli following
+rh-support-cli list --following
+
+# Unfollow cases
+rh-support-cli unfollow 12345678
+```
+
+### 11. Synchronize Tracked Cases & Background Service (`sync`)
+
+Poll the Red Hat GraphQL API across all followed and owned cases in parallel to detect remote updates:
+
+```bash
+# Manual synchronization
+rh-support-cli sync
+
+# Sync with desktop notification on new comments / status changes
+rh-support-cli sync --notify
+
+# Install systemd user service & timer for background synchronization
+rh-support-cli sync --install-systemd --interval 15m
+systemctl --user daemon-reload
+systemctl --user enable --now rh-support-sync.timer
+```
+
+### 12. Querying Unread Case Updates (`updates`)
+
+Quickly inspect remote changes and new comments across tracked cases:
+
+```bash
+# View excerpt summaries of unread updates
+rh-support-cli updates
+
+# View full comments
+rh-support-cli updates --full
+
+# Mark updates as read
+rh-support-cli updates --mark-read
+```
+
+### 13. Interactive Terminal User Interface (`tui`)
 
 Launches a beautiful, interactive Terminal User Interface (TUI) to browse and manage your Red Hat support cases directly inside your terminal session.
 
 **Options:**
+- `-l`, `--layout`: Split layout: `vertical` (side-by-side) or `horizontal` / `mailbox` (top-and-bottom mailbox style)
 - `-b`, `--bookmark`: Use a preset bookmark of filters on startup instead of the default bookmark
 - `--no-default-bookmark`: Do not load any default bookmark on startup (loads all cases unfiltered)
-
 **Features:**
-- **Split Dashboard Layout**: Scroll through the list of cases in the left pane while viewing details, description (fully parsed Markdown), and complete comment threads in the right pane.
+- **Dual Layout Topologies (Vertical & Horizontal Mailbox)**: Switch between vertical split (side-by-side) and horizontal split (mailbox style with a full-width case list on top and details below). Toggle dynamically at any time using **`v`** or **`l`**, or set via `--layout <vertical|horizontal|mailbox>`.
+- **Compact Zero-Margin Panes**: Panes sit flush with zero margin gap between borders, maximizing visible columns and rows for tables, logs, and comments.
 - **Asynchronous Background Processing**: Keeps the UI highly responsive by loading cases and updates asynchronously.
 - **Vim / Arrow Navigation**: Navigate intuitively with standard keyboard binds.
 - **Single-Pane Focus / Zoom**:
@@ -249,10 +299,12 @@ Launches a beautiful, interactive Terminal User Interface (TUI) to browse and ma
 - **Quick Modals & Action Buttons**:
   - Press **`c`** (or click `Comment (C)`) to open the inline **Comment Pane** at the bottom of your case view, allowing you to scroll through and read the case description and comment history while drafting. Includes status dropdown integration (displaying and pre-selecting the auto-detected target status, e.g. `"Waiting on Red Hat"` if the case is `"Waiting on Customer"`), "dirty-state" draft auto-saving under `~/.config/rh-support-cli/drafts/`, and global **`ctrl+x`** keybinding to close/cancel commenting from anywhere.
   - Press **`a`** (or click `Attach (A)`) to easily specify and upload local file attachments in the background.
-  - Press **`t`** (or click `Template (T)`) to select and apply a local template (e.g. standard watchers) to the active case.
-  - Press **`b`** (or click `Bookmark (B)`) to select and apply any filter bookmark dynamically to refresh the case list, or clear filters entirely.
+  - Press **`v`** (or **`l`**) to toggle between vertical (side-by-side) and horizontal (mailbox) split layouts.
+  - Press **`w`** to toggle follow/unfollow for the active case.
+  - Press **`m`** to explicitly mark the active case as read.
+  - Press **`t`** (or click `Template (T)`) to select and apply a local template to the active case.
   - Press **`r`** (or click `Refresh (R)`) to trigger a contextual refresh (refreshes the active case view if the details panel is active; refreshes the case list if the table panel is active).
-
+  - **Visual Badges & Auto-Scroll**: Cases display `★` (followed) and `●` (unread updates) badges. Opening an unread case automatically scrolls to the yellow dotted checkpoint divider (`┈┈┈┈ 📍 Last read checkpoint ... ┈┈┈┈`). Dwelling for 2.5 seconds automatically marks the case as read.
 **Examples:**
 
 *Launch TUI with default bookmark filters:*
@@ -263,6 +315,11 @@ rh-support-cli tui
 *Launch TUI with a specific bookmark override:*
 ```bash
 rh-support-cli tui -b my_cases
+```
+
+*Launch TUI in horizontal mailbox style:*
+```bash
+rh-support-cli tui --layout mailbox
 ```
 
 *Launch TUI unfiltered (all cases):*
@@ -338,9 +395,7 @@ summary: "[Proactive] {{ product }} {{ version }} update on {{ cluster_name }}"
 description: |
   Planning upgrade to {{ next_version }}.
   ClusterID: {{ cluster_id }}
-watchers:
-  - alice
-  - bob
+severity: "1 (Urgent)"
 ```
 
 **Usage:**

@@ -347,6 +347,10 @@ class SupportApp(App):
         ("a", "add_attachment", "Attach File"),
         ("t", "apply_template", "Apply Template"),
         ("b", "select_bookmark", "Select Bookmark"),
+        ("w", "toggle_follow", "Follow"),
+        ("m", "mark_read", "Mark Read"),
+        ("v", "toggle_layout", "Split (H/V)"),
+        Binding("l", "toggle_layout", "Toggle Layout", show=False),
         ("f", "focus_pane", "Focus Pane"),
         Binding("escape", "escape_action", "Cancel/Unfocus", show=False),
         Binding("ctrl+x", "exit_commenting", "Cancel Commenting", show=False),
@@ -359,36 +363,46 @@ class SupportApp(App):
         grid-columns: 2fr 3fr;
         scrollbar-size: 1 1;
     }
-    Screen.focused-left {
+    Screen.layout-horizontal {
+        layout: grid;
+        grid-size: 1 2;
+        grid-rows: 2fr 3fr;
+        grid-columns: 1fr;
+        scrollbar-size: 1 1;
+    }
+    Screen.layout-horizontal.commenting {
+        grid-rows: 1fr 2fr;
+    }
+    Screen.focused-left, Screen.layout-horizontal.focused-left {
         layout: vertical;
     }
-    Screen.focused-left #right-column-container {
+    Screen.focused-left #right-column-container, Screen.layout-horizontal.focused-left #right-column-container {
         display: none;
     }
-    Screen.focused-left #case-list-container {
+    Screen.focused-left #case-list-container, Screen.layout-horizontal.focused-left #case-list-container {
         width: 100%;
         height: 100%;
     }
-    Screen.focused-right {
+    Screen.focused-right, Screen.layout-horizontal.focused-right {
         layout: vertical;
     }
-    Screen.focused-right #case-list-container {
+    Screen.focused-right #case-list-container, Screen.layout-horizontal.focused-right #case-list-container {
         display: none;
     }
-    Screen.focused-right #right-column-container {
+    Screen.focused-right #right-column-container, Screen.layout-horizontal.focused-right #right-column-container {
         width: 100%;
         height: 100%;
     }
-    Screen.focused-comment {
+    Screen.focused-comment, Screen.layout-horizontal.focused-comment {
         layout: vertical;
     }
-    Screen.focused-comment #case-list-container {
+    Screen.focused-comment #case-list-container, Screen.layout-horizontal.focused-comment #case-list-container {
         display: none;
     }
-    Screen.focused-comment #case-detail-container {
+    Screen.focused-comment #case-detail-container, Screen.layout-horizontal.focused-comment #case-detail-container {
         display: none;
     }
-    Screen.focused-comment #comment-pane-container {
+    Screen.focused-comment #comment-pane-container, Screen.layout-horizontal.focused-comment #comment-pane-container {
         width: 100%;
         height: 100%;
         display: block;
@@ -403,18 +417,20 @@ class SupportApp(App):
     }
     #case-list-container {
         border: solid cyan;
-        margin: 1;
-        padding: 1;
+        margin: 0;
+        padding: 0;
         height: 100%;
     }
     #right-column-container {
         height: 100%;
         layout: vertical;
+        margin: 0;
+        padding: 0;
     }
     #case-detail-container {
         border: solid yellow;
-        margin: 1;
-        padding: 1;
+        margin: 0;
+        padding: 0 1;
         height: 100%;
         overflow-y: scroll;
     }
@@ -431,7 +447,7 @@ class SupportApp(App):
     #comment-pane-container {
         border: solid $primary;
         height: 35%;
-        margin: 1;
+        margin: 0;
         padding: 0 1;
         background: $surface;
         display: none;
@@ -515,7 +531,7 @@ class SupportApp(App):
     }
     #tui-action-row {
         height: 1;
-        margin-top: 1;
+        margin-top: 0;
         margin-bottom: 1;
         align: center middle;
     }
@@ -537,6 +553,7 @@ class SupportApp(App):
         config: dict | None = None,
         bookmark: str | None = None,
         no_default_bookmark: bool = False,
+        layout: str | None = None,
     ):
         super().__init__()
         from rh_support_lib.api import LegacyAPIClient, RedHatAPIClient
@@ -551,6 +568,25 @@ class SupportApp(App):
         self.selected_case_id: str | None = None
         self.case_service = CaseService(self.api_client)
         self.attachment_service = AttachmentService(self.api_client)
+
+        # Resolve initial layout: explicit CLI arg > config > state.yaml > default ('vertical')
+        user = ""
+        with contextlib.suppress(Exception):
+            user = self.case_service.get_current_user()
+        saved_layout = "vertical"
+        with contextlib.suppress(Exception):
+            saved_layout = self.case_service.state_service.get_tui_layout(user)
+
+        initial_layout = (
+            layout
+            or (config.get("tui_layout") if config else None)
+            or (config.get("layout") if config else None)
+            or saved_layout
+            or "vertical"
+        ).lower()
+        self.layout = (
+            "horizontal" if initial_layout in ("horizontal", "mailbox") else "vertical"
+        )
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -572,6 +608,8 @@ class SupportApp(App):
         table = self.query_one("#case-table", DataTable)
         table.add_columns("NUMBER", "TITLE", "SEVERITY", "STATUS")
         table.cursor_type = "row"
+        if self.layout == "horizontal":
+            self.screen.add_class("layout-horizontal")
         self.run_worker(self.fetch_cases, thread=True)
 
     def fetch_cases(self) -> None:
@@ -626,8 +664,15 @@ class SupportApp(App):
             elif "closed" in status.lower():
                 status_style = "dim"
 
+            num_text = Text(num, style=status_style)
+            if getattr(c, "is_followed", False):
+                num_text.append(" ★", style="bold yellow")
+            if getattr(c, "has_unread", False):
+                cnt = getattr(c, "unread_count", 0)
+                num_text.append(f" ●{cnt}" if cnt else " ●", style="bold cyan")
+
             table.add_row(
-                Text(num, style=status_style),
+                num_text,
                 title,
                 Text(sev, style=sev_style),
                 Text(status, style=status_style),
@@ -637,6 +682,30 @@ class SupportApp(App):
         container = self.query_one("#case-detail-container")
         container.query("*").remove()
         container.mount(Static("Select a case from the list."))
+
+    def update_case_table_row(self, case_num: str) -> None:
+        with contextlib.suppress(Exception):
+            table = self.query_one("#case-table", DataTable)
+            for c in self.cases:
+                if str(c.case_number or c.id) == str(case_num):
+                    status = c.status or ""
+                    status_style = ""
+                    if "Red Hat" in status or "red hat" in status.lower():
+                        status_style = "bold orange3"
+                    elif "customer" in status.lower():
+                        status_style = "bold green"
+                    elif "closed" in status.lower():
+                        status_style = "dim"
+                    num_text = Text(case_num, style=status_style)
+                    if getattr(c, "is_followed", False):
+                        num_text.append(" ★", style="bold yellow")
+                    if getattr(c, "has_unread", False):
+                        cnt = getattr(c, "unread_count", 0)
+                        num_text.append(f" ●{cnt}" if cnt else " ●", style="bold cyan")
+                    cols = list(table.columns.keys())
+                    if cols:
+                        table.update_cell(case_num, cols[0], num_text)
+                    break
 
     def show_error(self, msg: str) -> None:
         container = self.query_one("#case-detail-container")
@@ -726,9 +795,10 @@ class SupportApp(App):
         """Fetches the details and comments for the selected case."""
 
         def show_loading():
-            container = self.query_one("#case-detail-container")
-            container.query("*").remove()
-            container.mount(Static(f"Fetching details for Case #{case_id}..."))
+            with contextlib.suppress(Exception):
+                container = self.query_one("#case-detail-container")
+                container.query("*").remove()
+                container.mount(Static(f"Fetching details for Case #{case_id}..."))
 
         self.call_from_thread(show_loading)
 
@@ -767,7 +837,32 @@ class SupportApp(App):
         description = details.description or ""
         owner = case.owner or "Unknown"
         comments = details.comments
-        # Construct Rich objects to print into details screen
+
+        user = self.case_service.get_current_user()
+        tc = self.case_service.state_service.get_tracked_cases(user).get(str(num))
+
+        status_changed = False
+        old_status = ""
+        last_read_date = ""
+        last_read_id = ""
+        if tc and tc.read_checkpoint:
+            old_status = tc.read_checkpoint.status
+            if old_status and status and old_status != status:
+                status_changed = True
+            last_read_date = tc.read_checkpoint.last_read_comment_date or ""
+            last_read_id = tc.read_checkpoint.last_read_comment_id or ""
+
+        unread_indices = set()
+        if last_read_date or last_read_id:
+            for idx, c in enumerate(comments):
+                if (
+                    last_read_date
+                    and c.created_date > last_read_date
+                    or not last_read_date
+                    and last_read_id
+                    and c.id != last_read_id
+                ):
+                    unread_indices.add(idx)
         widgets = []
 
         # Header Action Buttons
@@ -811,6 +906,9 @@ class SupportApp(App):
         widgets.append(
             Static(Panel(meta_table, title="Details", border_style="yellow"))
         )
+        if status_changed:
+            diff_banner = f"[bold yellow]⚡ Status Changed:[/] {old_status} ➔ [bold green]{status}[/]"
+            widgets.append(Static(Panel(diff_banner, border_style="yellow")))
         # Attachments Section
         if attachments:
             widgets.append(
@@ -842,8 +940,21 @@ class SupportApp(App):
         # Comments Header
         widgets.append(Static(f"\n[bold cyan]COMMENTS ({len(comments)}):[/]\n"))
 
-        # Comments panels
-        for c in comments:
+        checkpoint_shown = False
+        for idx, c in enumerate(comments):
+            is_unread = idx in unread_indices
+            if is_unread and not checkpoint_shown:
+                checkpoint_shown = True
+                count_unread = len(unread_indices)
+                ckpt_time = (
+                    tc.read_checkpoint.marked_read_at or last_read_date or "previous"
+                )
+                divider = Panel(
+                    f"[bold yellow]┈┈┈┈ 📍 Last read checkpoint ({ckpt_time}) │ ▼ {count_unread} unread below ┈┈┈┈[/]",
+                    border_style="yellow",
+                )
+                widgets.append(Static(divider, id="tui-checkpoint-divider"))
+
             c_date = c.created_date or ""
             c_by = c.created_by or "Unknown"
             is_public = (
@@ -855,9 +966,12 @@ class SupportApp(App):
                     else "Private"
                 )
             )
-            border_style = "green" if c.is_public else "red"
+            border_style = (
+                "yellow" if is_unread else ("green" if c.is_public else "red")
+            )
+            badge = " [bold yellow][NEW][/]" if is_unread else ""
             c_body = c.body or ""
-            comment_header = f"{c_by} ({is_public}) - {c_date}"
+            comment_header = f"{c_by} ({is_public}){badge} - {c_date}"
             widgets.append(
                 Static(
                     Panel(
@@ -868,6 +982,74 @@ class SupportApp(App):
                 )
             )
         detail_container.mount(*widgets)
+
+        if checkpoint_shown:
+
+            def scroll_to_divider() -> None:
+                with contextlib.suppress(Exception):
+                    div_widget = self.query_one("#tui-checkpoint-divider")
+                    detail_container.scroll_to_widget(div_widget, top=True)
+
+            self.call_after_refresh(scroll_to_divider)
+
+        if tc and (status_changed or unread_indices):
+            self.set_timer(
+                2.5,
+                lambda: self._auto_mark_read_dwell(str(num)),
+                name=f"dwell_read_{num}",
+            )
+
+    def _auto_mark_read_dwell(self, case_num: str) -> None:
+        if self.selected_case_id != str(case_num):
+            return
+        user = self.case_service.get_current_user()
+        self.case_service.state_service.mark_case_read(user, str(case_num))
+        for c in self.cases:
+            if str(c.case_number or c.id) == str(case_num):
+                c.has_unread = False
+                c.unread_count = 0
+                break
+        self.update_case_table_row(str(case_num))
+
+    def action_mark_read(self) -> None:
+        if not self.selected_case_id:
+            return
+        user = self.case_service.get_current_user()
+        self.case_service.state_service.mark_case_read(user, self.selected_case_id)
+        for c in self.cases:
+            if str(c.case_number or c.id) == str(self.selected_case_id):
+                c.has_unread = False
+                c.unread_count = 0
+                break
+        self.update_case_table_row(self.selected_case_id)
+        self.run_worker(
+            lambda: self.fetch_case_details(self.selected_case_id), thread=True
+        )
+
+    def action_toggle_follow(self) -> None:
+        if not self.selected_case_id:
+            return
+        user = self.case_service.get_current_user()
+        is_followed = self.case_service.state_service.toggle_follow(
+            user, self.selected_case_id
+        )
+        for c in self.cases:
+            if str(c.case_number or c.id) == str(self.selected_case_id):
+                c.is_followed = is_followed
+                break
+        self.update_case_table_row(self.selected_case_id)
+
+    def action_toggle_layout(self) -> None:
+        """Toggle between vertical split (side-by-side) and horizontal split (mailbox style)."""
+        if "layout-horizontal" in self.screen.classes:
+            self.screen.remove_class("layout-horizontal")
+            self.layout = "vertical"
+        else:
+            self.screen.add_class("layout-horizontal")
+            self.layout = "horizontal"
+        with contextlib.suppress(Exception):
+            user = self.case_service.get_current_user()
+            self.case_service.state_service.set_tui_layout(user, self.layout)
 
     def action_refresh(self) -> None:
         """Contextual refresh depending on which pane is focused."""
@@ -1246,5 +1428,6 @@ def cmd_tui(args, api_client, config):
     """Entry point to run the TUI."""
     bookmark = getattr(args, "bookmark", None)
     no_default = getattr(args, "no_default_bookmark", False)
-    app = SupportApp(api_client, config, bookmark, no_default)
+    layout = getattr(args, "layout", None)
+    app = SupportApp(api_client, config, bookmark, no_default, layout=layout)
     app.run()

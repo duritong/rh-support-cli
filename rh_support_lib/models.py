@@ -23,6 +23,11 @@ class Case:
     contact_sso: str = ""
     case_type: str = "Standard"
     id: str = ""  # Internal Salesforce ID (e.g. 500...)
+    is_followed: bool = False
+    has_unread: bool = False
+    unread_count: int = 0
+    status_changed: bool = False
+    old_status: str = ""
 
 
 @dataclass
@@ -78,11 +83,62 @@ class ProductItem:
 
 
 @dataclass
-class FollowedCase:
-    """Represents a followed/watched support case in local state."""
+class CaseCheckpoint:
+    """Represents a read checkpoint for a case."""
+
+    status: str = ""
+    severity: str = ""
+    last_read_comment_id: str = ""
+    last_read_comment_date: str = ""
+    marked_read_at: str = ""
+
+
+@dataclass
+class CaseLatestKnown:
+    """Represents the latest known remote state for a case."""
+
+    status: str = ""
+    severity: str = ""
+    last_modified_date: str = ""
+    latest_comment_id: str = ""
+    latest_comment_date: str = ""
+    latest_comment_author: str = ""
+    latest_comment_snippet: str = ""
+    unread_comment_count: int = 0
+    status_changed: bool = False
+
+
+@dataclass
+class TrackedCase:
+    """Represents a locally tracked (owned, followed, or both) support case."""
 
     case_number: str
-    added_at: str = ""
-    source: str = "cli"  # "cli" | "sync"
+    relationship: str = "followed"  # "owned" | "followed" | "both"
+    followed_at: str = ""
     summary: str = ""
     account_number: str = ""
+    source: str = "cli"
+    read_checkpoint: CaseCheckpoint = field(default_factory=CaseCheckpoint)
+    latest_known: CaseLatestKnown = field(default_factory=CaseLatestKnown)
+
+    @property
+    def added_at(self) -> str:
+        return self.followed_at
+
+    @property
+    def has_unread(self) -> bool:
+        return self.latest_known.status_changed or (
+            self.latest_known.unread_comment_count > 0
+        )
+
+    @property
+    def status_changed(self) -> bool:
+        return self.latest_known.status_changed
+
+    @property
+    def unread_count(self) -> int:
+        return self.latest_known.unread_comment_count
+
+
+# Backwards-compatibility alias
+FollowedCase = TrackedCase

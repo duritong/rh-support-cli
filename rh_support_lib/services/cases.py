@@ -3,12 +3,10 @@ from __future__ import annotations
 import contextlib
 import os
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
 from typing import Any
 
 from rh_support_lib.api import extract_jwt_username
 from rh_support_lib.constants import (
-    API_URL,
     GRAPHQL_URL,
     SEVERITY_MAP,
     STATUS_MAP,
@@ -354,9 +352,6 @@ class CaseService:
     ):
         self.api_client = api_client
         self.graphql_url = graphql_url or GRAPHQL_URL
-        self.rest_url = (rest_url or os.environ.get("RH_API_URL") or API_URL).rstrip(
-            "/"
-        )
         self.state_service = state_service or StateService()
 
     # --- NORMALIZATION HELPERS ---
@@ -600,10 +595,40 @@ class CaseService:
         edges = case_container.get("edges") or []
 
         cases = []
+        user = self.get_current_user()
+        tracked_map = self.state_service.get_tracked_cases(user)
+
         for edge in edges:
             node = edge.get("node")
             if node:
-                cases.append(self._normalize_case_node(node))
+                c = self._normalize_case_node(node)
+                # Auto-track owned cases (Option B)
+                if (c.contact_sso and c.contact_sso.lower() == user.lower()) or (
+                    c.owner and c.owner.lower() == user.lower()
+                ):
+                    self.state_service.register_owned_case(
+                        user=user,
+                        case_number=c.case_number,
+                        summary=c.summary,
+                        account_number=c.account_number,
+                        status=c.status,
+                        severity=c.severity,
+                        last_modified_date=c.last_modified_date,
+                    )
+
+                # Annotate tracking & unread badges
+                tc = tracked_map.get(c.case_number)
+                if tc:
+                    c.is_followed = tc.relationship in ("followed", "both")
+                    c.has_unread = (
+                        tc.latest_known.unread_comment_count > 0
+                        or tc.latest_known.status_changed
+                    )
+                    c.unread_count = tc.latest_known.unread_comment_count
+                    c.status_changed = tc.latest_known.status_changed
+                    if tc.read_checkpoint and tc.read_checkpoint.status:
+                        c.old_status = tc.read_checkpoint.status
+                cases.append(c)
         return cases
 
     def get_case_details(
@@ -1008,8 +1033,8 @@ class CaseService:
     def follow_case(
         self, case_numbers: list[str] | str, username: str | None = None
     ) -> list[str]:
-        """Attaches the specified username (defaults to current user) as a watcher on one or more cases.
-        Updates the local state and returns list of successfully followed case numbers."""
+        """Tracks one or more support cases in local state.yaml.
+        Initializes the read checkpoint and returns list of followed case numbers."""
         user = username or self.get_current_user()
         if not isinstance(case_numbers, list):
             case_numbers = [case_numbers]
@@ -1019,23 +1044,45 @@ class CaseService:
             c_str = str(c_num).strip()
             if not c_str:
                 continue
-            payload = {"user": [{"ssoUsername": user}]}
-            url = f"{self.rest_url}/cases/{c_str}/notifiedusers"
-            resp = self.api_client.post(url, json=payload)
-            if resp.status_code in (200, 201, 204):
-                followed.append(c_str)
-                self.state_service.add_followed_case(c_str, user, source="cli")
-            else:
-                resp.raise_for_status()
-                followed.append(c_str)
-                self.state_service.add_followed_case(c_str, user, source="cli")
+            summary = ""
+            acc = ""
+            status = ""
+            severity = ""
+            last_comm_id = ""
+            last_comm_date = ""
+            last_mod = ""
+            with contextlib.suppress(Exception):
+                details = self.get_case_details(c_str, first_comments=50)
+                if details:
+                    summary = details.case.summary
+                    acc = details.case.account_number
+                    status = details.case.status
+                    severity = details.case.severity
+                    last_mod = details.case.last_modified_date
+                    if details.comments:
+                        last_comm_id = details.comments[-1].id
+                        last_comm_date = details.comments[-1].created_date
+
+            self.state_service.add_tracked_case(
+                user=user,
+                case_number=c_str,
+                relationship="followed",
+                summary=summary,
+                account_number=acc,
+                status=status,
+                severity=severity,
+                last_comment_id=last_comm_id,
+                last_comment_date=last_comm_date,
+                last_modified_date=last_mod,
+                source="cli",
+            )
+            followed.append(c_str)
         return followed
 
     def unfollow_case(
         self, case_numbers: list[str] | str, username: str | None = None
     ) -> list[str]:
-        """Removes the specified username (defaults to current user) from watchers on one or more cases.
-        Updates the local state and returns list of successfully unfollowed case numbers."""
+        """Removes one or more support cases from followed cases in local state.yaml."""
         user = username or self.get_current_user()
         if not isinstance(case_numbers, list):
             case_numbers = [case_numbers]
@@ -1045,99 +1092,109 @@ class CaseService:
             c_str = str(c_num).strip()
             if not c_str:
                 continue
-            url = f"{self.rest_url}/cases/{c_str}/notifiedusers/{user}"
-            resp = self.api_client.delete(url)
-            if resp.status_code in (200, 204, 404):
+            if self.state_service.remove_followed_case(c_str, user):
                 unfollowed.append(c_str)
-                self.state_service.remove_followed_case(c_str, user)
-            else:
-                resp.raise_for_status()
-                unfollowed.append(c_str)
-                self.state_service.remove_followed_case(c_str, user)
         return unfollowed
 
-    @staticmethod
-    def _match_user(target: str, user_list: list[str]) -> bool:
-        """Matches username against a list of users, handling both exact matches and email prefixes."""
-        t_clean = target.strip().lower()
-        t_short = t_clean.split("@")[0]
-        for u in user_list:
-            u_clean = str(u).strip().lower()
-            u_short = u_clean.split("@")[0]
-            if t_clean == u_clean or t_short == u_short:
-                return True
-        return False
+    def sync_tracked_cases(
+        self, username: str | None = None, account: str | None = None
+    ) -> dict[str, Any]:
+        """Syncs all tracked cases (owned + followed) against the remote GraphQL API,
+        detecting status changes and new comments since last checkpoints."""
+        user = username or self.get_current_user()
+        tracked = self.state_service.get_tracked_cases(user)
+        if not tracked:
+            return {"synced_count": 0, "updated_cases": [], "new_comments": 0}
 
-    def get_notified_users(self, case_number: str) -> list[str]:
-        """Fetches the list of notified user SSO usernames for a given case."""
-        with contextlib.suppress(Exception):
-            resp = self.api_client.get(f"{self.rest_url}/cases/{case_number}")
-            if resp.status_code == 200:
-                data = resp.json() if resp.text else {}
-                users = []
-                raw_users = (
-                    data.get("notifiedUsers")
-                    or data.get("notifiedusers")
-                    or data.get("watchers")
-                    or data.get("notified_users")
-                    or []
+        def sync_one(c_num: str) -> dict[str, Any] | None:
+            tc = tracked[c_num]
+            try:
+                details = self.get_case_details(c_num, first_comments=50)
+                if not details:
+                    return None
+
+                status = details.case.status
+                severity = details.case.severity
+                last_mod = details.case.last_modified_date
+
+                # Check unread comments since checkpoint
+                last_read_date = tc.read_checkpoint.last_read_comment_date or ""
+                last_read_id = tc.read_checkpoint.last_read_comment_id or ""
+
+                new_comments = []
+                for comm in details.comments:
+                    if (
+                        last_read_date
+                        and comm.created_date > last_read_date
+                        or not last_read_date
+                        and last_read_id
+                        and comm.id != last_read_id
+                    ):
+                        new_comments.append(comm)
+
+                latest_comm_id = details.comments[-1].id if details.comments else ""
+                latest_comm_date = (
+                    details.comments[-1].created_date if details.comments else ""
                 )
-                if isinstance(raw_users, dict):
-                    raw_users = raw_users.get("user") or raw_users.get("users") or []
-                for u in raw_users:
-                    if isinstance(u, str):
-                        users.append(u)
-                    elif isinstance(u, dict):
-                        sso = (
-                            u.get("ssoUsername")
-                            or u.get("userSSOName")
-                            or u.get("sso")
-                            or u.get("name")
-                            or ""
-                        )
-                        if sso:
-                            users.append(sso)
-                return users
-        return []
+                latest_comm_author = (
+                    details.comments[-1].created_by if details.comments else ""
+                )
+                latest_comm_snippet = (
+                    details.comments[-1].body[:120].strip() if details.comments else ""
+                )
+
+                status_changed = bool(
+                    tc.read_checkpoint.status
+                    and status
+                    and tc.read_checkpoint.status != status
+                )
+
+                self.state_service.update_latest_known(
+                    user=user,
+                    case_number=c_num,
+                    status=status,
+                    severity=severity,
+                    last_modified_date=last_mod,
+                    latest_comment_id=latest_comm_id,
+                    latest_comment_date=latest_comm_date,
+                    latest_comment_author=latest_comm_author,
+                    latest_comment_snippet=latest_comm_snippet,
+                    new_comment_count=len(new_comments),
+                )
+
+                if len(new_comments) > 0 or status_changed:
+                    return {
+                        "case_number": c_num,
+                        "summary": details.case.summary,
+                        "status": status,
+                        "old_status": tc.read_checkpoint.status,
+                        "status_changed": status_changed,
+                        "new_comment_count": len(new_comments),
+                        "new_comments": new_comments,
+                        "latest_comment_author": latest_comm_author,
+                        "latest_comment_snippet": latest_comm_snippet,
+                    }
+            except Exception:  # noqa: BLE001
+                return None
+            return None
+
+        with ThreadPoolExecutor(max_workers=min(10, max(1, len(tracked)))) as executor:
+            results = list(executor.map(sync_one, list(tracked.keys())))
+
+        updated = [r for r in results if r]
+        total_new_comments = sum(r["new_comment_count"] for r in updated)
+        return {
+            "synced_count": len(tracked),
+            "updated_cases": updated,
+            "new_comments": total_new_comments,
+        }
 
     def sync_followed_cases(
         self, username: str | None = None, account: str | None = None
     ) -> list[str]:
-        """Scans active cases for the account in parallel to discover cases where the user is a watcher,
-        reconciles them into local state, and returns the list of followed case numbers."""
-        user = username or self.get_current_user()
-        active_cases = self.list_cases(
-            account=account, status=["Waiting on Red Hat", "Waiting on Customer"]
-        )
-        if not active_cases:
-            return []
-
-        def check_case(c: Case) -> str | None:
-            with contextlib.suppress(Exception):
-                users = self.get_notified_users(c.case_number)
-                if self._match_user(user, users):
-                    self.state_service.add_followed_case(
-                        c.case_number,
-                        user,
-                        summary=c.summary,
-                        account_number=c.account_number,
-                        source="sync",
-                    )
-                    return c.case_number
-            return None
-
-        with ThreadPoolExecutor(
-            max_workers=min(10, max(1, len(active_cases)))
-        ) as executor:
-            results = list(executor.map(check_case, active_cases))
-
-        synced = [r for r in results if r]
-        if account:
-            now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-            self.state_service.update_sync_info(
-                user, account, now_str, len(active_cases)
-            )
-        return synced
+        """Compatibility wrapper that runs sync_tracked_cases and returns updated case numbers."""
+        res = self.sync_tracked_cases(username=username, account=account)
+        return [u["case_number"] for u in res.get("updated_cases", [])]
 
     def list_followed_cases(
         self,
@@ -1146,46 +1203,56 @@ class CaseService:
         account: str | None = None,
         fetch_live: bool = True,
     ) -> list[Case]:
-        """Returns the list of followed cases for the user. If sync is True, reconciles with the remote account first.
-        Fetches live case details for all followed cases."""
+        """Returns the list of followed cases for the user. If sync is True, updates checkpoints first."""
         user = username or self.get_current_user()
         if sync:
-            self.sync_followed_cases(username=user, account=account)
+            self.sync_tracked_cases(username=user, account=account)
 
         followed_map = self.state_service.get_followed_cases(user)
         if not followed_map:
             return []
 
         case_numbers = list(followed_map.keys())
-
         if not fetch_live:
             return [
                 Case(
                     case_number=c_num,
-                    summary=f_info.summary or "Followed Case",
-                    status="Followed",
-                    severity="",
-                    account_number=f_info.account_number,
+                    summary=tc.summary or "Followed Case",
+                    status=tc.latest_known.status
+                    or tc.read_checkpoint.status
+                    or "Unknown",
+                    severity=tc.latest_known.severity
+                    or tc.read_checkpoint.severity
+                    or "Normal",
+                    account_number=tc.account_number,
+                    is_followed=True,
+                    has_unread=(
+                        tc.latest_known.unread_comment_count > 0
+                        or tc.latest_known.status_changed
+                    ),
+                    unread_count=tc.latest_known.unread_comment_count,
+                    status_changed=tc.latest_known.status_changed,
+                    old_status=tc.read_checkpoint.status,
                 )
-                for c_num, f_info in followed_map.items()
+                for c_num, tc in followed_map.items()
             ]
 
-        # Fetch live case objects in parallel
         def fetch_one(c_num: str) -> Case | None:
             with contextlib.suppress(Exception):
-                details = self.get_case_details(c_num)
+                details = self.get_case_details(c_num, first_comments=1)
                 if details and details.case:
-                    # Update cached summary
-                    if details.case.summary:
-                        self.state_service.add_followed_case(
-                            c_num,
-                            user,
-                            summary=details.case.summary,
-                            account_number=details.case.account_number,
-                            source=followed_map[c_num].source,
+                    c = details.case
+                    tc = followed_map.get(c_num)
+                    c.is_followed = True
+                    if tc:
+                        c.has_unread = (
+                            tc.latest_known.unread_comment_count > 0
+                            or tc.latest_known.status_changed
                         )
-                    return details.case
-            # Fallback to local representation if individual fetch fails
+                        c.unread_count = tc.latest_known.unread_comment_count
+                        c.status_changed = tc.latest_known.status_changed
+                        c.old_status = tc.read_checkpoint.status
+                    return c
             f_info = followed_map.get(c_num)
             return Case(
                 case_number=c_num,
@@ -1193,6 +1260,7 @@ class CaseService:
                 status="Unknown",
                 severity="",
                 account_number=f_info.account_number if f_info else "",
+                is_followed=True,
             )
 
         with ThreadPoolExecutor(max_workers=min(10, len(case_numbers))) as executor:

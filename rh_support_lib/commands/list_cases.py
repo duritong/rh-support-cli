@@ -138,6 +138,24 @@ def cmd_list(args, api_client, config=None):
 
     for c in cases:
         num = c.case_number or c.id
+        # Badges for followed and unread updates
+        if args.simple_output:
+            num_str = num
+            if getattr(c, "is_followed", False):
+                num_str += " [F]"
+            if getattr(c, "has_unread", False):
+                cnt = getattr(c, "unread_count", 0)
+                num_str += f" *({cnt})" if cnt else " *"
+            num_col = num_str
+        else:
+            from rich.text import Text as RichText
+
+            num_col = RichText(num)
+            if getattr(c, "is_followed", False):
+                num_col.append(" ★", style="bold yellow")
+            if getattr(c, "has_unread", False):
+                cnt = getattr(c, "unread_count", 0)
+                num_col.append(f" ●{cnt}" if cnt else " ●", style="bold cyan")
         title = c.summary
         owner = c.owner or c.contact_name or "Unknown"
         mod_by = c.last_modified_by or "Red Hat Support"
@@ -168,7 +186,7 @@ def cmd_list(args, api_client, config=None):
                 status_style = "dim"
 
         table.add_row(
-            num,
+            num_col,
             title,
             owner,
             mod_by,

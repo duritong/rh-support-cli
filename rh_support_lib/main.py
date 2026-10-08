@@ -15,6 +15,7 @@ from rh_support_lib.commands.attachments import cmd_attachment
 from rh_support_lib.commands.create_case import cmd_create
 from rh_support_lib.commands.list_cases import cmd_list
 from rh_support_lib.commands.show_case import cmd_show
+from rh_support_lib.commands.tracking import cmd_sync, cmd_updates
 from rh_support_lib.commands.watchers import (
     cmd_follow,
     cmd_following,
@@ -175,6 +176,12 @@ Authentication:
     parser_show.add_argument("-c", "--case", required=True, help="Case Number")
     parser_show.add_argument(
         "--no-pager", action="store_true", help="Disable pager output"
+    )
+    parser_show.add_argument(
+        "--mark-read", action="store_true", help="Mark this case's updates as read"
+    )
+    parser_show.add_argument(
+        "--simple-output", action="store_true", help="Disable colored output"
     )
 
     # Link Subcommand
@@ -371,7 +378,7 @@ Authentication:
 
     # Follow Subcommand
     parser_follow = subparsers.add_parser(
-        "follow", help="Attach myself (or specified user) to support case(s) as watcher"
+        "follow", help="Follow support case(s) locally to track updates"
     )
     parser_follow.add_argument("cases", nargs="*", help="Case number(s) to follow")
     parser_follow.add_argument(
@@ -383,25 +390,25 @@ Authentication:
     parser_follow.add_argument(
         "-u",
         "--user",
-        help="SSO username to add as watcher (defaults to myself/current authenticated user)",
+        help="SSO username (defaults to myself/current authenticated user)",
     )
     parser_follow.add_argument(
         "--sync",
         action="store_true",
-        help="Scan and sync followed cases from account",
+        help="Sync followed cases from account before following",
     )
     parser_follow.add_argument("--account", help="Account number to sync from")
 
     # Following Subcommand
     parser_following = subparsers.add_parser(
         "following",
-        help="List support cases currently followed by myself (or specified user)",
+        help="List support cases currently followed",
     )
     parser_following.add_argument("--account", help="Account Number")
     parser_following.add_argument(
         "--sync",
         action="store_true",
-        help="Sync followed cases from account before listing",
+        help="Sync followed cases before listing",
     )
     parser_following.add_argument(
         "-u",
@@ -423,7 +430,7 @@ Authentication:
     # Unfollow Subcommand
     parser_unfollow = subparsers.add_parser(
         "unfollow",
-        help="Remove myself (or specified user) from support case(s) watchers",
+        help="Unfollow support case(s) locally",
     )
     parser_unfollow.add_argument("cases", nargs="*", help="Case number(s) to unfollow")
     parser_unfollow.add_argument(
@@ -435,9 +442,62 @@ Authentication:
     parser_unfollow.add_argument(
         "-u",
         "--user",
-        help="SSO username to remove from watchers (defaults to myself/current authenticated user)",
+        help="SSO username (defaults to myself/current authenticated user)",
     )
 
+    # Sync Subcommand
+    parser_sync = subparsers.add_parser(
+        "sync", help="Synchronize tracked cases with remote updates"
+    )
+    parser_sync.add_argument(
+        "-u", "--user", help="SSO username (defaults to current user)"
+    )
+    parser_sync.add_argument("--account", help="Account Number filter")
+    parser_sync.add_argument(
+        "--notify",
+        action="store_true",
+        help="Send desktop notification if updates found",
+    )
+    parser_sync.add_argument(
+        "--install-systemd",
+        action="store_true",
+        help="Generate and install systemd user service and timer",
+    )
+    parser_sync.add_argument(
+        "--interval",
+        default="15m",
+        help="Sync interval for systemd timer (default: 15m)",
+    )
+    parser_sync.add_argument(
+        "--simple-output", action="store_true", help="Disable colored output"
+    )
+
+    # Updates Subcommand
+    parser_updates = subparsers.add_parser(
+        "updates", help="Display unread updates and new comments on tracked cases"
+    )
+    parser_updates.add_argument(
+        "-c", "--case", help="Filter updates to a specific case number"
+    )
+    parser_updates.add_argument(
+        "--full",
+        action="store_true",
+        help="Show full content of new comments (default: excerpt summary)",
+    )
+    parser_updates.add_argument(
+        "--all",
+        action="store_true",
+        help="Show all tracked cases, including those without new updates",
+    )
+    parser_updates.add_argument(
+        "--mark-read", action="store_true", help="Mark inspected updates as read"
+    )
+    parser_updates.add_argument(
+        "--simple-output", action="store_true", help="Disable colored output"
+    )
+    parser_updates.add_argument(
+        "-u", "--user", help="SSO username (defaults to current user)"
+    )
     # List Templates Subcommand
     subparsers.add_parser(
         "list-templates", help="List all local templates and their details"
@@ -457,6 +517,12 @@ Authentication:
         "--no-default-bookmark",
         action="store_true",
         help="Do not load the default bookmark on startup",
+    )
+    parser_tui.add_argument(
+        "-l",
+        "--layout",
+        choices=["vertical", "horizontal", "mailbox"],
+        help="Split layout: 'vertical' (side-by-side) or 'horizontal' / 'mailbox' (top-and-bottom)",
     )
 
     # Mock Portal Subcommand
@@ -479,6 +545,8 @@ Authentication:
         argcomplete.autocomplete(parser)
 
     args = parser.parse_args()
+    if "--simple-output" in sys.argv or getattr(args, "simple_output", False):
+        args.simple_output = True
 
     config = load_config(args.config_file)
 
@@ -529,6 +597,10 @@ Authentication:
         cmd_following(args, api_client, config)
     elif args.command == "unfollow":
         cmd_unfollow(args, api_client)
+    elif args.command == "sync":
+        cmd_sync(args, api_client, config)
+    elif args.command == "updates":
+        cmd_updates(args, api_client, config)
     elif args.command == "tui":
         cmd_tui(args, api_client, config)
 

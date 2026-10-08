@@ -571,19 +571,6 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                 ).encode()
             )
             return
-        # Notified Users Endpoint: /cases/{case}/notifiedusers
-        if "/notifiedusers" in self.path:
-            data = json.loads(body.decode())
-            if "user" in data and isinstance(data["user"], list):
-                self.send_response(201)
-                self.end_headers()
-                self.wfile.write(b"")
-            else:
-                self.send_response(400)
-                self.end_headers()
-                self.wfile.write(b"Missing user array")
-            return
-
         self.send_response(404)
         self.end_headers()
 
@@ -701,14 +688,6 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                 ).encode()
             )
             return
-        # GET /cases/{id}/notifiedusers
-        if "/notifiedusers" in self.path and "/cases/" in self.path:
-            self.send_response(200)
-            self.send_header("Content-type", "application/json")
-            self.end_headers()
-            self.wfile.write(json.dumps([{"ssoUsername": "jdeveloper"}]).encode())
-            return
-
         # GET /cases/{id}
         if "/cases/" in self.path:
             parts = self.path.split("/")
@@ -756,12 +735,6 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
         # DELETE /v3/cases/attachments/deleteFile/{caseNumber}/{attachmentId}
         match_del = re.search(r"/attachments/deleteFile/([^/]+)/([^/]+)$", self.path)
         if match_del:
-            self.send_response(204)
-            self.end_headers()
-            return
-
-        if "/notifiedusers" in self.path:
-            MockRedHatHandler.last_deleted_notifieduser = self.path
             self.send_response(204)
             self.end_headers()
             return
@@ -829,11 +802,13 @@ class TestRhSupportCli(unittest.TestCase):
         # Avoid truncation in list output
         self.env["COLUMNS"] = "200"
 
-        # Isolate cache for every test
+        # Isolate cache and config for every test
         import tempfile
 
         self.test_cache_dir = tempfile.mkdtemp()
         self.env["XDG_CACHE_HOME"] = self.test_cache_dir
+        self.test_config_dir = tempfile.mkdtemp()
+        self.env["XDG_CONFIG_HOME"] = self.test_config_dir
 
         self.cli_path = os.path.abspath("rh-support-cli.py")
 
@@ -842,6 +817,8 @@ class TestRhSupportCli(unittest.TestCase):
 
         if os.path.exists(self.test_cache_dir):
             shutil.rmtree(self.test_cache_dir)
+        if os.path.exists(self.test_config_dir):
+            shutil.rmtree(self.test_config_dir)
 
     def run_cli(self, args, input=None):
         """Helper to run the CLI script as a subprocess"""
@@ -1984,9 +1961,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
         template_path = os.path.join(template_dir, "test_template.yaml")
         with open(template_path, "w") as f:
-            f.write(
-                "severity: Low\nstatus: Waiting on Customer\nwatchers:\n  - alice\n  - bob\n"
-            )
+            f.write("severity: Low\nstatus: Waiting on Customer\n")
 
         try:
             result = self.run_cli(
@@ -2006,8 +1981,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             self.assertIn(
                 "status: Waiting on Red Hat -> Waiting on Customer", result.stdout
             )
-            self.assertIn("alice", result.stdout)
-            self.assertIn("bob", result.stdout)
+
         finally:
             shutil.rmtree(temp_home)
 
@@ -2025,13 +1999,12 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
         template_path = os.path.join(template_dir, "test_template.yaml")
         with open(template_path, "w") as f:
-            f.write("severity: Low\nwatchers:\n  - alice\n")
+            f.write("severity: Low\n")
 
         try:
             result = self.run_cli(["apply", "-c", "12345", "-t", "test_template"])
             self.assertEqual(result.returncode, 0)
             self.assertIn("Success: Case fields updated.", result.stdout)
-            self.assertIn("Success: Watchers added.", result.stdout)
         finally:
             shutil.rmtree(temp_home)
 
@@ -2077,7 +2050,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         template_path = os.path.join(template_dir, "test_template.yaml")
         with open(template_path, "w") as f:
             f.write(
-                'severity: "{{ target_severity }}"\nwatchers:\n  - "{{ watcher_name }}"\n'
+                'severity: "{{ target_severity }}"\nstatus: "{{ target_status }}"\n'
             )
 
         try:
@@ -2092,13 +2065,13 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                     "--template-var",
                     "target_severity=Low",
                     "--template-var",
-                    "watcher_name=alice",
+                    "target_status=Closed",
                     "--dry-run",
                 ]
             )
             self.assertEqual(result.returncode, 0)
             self.assertIn("severity: High -> Low", result.stdout)
-            self.assertIn("alice", result.stdout)
+            self.assertIn("status: Waiting on Red Hat -> Closed", result.stdout)
         finally:
             shutil.rmtree(temp_home)
 
@@ -2159,7 +2132,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             self.assertIn("Template:    tmpl_a", result.stdout)
             self.assertIn("Desc:      Template A Description", result.stdout)
             self.assertIn("Fields:    severity: Low", result.stdout)
-            self.assertIn("Watchers:  alice", result.stdout)
+
             self.assertNotIn("_some_ignored_meta", result.stdout)
 
             self.assertIn("Template:    tmpl_b", result.stdout)
@@ -2452,6 +2425,17 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 # Dismiss modal
                 attach_modal.dismiss("")
                 await pilot.pause()
+
+                # 7. Test TUI follow toggle and mark read actions
+                app.selected_case_id = "12345"
+                app.action_toggle_follow()
+                u = app.case_service.get_current_user()
+                self.assertTrue(app.case_service.state_service.is_following("12345", u))
+                app.action_toggle_follow()
+                self.assertFalse(
+                    app.case_service.state_service.is_following("12345", u)
+                )
+                app.action_mark_read()
 
         try:
             asyncio.run(run_headless())
@@ -3321,7 +3305,9 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
         temp_home = tempfile.mkdtemp()
         orig_home = self.env.get("HOME")
+        orig_config = self.env.get("XDG_CONFIG_HOME")
         self.env["HOME"] = temp_home
+        self.env["XDG_CONFIG_HOME"] = os.path.join(temp_home, ".config")
         try:
             config_dir = os.path.join(temp_home, ".config", "rh-support-cli")
             os.makedirs(config_dir, exist_ok=True)
@@ -3354,7 +3340,253 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         finally:
             if orig_home:
                 self.env["HOME"] = orig_home
+            if orig_config:
+                self.env["XDG_CONFIG_HOME"] = orig_config
             shutil.rmtree(temp_home)
+
+    def test_state_service_tracked_and_checkpoints(self):
+        """Test StateService tracking, checkpoints, unread counts, and auto-registration."""
+        import shutil
+        import tempfile
+
+        from rh_support_lib.services.state import StateService
+
+        temp_dir = tempfile.mkdtemp()
+        try:
+            state_file = os.path.join(temp_dir, "state.yaml")
+            svc = StateService(state_file=state_file)
+            # 1. Follow a case
+            svc.add_tracked_case(
+                "testuser",
+                "12345",
+                relationship="followed",
+                summary="Case 12345",
+                status="Waiting on Red Hat",
+            )
+            self.assertTrue(svc.is_following("12345", "testuser"))
+            tc = svc.get_tracked_cases("testuser").get("12345")
+            self.assertIsNotNone(tc)
+            self.assertEqual(tc.relationship, "followed")
+            self.assertEqual(tc.case_number, "12345")
+
+            # 2. Update latest known remote state (new comment and status change)
+            svc.update_latest_known(
+                user="testuser",
+                case_number="12345",
+                status="Waiting on Customer Action Required",
+                severity="1 (Urgent)",
+                latest_comment_id="comm_002",
+                latest_comment_date="2026-10-08T12:00:00Z",
+                latest_comment_author="Red Hat Support",
+                latest_comment_snippet="Please provide logs",
+                last_modified_date="2026-10-08T12:00:00Z",
+                new_comment_count=1,
+            )
+            tc = svc.get_tracked_cases("testuser").get("12345")
+            self.assertTrue(tc.has_unread)
+            self.assertTrue(tc.status_changed)
+            self.assertEqual(tc.unread_count, 1)
+
+            # 3. Mark read
+            svc.mark_case_read("testuser", "12345")
+            tc = svc.get_tracked_cases("testuser").get("12345")
+            self.assertFalse(tc.has_unread)
+            self.assertFalse(tc.status_changed)
+            self.assertEqual(tc.unread_count, 0)
+            self.assertEqual(
+                tc.read_checkpoint.status, "Waiting on Customer Action Required"
+            )
+            self.assertEqual(tc.read_checkpoint.last_read_comment_id, "comm_002")
+
+            # 4. Auto-register owned case
+            svc.register_owned_case(
+                "testuser", "99999", summary="My Bug", status="In Progress"
+            )
+            owned = svc.get_owned_cases("testuser")
+            self.assertIn("99999", owned)
+            self.assertEqual(owned["99999"].relationship, "owned")
+        finally:
+            shutil.rmtree(temp_dir)
+
+    def test_sync_command_and_systemd(self):
+        """Test sync CLI command and --install-systemd unit generation."""
+        import shutil
+        import tempfile
+
+        temp_home = tempfile.mkdtemp()
+        orig_home = self.env.get("HOME")
+        orig_config = self.env.get("XDG_CONFIG_HOME")
+        self.env["HOME"] = temp_home
+        self.env["XDG_CONFIG_HOME"] = os.path.join(temp_home, ".config")
+        try:
+            # 1. Follow a case first
+            res_f = self.run_cli(["follow", "12345"])
+            self.assertEqual(res_f.returncode, 0)
+
+            # 2. Run sync command
+            res_sync = self.run_cli(["sync"])
+            self.assertEqual(res_sync.returncode, 0)
+            self.assertIn("Syncing tracked cases for", res_sync.stdout)
+            self.assertIn("Sync complete:", res_sync.stdout)
+
+            # 3. Run sync --install-systemd
+            res_systemd = self.run_cli(
+                ["sync", "--install-systemd", "--interval", "10m"]
+            )
+            self.assertEqual(res_systemd.returncode, 0)
+            self.assertIn("Installed systemd user service:", res_systemd.stdout)
+            self.assertIn("Installed systemd user timer:", res_systemd.stdout)
+            service_path = os.path.join(
+                temp_home, ".config", "systemd", "user", "rh-support-sync.service"
+            )
+            timer_path = os.path.join(
+                temp_home, ".config", "systemd", "user", "rh-support-sync.timer"
+            )
+            self.assertTrue(os.path.exists(service_path))
+            self.assertTrue(os.path.exists(timer_path))
+            with open(timer_path) as f:
+                content = f.read()
+                self.assertIn("OnUnitActiveSec=10m", content)
+        finally:
+            if orig_home:
+                self.env["HOME"] = orig_home
+            if orig_config:
+                self.env["XDG_CONFIG_HOME"] = orig_config
+            shutil.rmtree(temp_home)
+
+    def test_updates_and_show_checkpoint(self):
+        """Test updates CLI command and show command with visual checkpoint divider and status banner."""
+        import shutil
+        import tempfile
+
+        temp_home = tempfile.mkdtemp()
+        orig_home = self.env.get("HOME")
+        orig_config = self.env.get("XDG_CONFIG_HOME")
+        self.env["HOME"] = temp_home
+        self.env["XDG_CONFIG_HOME"] = os.path.join(temp_home, ".config")
+        try:
+            # 1. Follow case 12345
+            res_f = self.run_cli(["follow", "12345"])
+            self.assertEqual(res_f.returncode, 0)
+
+            # 2. Manually set older read checkpoint in state.yaml to simulate unread comments and status change
+            state_path = os.path.join(
+                temp_home, ".config", "rh-support-cli", "state.yaml"
+            )
+            user = self.env.get("REDHAT_SUPPORT_USERNAME") or self.env.get(
+                "USER", "jdeveloper"
+            )
+            from rh_support_lib.services.state import StateService
+
+            svc = StateService(state_file=state_path)
+            svc.add_tracked_case(
+                user, "12345", relationship="followed", summary="Test Case"
+            )
+            # Checkpoint with older date and old status
+            state_data = svc.load_state()
+            u_state = svc._get_user_state(state_data, user)
+            u_state["tracked_cases"]["12345"]["read_checkpoint"] = {
+                "last_read_comment_date": "2023-01-01T00:00:00Z",
+                "last_read_comment_id": "old_comm",
+                "status": "Waiting on Customer Action Required",
+                "marked_read_at": "2023-01-01T00:00:00Z",
+            }
+            u_state["tracked_cases"]["12345"]["latest_known"] = {
+                "last_comment_date": "2026-08-20T10:00:00Z",
+                "last_comment_id": "c1",
+                "status": "Waiting on Red Hat",
+                "status_changed": True,
+                "unread_comment_count": 2,
+                "latest_comment_author": "Red Hat Support",
+                "latest_comment_snippet": "We are investigating",
+            }
+            svc.save_state(state_data)
+
+            # 3. Run 'updates' command
+            res_upd = self.run_cli(["updates", "--simple-output"])
+            self.assertEqual(res_upd.returncode, 0)
+            self.assertIn("Case #12345", res_upd.stdout)
+            self.assertIn("Status Changed", res_upd.stdout)
+            self.assertIn("new comment(s)", res_upd.stdout)
+
+            # 4. Run 'show -c 12345' with simple output: verify status diff banner and checkpoint divider
+            res_show = self.run_cli(
+                ["show", "-c", "12345", "--simple-output", "--no-pager"]
+            )
+            self.assertEqual(res_show.returncode, 0)
+            self.assertIn("⚡ Status Changed:", res_show.stdout)
+            self.assertIn(
+                "Waiting on Customer Action Required -> Waiting on Red Hat",
+                res_show.stdout,
+            )
+            self.assertIn("Last read checkpoint", res_show.stdout)
+
+            # 5. Mark read via 'show -c 12345 --mark-read'
+            res_mark = self.run_cli(
+                ["show", "-c", "12345", "--mark-read", "--simple-output", "--no-pager"]
+            )
+            self.assertEqual(res_mark.returncode, 0)
+            self.assertIn("Marked Case #12345 as read.", res_mark.stdout)
+
+            # 6. Verify subsequent updates command reports no unread updates
+            res_upd_clean = self.run_cli(["updates", "--simple-output"])
+            self.assertEqual(res_upd_clean.returncode, 0)
+            self.assertIn(
+                "No unread updates across tracked cases.", res_upd_clean.stdout
+            )
+        finally:
+            if orig_home:
+                self.env["HOME"] = orig_home
+            if orig_config:
+                self.env["XDG_CONFIG_HOME"] = orig_config
+            shutil.rmtree(temp_home)
+
+    def test_tui_layout_horizontal_mailbox_and_persistence(self):
+        """Test TUI horizontal split (mailbox) layout initialization, toggle action, and persistence."""
+        import asyncio
+        import shutil
+        import tempfile
+
+        from rh_support_lib.services.state import StateService
+        from rh_support_lib.tui.app import SupportApp
+
+        # 1. StateService get/set tui layout
+        temp_dir = tempfile.mkdtemp()
+        try:
+            state_file = os.path.join(temp_dir, "state.yaml")
+            svc = StateService(state_file=state_file)
+            self.assertEqual(svc.get_tui_layout("testuser"), "vertical")
+            svc.set_tui_layout("testuser", "horizontal")
+            self.assertEqual(svc.get_tui_layout("testuser"), "horizontal")
+            svc.set_tui_layout("testuser", "mailbox")
+            self.assertEqual(svc.get_tui_layout("testuser"), "horizontal")
+            svc.set_tui_layout("testuser", "vertical")
+            self.assertEqual(svc.get_tui_layout("testuser"), "vertical")
+        finally:
+            shutil.rmtree(temp_dir)
+
+        # 2. Headless SupportApp with explicit layout="horizontal"
+        async def run_layout_test():
+            app = SupportApp(
+                token="mock_access_token_123", config={}, layout="horizontal"
+            )
+            async with app.run_test() as pilot:
+                self.assertEqual(app.layout, "horizontal")
+                self.assertIn("layout-horizontal", app.screen.classes)
+
+                # Toggle to vertical
+                app.action_toggle_layout()
+                await pilot.pause()
+                self.assertEqual(app.layout, "vertical")
+                self.assertNotIn("layout-horizontal", app.screen.classes)
+
+                # Toggle back to horizontal
+                app.action_toggle_layout()
+                await pilot.pause()
+                self.assertEqual(app.layout, "horizontal")
+                self.assertIn("layout-horizontal", app.screen.classes)
+
+        asyncio.run(run_layout_test())
 
 
 if __name__ == "__main__":

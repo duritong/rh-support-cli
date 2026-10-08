@@ -7,7 +7,12 @@ from typing import Any
 
 import yaml
 
-from rh_support_lib.models import FollowedCase
+from rh_support_lib.models import (
+    CaseCheckpoint,
+    CaseLatestKnown,
+    FollowedCase,
+    TrackedCase,
+)
 
 
 class StateService:
@@ -92,50 +97,173 @@ class StateService:
         users = data.setdefault("users", {})
         return users.setdefault(user, {})
 
-    # --- Followed Cases ---
+    # --- Tracked & Followed Cases ---
+
+    @staticmethod
+    def _parse_tracked_case(c_num: str, info: Any) -> TrackedCase:
+        """Deserializes a tracked case record from dict or legacy string/list entry."""
+        if isinstance(info, dict):
+            cp_dict = info.get("read_checkpoint", {})
+            lk_dict = info.get("latest_known", {})
+            return TrackedCase(
+                case_number=str(c_num),
+                relationship=info.get("relationship", "followed"),
+                followed_at=info.get("followed_at") or info.get("added_at", ""),
+                summary=info.get("summary", ""),
+                account_number=str(info.get("account_number", "")),
+                source=info.get("source", "cli"),
+                read_checkpoint=CaseCheckpoint(
+                    status=cp_dict.get("status", ""),
+                    severity=cp_dict.get("severity", ""),
+                    last_read_comment_id=cp_dict.get("last_read_comment_id", ""),
+                    last_read_comment_date=cp_dict.get("last_read_comment_date", ""),
+                    marked_read_at=cp_dict.get("marked_read_at", ""),
+                ),
+                latest_known=CaseLatestKnown(
+                    status=lk_dict.get("status", ""),
+                    severity=lk_dict.get("severity", ""),
+                    last_modified_date=lk_dict.get("last_modified_date", ""),
+                    latest_comment_id=lk_dict.get("latest_comment_id", ""),
+                    latest_comment_date=lk_dict.get("latest_comment_date", ""),
+                    latest_comment_author=lk_dict.get("latest_comment_author", ""),
+                    latest_comment_snippet=lk_dict.get("latest_comment_snippet", ""),
+                    unread_comment_count=int(lk_dict.get("unread_comment_count", 0)),
+                    status_changed=bool(lk_dict.get("status_changed", False)),
+                ),
+            )
+        if isinstance(info, str):
+            return TrackedCase(case_number=str(c_num), summary=info)
+        return TrackedCase(case_number=str(c_num))
+
+    def get_tracked_cases(self, user: str) -> dict[str, TrackedCase]:
+        """Returns all tracked (owned, followed, or both) cases for a user."""
+        data = self.load_state()
+        user_state = self._get_user_state(data, user)
+        raw_tracked = user_state.get("tracked_cases")
+        result: dict[str, TrackedCase] = {}
+
+        if isinstance(raw_tracked, dict):
+            for c_num, info in raw_tracked.items():
+                result[str(c_num)] = self._parse_tracked_case(str(c_num), info)
+        else:
+            # Backwards compatibility: check legacy 'following'
+            raw_following = user_state.get("following", {})
+            if isinstance(raw_following, dict):
+                for c_num, info in raw_following.items():
+                    result[str(c_num)] = self._parse_tracked_case(str(c_num), info)
+            elif isinstance(raw_following, list):
+                for item in raw_following:
+                    if isinstance(item, str):
+                        result[item] = TrackedCase(case_number=item)
+                    elif isinstance(item, dict) and "case_number" in item:
+                        c_num = str(item["case_number"])
+                        result[c_num] = self._parse_tracked_case(c_num, item)
+
+        return result
 
     def get_followed_cases(self, user: str) -> dict[str, FollowedCase]:
         """Returns all followed cases for a user mapped by case number."""
-        data = self.load_state()
-        user_state = self._get_user_state(data, user)
-        raw_following = user_state.get("following", {})
-        result: dict[str, FollowedCase] = {}
+        all_tracked = self.get_tracked_cases(user)
+        return {
+            c_num: tc
+            for c_num, tc in all_tracked.items()
+            if tc.relationship in ("followed", "both")
+        }
 
-        if isinstance(raw_following, dict):
-            for case_num, info in raw_following.items():
-                if isinstance(info, dict):
-                    result[str(case_num)] = FollowedCase(
-                        case_number=str(case_num),
-                        added_at=info.get("added_at", ""),
-                        source=info.get("source", "cli"),
-                        summary=info.get("summary", ""),
-                        account_number=str(info.get("account_number", "")),
-                    )
-                elif isinstance(info, str):
-                    result[str(case_num)] = FollowedCase(
-                        case_number=str(case_num),
-                        summary=info,
-                    )
-        elif isinstance(raw_following, list):
-            for item in raw_following:
-                if isinstance(item, str):
-                    result[item] = FollowedCase(case_number=item)
-                elif isinstance(item, dict) and "case_number" in item:
-                    c_num = str(item["case_number"])
-                    result[c_num] = FollowedCase(
-                        case_number=c_num,
-                        added_at=item.get("added_at", ""),
-                        source=item.get("source", "cli"),
-                        summary=item.get("summary", ""),
-                        account_number=str(item.get("account_number", "")),
-                    )
-
-        return result
+    def get_owned_cases(self, user: str) -> dict[str, TrackedCase]:
+        """Returns all owned cases tracked for a user."""
+        all_tracked = self.get_tracked_cases(user)
+        return {
+            c_num: tc
+            for c_num, tc in all_tracked.items()
+            if tc.relationship in ("owned", "both")
+        }
 
     def is_following(self, case_number: str, user: str) -> bool:
         """Checks if a case is currently followed by the user."""
         following = self.get_followed_cases(user)
         return str(case_number) in following
+
+    def add_tracked_case(
+        self,
+        user: str,
+        case_number: str,
+        relationship: str = "followed",
+        summary: str = "",
+        account_number: str = "",
+        status: str = "",
+        severity: str = "",
+        last_comment_id: str = "",
+        last_comment_date: str = "",
+        last_modified_date: str = "",
+        source: str = "cli",
+    ) -> None:
+        """Adds or updates a tracked case record in state.yaml."""
+        data = self.load_state()
+        user_state = self._get_user_state(data, user)
+        tracked_dict = user_state.setdefault("tracked_cases", {})
+        following_legacy = user_state.setdefault("following", {})
+        c_num = str(case_number).strip()
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        existing = tracked_dict.get(c_num)
+        if not existing and isinstance(following_legacy.get(c_num), dict):
+            existing = following_legacy.get(c_num)
+
+        final_rel = relationship
+        if existing and isinstance(existing, dict):
+            cur_rel = existing.get("relationship", "followed")
+            if (
+                cur_rel != relationship
+                and cur_rel in ("owned", "followed")
+                or cur_rel == "both"
+            ):
+                final_rel = "both"
+
+        entry = {
+            "relationship": final_rel,
+            "followed_at": (
+                existing.get("followed_at") or now_str
+                if isinstance(existing, dict)
+                else now_str
+            ),
+            "summary": summary
+            or (existing.get("summary", "") if isinstance(existing, dict) else ""),
+            "account_number": str(account_number)
+            if account_number
+            else (
+                str(existing.get("account_number", ""))
+                if isinstance(existing, dict)
+                else ""
+            ),
+            "source": source
+            or (existing.get("source", "cli") if isinstance(existing, dict) else "cli"),
+            "read_checkpoint": {
+                "status": status,
+                "severity": severity,
+                "last_read_comment_id": last_comment_id,
+                "last_read_comment_date": last_comment_date,
+                "marked_read_at": now_str,
+            },
+            "latest_known": {
+                "status": status,
+                "severity": severity,
+                "last_modified_date": last_modified_date or now_str,
+                "latest_comment_id": last_comment_id,
+                "latest_comment_date": last_comment_date,
+                "unread_comment_count": 0,
+                "status_changed": False,
+            },
+        }
+        tracked_dict[c_num] = entry
+        if final_rel in ("followed", "both"):
+            following_legacy[c_num] = {
+                "added_at": entry["followed_at"],
+                "source": entry["source"],
+                "summary": entry["summary"],
+                "account_number": entry["account_number"],
+            }
+        self.save_state(data)
 
     def add_followed_case(
         self,
@@ -145,60 +273,197 @@ class StateService:
         account_number: str = "",
         source: str = "cli",
     ) -> None:
-        """Adds or updates a followed case in the user's state."""
+        """Backwards-compatibility alias for add_tracked_case with relationship='followed'."""
+        self.add_tracked_case(
+            user=user,
+            case_number=case_number,
+            relationship="followed",
+            summary=summary,
+            account_number=account_number,
+            source=source,
+        )
+
+    def register_owned_case(
+        self,
+        user: str,
+        case_number: str,
+        summary: str = "",
+        account_number: str = "",
+        status: str = "",
+        severity: str = "",
+        last_comment_id: str = "",
+        last_comment_date: str = "",
+        last_modified_date: str = "",
+    ) -> None:
+        """Registers or updates an owned case in state.yaml."""
+        self.add_tracked_case(
+            user=user,
+            case_number=case_number,
+            relationship="owned",
+            summary=summary,
+            account_number=account_number,
+            status=status,
+            severity=severity,
+            last_comment_id=last_comment_id,
+            last_comment_date=last_comment_date,
+            last_modified_date=last_modified_date,
+            source="auto",
+        )
+
+    def remove_followed_case(self, case_number: str, user: str) -> bool:
+        """Removes a case from following. If the case is also owned, retains it as owned."""
         data = self.load_state()
         user_state = self._get_user_state(data, user)
-        following = user_state.setdefault("following", {})
+        tracked_dict = user_state.get("tracked_cases", {})
+        following_legacy = user_state.get("following", {})
+        c_num = str(case_number).strip()
+        modified = False
+
+        if c_num in tracked_dict:
+            cur_rel = tracked_dict[c_num].get("relationship", "followed")
+            if cur_rel == "both":
+                tracked_dict[c_num]["relationship"] = "owned"
+                modified = True
+            else:
+                del tracked_dict[c_num]
+                modified = True
+
+        if isinstance(following_legacy, dict) and c_num in following_legacy:
+            del following_legacy[c_num]
+            modified = True
+        elif isinstance(following_legacy, list):
+            new_list = [
+                i
+                for i in following_legacy
+                if (
+                    i != c_num
+                    and getattr(i, "get", lambda _: None)("case_number") != c_num
+                )
+            ]
+            if len(new_list) != len(following_legacy):
+                user_state["following"] = new_list
+                modified = True
+
+        if modified:
+            self.save_state(data)
+        return modified
+
+    def toggle_follow(self, user: str, case_number: str) -> bool:
+        """Toggles follow status for a case. Returns True if now following, False if unfollowed."""
+        if self.is_following(case_number, user):
+            self.remove_followed_case(case_number, user)
+            return False
+        self.add_followed_case(case_number, user)
+        return True
+
+    def update_latest_known(
+        self,
+        user: str,
+        case_number: str,
+        status: str,
+        severity: str,
+        last_modified_date: str,
+        latest_comment_id: str = "",
+        latest_comment_date: str = "",
+        latest_comment_author: str = "",
+        latest_comment_snippet: str = "",
+        new_comment_count: int = 0,
+    ) -> None:
+        """Updates the latest known remote state for a case, computing unread indicators."""
+        data = self.load_state()
+        user_state = self._get_user_state(data, user)
+        tracked_dict = user_state.setdefault("tracked_cases", {})
+        c_num = str(case_number).strip()
+
+        tc = tracked_dict.get(c_num)
+        if not tc or not isinstance(tc, dict):
+            # Initialize tracked entry
+            now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            tc = {
+                "relationship": "followed",
+                "followed_at": now_str,
+                "summary": "",
+                "account_number": "",
+                "source": "sync",
+                "read_checkpoint": {
+                    "status": status,
+                    "severity": severity,
+                    "last_read_comment_id": latest_comment_id,
+                    "last_read_comment_date": latest_comment_date,
+                    "marked_read_at": now_str,
+                },
+                "latest_known": {},
+            }
+            tracked_dict[c_num] = tc
+
+        cp = tc.setdefault("read_checkpoint", {})
+        cp_status = cp.get("status", "")
+        status_changed = bool(cp_status and status and cp_status != status)
+
+        tc["latest_known"] = {
+            "status": status,
+            "severity": severity,
+            "last_modified_date": last_modified_date,
+            "latest_comment_id": latest_comment_id,
+            "latest_comment_date": latest_comment_date,
+            "latest_comment_author": latest_comment_author,
+            "latest_comment_snippet": latest_comment_snippet,
+            "unread_comment_count": new_comment_count,
+            "status_changed": status_changed,
+        }
+        self.save_state(data)
+
+    def mark_case_read(
+        self,
+        user: str,
+        case_number: str,
+        status: str | None = None,
+        severity: str | None = None,
+        last_comment_id: str | None = None,
+        last_comment_date: str | None = None,
+    ) -> None:
+        """Advances read_checkpoint for a case, marking all updates as read."""
+        data = self.load_state()
+        user_state = self._get_user_state(data, user)
+        tracked_dict = user_state.setdefault("tracked_cases", {})
+        c_num = str(case_number).strip()
+        tc = tracked_dict.get(c_num)
+        if not tc or not isinstance(tc, dict):
+            return
 
         now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        c_num = str(case_number)
+        lk = tc.get("latest_known", {})
+        cp = tc.setdefault("read_checkpoint", {})
 
-        existing = following.get(c_num)
-        if isinstance(existing, dict):
-            existing["summary"] = summary or existing.get("summary", "")
-            existing["account_number"] = (
-                str(account_number)
-                if account_number
-                else existing.get("account_number", "")
-            )
-            existing["source"] = source or existing.get("source", "cli")
-        else:
-            following[c_num] = {
-                "added_at": now_str,
-                "source": source,
-                "summary": summary,
-                "account_number": str(account_number) if account_number else "",
-            }
+        cp["status"] = status or lk.get("status") or cp.get("status", "")
+        cp["severity"] = severity or lk.get("severity") or cp.get("severity", "")
+        cp["last_read_comment_id"] = (
+            last_comment_id
+            or lk.get("latest_comment_id")
+            or cp.get("last_read_comment_id", "")
+        )
+        cp["last_read_comment_date"] = (
+            last_comment_date
+            or lk.get("latest_comment_date")
+            or cp.get("last_read_comment_date", "")
+        )
+        cp["marked_read_at"] = now_str
+
+        if "latest_known" in tc:
+            tc["latest_known"]["unread_comment_count"] = 0
+            tc["latest_known"]["status_changed"] = False
 
         self.save_state(data)
 
-    def remove_followed_case(self, case_number: str, user: str) -> bool:
-        """Removes a followed case from the user's state. Returns True if removed."""
-        data = self.load_state()
-        user_state = self._get_user_state(data, user)
-        following = user_state.get("following", {})
-        c_num = str(case_number)
-
-        removed = False
-        if isinstance(following, dict) and c_num in following:
-            del following[c_num]
-            removed = True
-        elif isinstance(following, list):
-            new_list = [
-                item
-                for item in following
-                if (
-                    item != c_num
-                    and getattr(item, "get", lambda _: None)("case_number") != c_num
-                )
-            ]
-            if len(new_list) != len(following):
-                user_state["following"] = new_list
-                removed = True
-
-        if removed:
-            self.save_state(data)
-        return removed
+    def get_unread_cases(self, user: str) -> list[TrackedCase]:
+        """Returns all tracked cases that have unread comments or status changes."""
+        all_tracked = self.get_tracked_cases(user)
+        return [
+            tc
+            for tc in all_tracked.values()
+            if tc.latest_known.unread_comment_count > 0
+            or tc.latest_known.status_changed
+        ]
 
     # --- Sync Checkpoints ---
 
@@ -284,4 +549,19 @@ class StateService:
         user_state = self._get_user_state(data, user)
         tags_dict = user_state.setdefault("tags", {})
         tags_dict[str(case_number)] = list(tags)
+        self.save_state(data)
+
+    def get_tui_layout(self, user: str) -> str:
+        """Returns persistent TUI layout for user ('vertical' or 'horizontal')."""
+        data = self.load_state()
+        user_state = self._get_user_state(data, user)
+        return user_state.get("tui_layout", "vertical")
+
+    def set_tui_layout(self, user: str, layout: str) -> None:
+        """Sets persistent TUI layout for user ('vertical' or 'horizontal')."""
+        data = self.load_state()
+        user_state = self._get_user_state(data, user)
+        user_state["tui_layout"] = (
+            "horizontal" if layout in ("horizontal", "mailbox") else "vertical"
+        )
         self.save_state(data)

@@ -73,17 +73,16 @@ bookmarks:
 
 ## 4. Case Sizing Templates
 
-Templates are Jinja2-compatible YAML files located inside `~/.config/rh-support-cli/templates/`. They allow pre-filling case values during creation (`create`) or enforcing compliance/adding default watchers post-creation (`apply`).
+Templates are Jinja2-compatible YAML files located inside `~/.config/rh-support-cli/templates/`. They allow pre-filling case values during creation (`create`) or enforcing compliance/updating fields post-creation (`apply`).
 
 ### Template Metadata and Underscore (`_`) Fields
 Any keys in a template file starting with an underscore `_` are treated as **private metadata** for the template itself. They are ignored when rendering, compiling, or sending payloads to the Red Hat API, keeping your case comments/descriptions safe.
 
-#### Example `templates/default-watchers.yaml`:
+#### Example `templates/prod-standard.yaml`:
 ```yaml
-_template_description: "Add core platform team watchers to cases"
-watchers:
-  - alice
-  - bob
+_template_description: "Standard production severity and status settings"
+severity: "2 (High)"
+status: "Waiting on Customer Action Required"
 ```
 
 ### Comment Templates
@@ -145,8 +144,7 @@ description: |
   ```text
   {{ cluster_details }}
   ```
-watchers:
-  - ocp-leads-mailing-list@example.com
+severity: "1 (Urgent)"
 ```
 
 #### 2. Gather Cluster Status
@@ -252,8 +250,8 @@ rh-support-cli close -c 12345678 -t close_case
     ```bash
     rh-support-cli attachment -c 12345678 status [-a <ATTACHMENT_UUID>]
     ```
-### Following & Unfollowing Cases (`follow` / `unfollow` / `following`)
-Attach or remove yourself (or a specific SSO user) as a watcher on one or multiple support cases, or query cases you are currently following:
+### Following & Tracking Cases Locally (`follow` / `unfollow` / `following`)
+Because remote watcher APIs are no longer part of Red Hat's CRM platform, the CLI maintains local case tracking inside `~/.config/rh-support-cli/state.yaml`. Followed cases are monitored across local sessions, synced with remote updates, and flagged with visual indicators:
 
 *   **Follow a single case**:
     ```bash
@@ -265,7 +263,7 @@ Attach or remove yourself (or a specific SSO user) as a watcher on one or multip
     ```bash
     rh-support-cli follow 12345678 23456789 34567890
     ```
-*   **Follow on behalf of another user**:
+*   **Follow on behalf of another user identity**:
     ```bash
     rh-support-cli follow 12345678 --user alice
     ```
@@ -274,12 +272,6 @@ Attach or remove yourself (or a specific SSO user) as a watcher on one or multip
     rh-support-cli following
     # or with standard list filter:
     rh-support-cli list --following
-    ```
-*   **Sync followed cases from account**:
-    ```bash
-    rh-support-cli follow --sync
-    # or while listing:
-    rh-support-cli following --sync
     ```
 *   **Filter followed cases via config bookmark**:
     ```yaml
@@ -294,24 +286,84 @@ Attach or remove yourself (or a specific SSO user) as a watcher on one or multip
     ```bash
     rh-support-cli unfollow 12345678
     rh-support-cli unfollow 12345678 23456789
-    rh-support-cli unfollow 12345678 --user alice
+    ```
+
+### Synchronizing Tracked Cases & Background Service (`sync`)
+Poll Red Hat's GraphQL backend in parallel across all tracked (followed and owned) cases to detect status changes and new comments:
+
+*   **Run a manual sync**:
+    ```bash
+    rh-support-cli sync
+    ```
+*   **Sync with desktop notification**:
+    If new comments or status transitions are detected, send a desktop notification using `notify-send`:
+    ```bash
+    rh-support-cli sync --notify
+    ```
+*   **Install systemd user service & timer**:
+    Automatically generate and install user-level systemd service and timer units to poll periodically in the background:
+    ```bash
+    rh-support-cli sync --install-systemd --interval 15m
+
+    # Enable and start the timer:
+    systemctl --user daemon-reload
+    systemctl --user enable --now rh-support-sync.timer
+    ```
+
+### Querying Unread Case Updates (`updates`)
+Quickly inspect what changed on your tracked cases since you last checked:
+
+*   **View unread update summary**:
+    ```bash
+    rh-support-cli updates
+    ```
+*   **View full comment content**:
+    ```bash
+    rh-support-cli updates --full
+    ```
+*   **Filter updates to a single case**:
+    ```bash
+    rh-support-cli updates -c 12345678
+    ```
+*   **Mark updates as read while reviewing**:
+    ```bash
+    rh-support-cli updates --mark-read
+    ```
+*   **Show all tracked cases (including those without updates)**:
+    ```bash
+    rh-support-cli updates --all
+    ```
+
+### Visual Indicators & Read Checkpoints
+Both the CLI and TUI provide clear visual cues for tracked cases:
+*   **Table Badges**: In `list` and the TUI case table, followed cases display `★` and cases with unread updates display `●` (with unread comment count). In `--simple-output`, they appear as `[F]` and `*`.
+*   **Status Change Banner**: When viewing a case whose status changed remotely (`show` or TUI), a distinct banner highlights the change:
+    ```text
+    ⚡ Status Changed: Waiting on Red Hat ➔ Waiting on Customer Action Required
+    ```
+*   **Checkpoint Divider**: When reading a case with new comments, a dotted divider separates previously seen comments from unread ones:
+    ```text
+    ┈┈┈┈ 📍 Last read checkpoint (2026-10-08T10:00:00Z) │ ▼ 2 unread below ┈┈┈┈
+    ```
+*   **Mark Read via CLI**:
+    ```bash
+    rh-support-cli show -c 12345678 --mark-read
     ```
 
 ### Local State & Cache Management (`state.yaml`)
 Operational state (such as followed cases, sync checkpoints, pinned tickets, and local tags) is managed in `~/.config/rh-support-cli/state.yaml` (or via `RH_SUPPORT_STATE` / `XDG_CONFIG_HOME`). It uses safe atomic file operations and scopes metadata per SSO identity.
 
 ### Listing local templates
-List all configured local templates, including their private descriptions, target fields, and watchers. This command runs **completely offline**:
+List all configured local templates, including their private descriptions and target fields. This command runs **completely offline**:
 ```bash
 rh-support-cli list-templates
 ```
 
 ### Applying a Template
-Apply a template over an existing case. Only fields that differ will be updated, and only missing watchers will be added:
+Apply a template over an existing case. Only fields that differ will be updated:
 ```bash
-rh-support-cli apply -c 12345678 -t default-watchers --dry-run
+rh-support-cli apply -c 12345678 -t prod-standard --dry-run
 ```
-
 ### Custom Simple Output Fallback
 If you are pipe-logging or working in a terminal that doesn't support rich formatting, pass the global `--simple-output` flag to strip all terminal escape colors and layout borders:
 ```bash
@@ -326,13 +378,16 @@ rh-support-cli tui
 ```
 
 ### CLI Options:
+*   `-l <layout>` / `--layout <layout>`: Select TUI split layout (`vertical` for side-by-side or `horizontal` / `mailbox` for top-and-bottom mailbox style).
 *   `-b <bookmark_name>` / `--bookmark <bookmark_name>`: Launch the TUI using a specific bookmark of filters on startup instead of the default bookmark.
 *   `--no-default-bookmark`: Launch the TUI completely unfiltered, loading all cases on startup.
 
-### Core Features & Layout
-*   **Dual-Pane View**: Case table on the left, full rich case details, descriptions (fully rendered Markdown), and complete scrollable comments thread on the right.
+### Core Features & Layout Modes
+*   **Vertical Split (Side-by-Side)**: Case table on the left, full rich case details, descriptions (fully rendered Markdown), and complete scrollable comments thread on the right.
+*   **Horizontal Split (Mailbox Style)**: Full-width case list positioned across the top (like an email inbox), with expansive case details and comment thread below. Ideal for terminal multiplexers (`tmux`/`screen`) and widescreen monitors.
+*   **Compact Zero-Margin Panes**: Panes sit flush against each other with zero margin gap, maximizing terminal columns and rows for case text and tables.
+*   **Persistent Layout Preference**: Toggling layouts or configuring `default_layout: horizontal` / `tui_layout: horizontal` in `~/.config/rh-support-cli/config.yaml` or `state.yaml` automatically preserves your preferred view.
 *   **Contextual Command Buttons**: Interactive action buttons (`Comment (C)`, `Template (T)`, `Bookmark (B)`, `Refresh (R)`) for easy mouse-clicks or keyboard legends.
-
 ### Keyboard Navigation & Scrolling Controls
 Toggle focus between the case list and details pane using **`Tab`** or **`Shift+Tab`**. When focused on a pane:
 
@@ -345,12 +400,18 @@ Toggle focus between the case list and details pane using **`Tab`** or **`Shift+
 | **`a`** | Specify and upload local file attachments (Attach Modal) |
 | **`t`** | Select and apply a local template (Template Modal) |
 | **`b`** | Select and apply an active filter bookmark dynamically (Bookmark Modal) |
+| **`v` / `l`** | Toggle split layout between vertical (side-by-side) and horizontal (mailbox style) |
+| **`w`** | Toggle follow/unfollow for the currently selected case |
+| **`m`** | Explicitly mark the currently selected case as read |
 | **`f`** | Zoom / Focus on the active pane (press again to exit fullscreen) |
 | **`Escape`** | Exit fullscreen focus mode (unfocus layout) |
 | **`Ctrl+X`** | Close / Cancel commenting from anywhere inside the TUI (Comment Pane) |
 | **`r`** | Trigger contextual refresh (refreshes case details if focused; refreshes case list if table is focused) |
 | **`q`** | Quit the TUI |
 
+### TUI Unread Auto-Navigation & Dwell Mark-Read
+*   **Auto-Scroll to Unread**: When selecting a case with unread comments, the details pane automatically scrolls to the yellow dotted checkpoint divider (`┈┈┈┈ 📍 Last read checkpoint ... ┈┈┈┈`).
+*   **Dwell Auto-Mark Read**: Dwelling on an active case for 2.5 seconds automatically advances the read checkpoint in `state.yaml` and clears the unread badge (`●`) from the case table.
 ## 7. Stateful Offline Mock Support Mode (Offline & Demos)
 
 To facilitate zero-setup demonstrations, offline testing, and development without real credentials or network connectivity, the tool includes an advanced, built-in **Stateful Offline Mock Support Mode**.

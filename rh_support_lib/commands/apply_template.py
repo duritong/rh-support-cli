@@ -1,10 +1,9 @@
 import os
 import sys
 
-import requests
 import yaml
 
-from rh_support_lib.constants import API_URL, COLORS, SEVERITY_MAP, STATUS_MAP
+from rh_support_lib.constants import COLORS, SEVERITY_MAP, STATUS_MAP
 from rh_support_lib.services.cases import CaseService
 from rh_support_lib.templates import TemplateEngine
 from rh_support_lib.utils import colorize
@@ -125,48 +124,8 @@ def cmd_apply(args, api_client, config):
             elif v is not None:
                 if str(current_val).strip() != str(v).strip():
                     updates[target_key] = v
-    # 4. Compute watchers/notified users differences
-    watchers_keys = ["notified_users", "notifiedUsers", "watchers"]
-    template_watchers = []
-    for wk in watchers_keys:
-        if wk in template_data:
-            val = template_data[wk]
-            if isinstance(val, list):
-                for item in val:
-                    if isinstance(item, dict):
-                        sso = item.get("ssoUsername") or item.get("username")
-                        if sso:
-                            template_watchers.append(str(sso))
-                    elif isinstance(item, str):
-                        template_watchers.append(item)
-            elif isinstance(val, str):
-                template_watchers.extend(
-                    [s.strip() for s in val.split(",") if s.strip()]
-                )
-
-    # Dedup target watchers case-insensitively while preserving original case
-    target_watchers = {}
-    for w in template_watchers:
-        target_watchers[w.lower()] = w
-
-    existing_watchers = case.get("notifiedUsers", [])
-    existing_ssos = set()
-    if isinstance(existing_watchers, list):
-        for u in existing_watchers:
-            if isinstance(u, dict):
-                sso = u.get("ssoUsername")
-                if sso:
-                    existing_ssos.add(sso.lower())
-            elif isinstance(u, str):
-                existing_ssos.add(u.lower())
-
-    watchers_to_add = []
-    for low_sso, orig_sso in target_watchers.items():
-        if low_sso not in existing_ssos:
-            watchers_to_add.append(orig_sso)
-
-    # 5. Output comparison and update plan
-    if not updates and not watchers_to_add:
+    # 4. Output comparison and update plan
+    if not updates:
         print(
             f"Case #{args.case} already adheres to the template(s). No changes needed."
         )
@@ -182,12 +141,6 @@ def cmd_apply(args, api_client, config):
             # Apply terminal colors if enabled
             c_label = colorize(k, COLORS.BOLD, args.simple_output)
             print(f"    - {c_label}: {current_val} -> {v}")
-
-    if watchers_to_add:
-        print("  Watchers to add:")
-        for w in sorted(watchers_to_add):
-            c_watcher = colorize(w, COLORS.GREEN, args.simple_output)
-            print(f"    - {c_watcher}")
 
     # 6. Apply updates or exit on dry-run
     if args.dry_run:
@@ -207,22 +160,6 @@ def cmd_apply(args, api_client, config):
             print("Success: Case fields updated.")
         except Exception as e:  # noqa: BLE001
             sys.exit(f"Network Error updating fields: {e}")
-    if watchers_to_add:
-        print("Adding watchers...")
-        payload = {"user": [{"ssoUsername": sso} for sso in watchers_to_add]}
-        try:
-            resp = api_client.post(
-                f"{API_URL}/cases/{args.case}/notifiedusers",
-                json=payload,
-            )
-            if resp.status_code in [200, 201]:
-                print("Success: Watchers added.")
-            else:
-                print(f"Error: Watcher addition failed (HTTP {resp.status_code})")
-                print(resp.text)
-                sys.exit(1)
-        except requests.exceptions.RequestException as e:
-            sys.exit(f"Network Error adding watchers: {e}")
 
 
 def cmd_list_templates(args, config):
@@ -274,23 +211,6 @@ def cmd_list_templates(args, config):
         if isinstance(includes, str):
             includes = [includes]
 
-        # Get watchers
-        watchers_keys = ["notified_users", "notifiedUsers", "watchers"]
-        watchers = []
-        for wk in watchers_keys:
-            if wk in data:
-                val = data[wk]
-                if isinstance(val, list):
-                    for item in val:
-                        if isinstance(item, dict):
-                            sso = item.get("ssoUsername") or item.get("username")
-                            if sso:
-                                watchers.append(str(sso))
-                        elif isinstance(item, str):
-                            watchers.append(item)
-                elif isinstance(val, str):
-                    watchers.extend([s.strip() for s in val.split(",") if s.strip()])
-
         # Fields (everything else except description, include_templates, watchers, and anything starting with '_')
         special_keys = {
             "description",
@@ -300,7 +220,10 @@ def cmd_list_templates(args, config):
             "_template_desc",
             "_description",
             "_desc",
-        } | set(watchers_keys)
+            "notified_users",
+            "notifiedUsers",
+            "watchers",
+        }
         fields = {
             k: v
             for k, v in data.items()
@@ -317,11 +240,7 @@ def cmd_list_templates(args, config):
             if fields:
                 fields_str = ", ".join(f"{k}: {v}" for k, v in fields.items())
                 print(f"  Fields:    {fields_str}")
-            if watchers:
-                watchers_str = ", ".join(
-                    colorize(w, COLORS.GREEN, args.simple_output) for w in watchers
-                )
-                print(f"  Watchers:  {watchers_str}")
+
             if includes:
                 includes_str = ", ".join(includes)
                 print(f"  Includes:  {includes_str}")
@@ -344,10 +263,7 @@ def cmd_list_templates(args, config):
                 fields_str = ", ".join(f"{k}: {v}" for k, v in fields.items())
                 body_text.append("Fields:    ", style="bold yellow")
                 body_text.append(f"{fields_str}\n")
-            if watchers:
-                watchers_str = ", ".join(watchers)
-                body_text.append("Watchers:  ", style="bold yellow")
-                body_text.append(f"{watchers_str}\n", style="green")
+
             if includes:
                 includes_str = ", ".join(includes)
                 body_text.append("Includes:  ", style="bold yellow")

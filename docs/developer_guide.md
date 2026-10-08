@@ -27,7 +27,8 @@ The project is structured as a Python CLI wrapper around the Red Hat Support Cas
     │   ├── create_case.py  # create subcommand
     │   ├── list_cases.py   # list subcommand (Rich Table based)
     │   ├── show_case.py    # show subcommand (Rich Panels/Markdown based)
-    │   └── watchers.py     # follow, unfollow, following subcommands
+    │   ├── tracking.py     # sync and updates subcommands, systemd unit generation
+    │   └── watchers.py     # follow, unfollow, following subcommands (local state)
     ├── services/           # Decoupled domain service layer
     │   ├── attachments.py  # AttachmentService (v3 presigned upload, download, delete, status)
     │   ├── cases.py        # CaseService (GraphQL queries, mutations, case lookups)
@@ -41,12 +42,18 @@ The project is structured as a Python CLI wrapper around the Red Hat Support Cas
 
 ### Key Design Decoupling
 *   **Library-First Domain Services**: Core domain logic is encapsulated within `rh_support_lib/services/` (`CaseService`, `AttachmentService`, and `StateService`). Both CLI subcommands (`commands/`) and the interactive dashboard (`tui/`) act as presentation-only consumers of normalized domain models (`models.py`), ensuring complete separation of concerns and zero API/state leakages into UI code.
-*   **Generic State & Cache Decoupling**: Persistent operational metadata (e.g. followed cases registry, sync checkpoints, pinned tickets, local tags) is managed via `StateService` (`state.yaml`) with atomic file writes and per-identity user scoping.
+*   **Generic State & Cache Decoupling**: Persistent operational metadata (e.g. followed/owned cases registry, read checkpoints, unread counts, sync checkpoints, pinned tickets, local tags) is managed via `StateService` (`state.yaml`) with atomic file writes and per-identity user scoping.
+*   **Local Follow & Change Tracking**: Because remote server-side watchers are deprecated in the new CRM platform, case tracking is handled locally via `StateService`. Checkpoints track `status` and `last_read_comment_date`/`last_read_comment_id`. Parallel background syncing (`sync`) and review commands (`updates`, `show --mark-read`) enable fast differential analysis without server-side watcher dependencies.
 *   **Modern API Backend**: `CaseService` and `AttachmentService` communicate natively with Red Hat's CRM platform via GraphQL (`https://graphql.redhat.com`) and the v3 Attachment Service.
 *   **Presigned Direct Transfer Attachments**: Under the new CRM mode, large files up to 5 TB bypass intermediate API gateways via `AttachmentService`, using single PUT ($\le 5\text{ GB}$) or multipart parallel chunks (> $5\text{ GB}$) with automatic completion verification.
 *   **No-Auth Execution Paths**: Commands that only inspect local resources (like `list-templates` and `completion`) are routed before OIDC token fetching in `main.py`, providing fast, completely offline execution.
-
 The interactive dashboard is implemented using the **`Textual`** reactive framework. 
+
+### Responsive Dual-Layout (Vertical vs Horizontal Mailbox)
+The TUI supports two responsive viewing topologies:
+1.  **Vertical Split (`Screen`)**: Side-by-side (`grid-columns: 2fr 3fr`), ideal for standard terminal windows.
+2.  **Horizontal Split (`Screen.layout-horizontal`)**: Mailbox style (`grid-rows: 2fr 3fr; grid-columns: 1fr`), positioning a full-width case table across the top and case details below. Ideal for terminal multiplexers (`tmux`/`screen`) and wide viewports.
+Panes utilize compact zero-margin boundaries (`margin: 0; padding: 0 1;`) to maximize visible information density, with single-pane zoom (`f` / `focus_pane`) seamlessly expanding whichever pane is active across the entire viewport in both modes.
 
 ### Dynamic Container View-Swapping
 To prevent standard widget-mounting or type-mismatch exceptions inside Textual, the right-hand case detail pane (`#case-detail-container`) uses a view-swapping architecture:
