@@ -1,10 +1,15 @@
 import html
+import json
 import os
 import re
 import shlex
 import subprocess
 import tempfile
+from dataclasses import asdict, is_dataclass
 from html.parser import HTMLParser
+from typing import Any
+
+import yaml
 
 from rh_support_lib.constants import COLORS
 
@@ -285,3 +290,21 @@ def open_editor(case_number, status_label, header_content=None, initial_body=Non
         if os.path.exists(tf_path):
             os.remove(tf_path)
         raise
+
+
+def format_structured_output(data: Any, fmt: str = "json") -> str:
+    """Formats structured data (dataclasses, lists, dicts) as JSON or YAML."""
+
+    def _convert(obj: Any) -> Any:
+        if is_dataclass(obj) and not isinstance(obj, type):
+            return {k: _convert(v) for k, v in asdict(obj).items()}
+        if isinstance(obj, (list, tuple, set)):
+            return [_convert(x) for x in obj]
+        if isinstance(obj, dict):
+            return {str(k): _convert(v) for k, v in obj.items()}
+        return obj
+
+    converted = _convert(data)
+    if fmt == "yaml":
+        return yaml.dump(converted, sort_keys=False, default_flow_style=False)
+    return json.dumps(converted, indent=2, default=str)

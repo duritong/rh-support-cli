@@ -75,16 +75,21 @@ def cmd_list(args, api_client, config=None):
     sync_flag = bool(getattr(args, "sync", False))
     user_override = getattr(args, "user", None) or filters.get("user")
     service = CaseService(api_client)
+    fmt = getattr(args, "format", "text")
+    is_structured = fmt in ("json", "yaml") or getattr(args, "json", False)
+
     try:
         if is_following:
-            print("Fetching followed cases...")
+            if not is_structured:
+                print("Fetching followed cases...")
             cases = service.list_followed_cases(
                 username=user_override,
                 sync=sync_flag,
                 account=str(acc) if acc else None,
             )
         else:
-            print("Fetching cases...")
+            if not is_structured:
+                print("Fetching cases...")
             all_pages_flag = bool(getattr(args, "all", False))
             limit_val = getattr(args, "limit", None)
             cases = service.list_cases(
@@ -97,6 +102,12 @@ def cmd_list(args, api_client, config=None):
             )
     except Exception as e:  # noqa: BLE001
         sys.exit(f"Network Error: {e}")
+    if is_structured:
+        from rh_support_lib.utils import format_structured_output
+
+        print(format_structured_output(cases, fmt="yaml" if fmt == "yaml" else "json"))
+        return
+
     if not cases:
         print("No cases found.")
         return

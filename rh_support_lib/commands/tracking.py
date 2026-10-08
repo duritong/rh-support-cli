@@ -21,13 +21,21 @@ def cmd_sync(args, api_client, config=None):
     case_service = CaseService(api_client)
     user = getattr(args, "user", None) or case_service.get_current_user()
     acc = getattr(args, "account", None)
+    fmt = getattr(args, "format", "text")
+    is_structured = fmt in ("json", "yaml") or getattr(args, "json", False)
 
-    print(f"Syncing tracked cases for '{user}'...")
+    if not is_structured:
+        print(f"Syncing tracked cases for '{user}'...")
     try:
         res = case_service.sync_tracked_cases(username=user, account=acc)
     except Exception as e:  # noqa: BLE001
         sys.exit(f"Network Error during sync: {e}")
 
+    if is_structured:
+        from rh_support_lib.utils import format_structured_output
+
+        print(format_structured_output(res, fmt="yaml" if fmt == "yaml" else "json"))
+        return
     synced_count = res.get("synced_count", 0)
     updated = res.get("updated_cases", [])
     new_comments = res.get("new_comments", 0)
@@ -81,11 +89,26 @@ def cmd_updates(args, api_client, config=None):
             if tc.latest_known.unread_comment_count > 0
             or tc.latest_known.status_changed
         ]
+    mark_read_flag = bool(getattr(args, "mark_read", False))
+    fmt = getattr(args, "format", "text")
+    is_structured = fmt in ("json", "yaml") or getattr(args, "json", False)
+
+    if is_structured:
+        from rh_support_lib.utils import format_structured_output
+
+        print(
+            format_structured_output(
+                cases_to_check, fmt="yaml" if fmt == "yaml" else "json"
+            )
+        )
+        if mark_read_flag:
+            for tc in cases_to_check:
+                state_service.mark_case_read(user, tc.case_number)
+        return
 
     if not cases_to_check:
         print("No unread updates across tracked cases.")
         return
-
     full_output = getattr(args, "full", False)
     simple = getattr(args, "simple_output", False)
 

@@ -47,6 +47,7 @@ The project is structured as a Python CLI wrapper around the Red Hat Support Cas
 *   **Modern API Backend**: `CaseService` and `AttachmentService` communicate natively with Red Hat's CRM platform via GraphQL (`https://graphql.redhat.com`) and the v3 Attachment Service.
 *   **Presigned Direct Transfer Attachments**: Under the new CRM mode, large files up to 5 TB bypass intermediate API gateways via `AttachmentService`, using single PUT ($\le 5\text{ GB}$) or multipart parallel chunks (> $5\text{ GB}$) with automatic completion verification.
 *   **Relay Cursor-Based Pagination**: GraphQL operations use standardized Relay cursor connections (`edges { node, cursor }`, `pageInfo { hasNextPage, endCursor }`). `CaseService` features transparent auto-exhaustion for comment threads (`get_case_details`), configurable batch looping for case listings (`list_cases(all_pages=..., limit=...)`), and catalog iteration for products (`get_active_products`).
+*   **Structured Machine-Readable Serialization**: All domain models and query commands provide native serialization through `format_structured_output` (`--json`, `--format yaml`), stripping all interactive logging and ANSI escape sequences to enable robust scripting and pipe automation.
 *   **No-Auth Execution Paths**: Commands that only inspect local resources (like `list-templates` and `completion`) are routed before OIDC token fetching in `main.py`, providing fast, completely offline execution.
 The interactive dashboard is implemented using the **`Textual`** reactive framework. 
 

@@ -6,7 +6,10 @@ from rh_support_lib.services.cases import CaseService
 
 
 def cmd_show(args, api_client):
-    print(f"Fetching case {args.case}...")
+    fmt = getattr(args, "format", "text")
+    is_structured = fmt in ("json", "yaml") or getattr(args, "json", False)
+    if not is_structured:
+        print(f"Fetching case {args.case}...")
     service = CaseService(api_client)
     try:
         details = service.get_case_details(args.case)
@@ -56,6 +59,19 @@ def cmd_show(args, api_client):
         )
         tc = service.state_service.get_tracked_cases(user).get(str(num))
 
+    if is_structured:
+        from rh_support_lib.utils import format_structured_output
+
+        data = {
+            "case": case,
+            "description": description,
+            "comments": comments,
+            "attachments": attachments,
+        }
+        print(format_structured_output(data, fmt="yaml" if fmt == "yaml" else "json"))
+        if getattr(args, "mark_read", False):
+            service.state_service.mark_case_read(user, str(num))
+        return
     status_changed = False
     old_status = ""
     last_read_date = ""

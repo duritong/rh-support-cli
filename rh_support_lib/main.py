@@ -102,6 +102,18 @@ Authentication:
         "--token-file", help="Path to file containing the offline token"
     )
     parser.add_argument(
+        "-j",
+        "--json",
+        action="store_true",
+        help="Output structured results in JSON format",
+    )
+    parser.add_argument(
+        "--format",
+        choices=["text", "json", "yaml"],
+        default=None,
+        help="Output format: 'text' (default), 'json', or 'yaml'",
+    )
+    parser.add_argument(
         "--simple-output",
         action="store_true",
         help="Disable colored output and visual indicators",
@@ -573,6 +585,26 @@ Authentication:
         default=8080,
         help="Local TCP port to bind the server to (default: 8080)",
     )
+    for p in set(subparsers.choices.values()):
+        p.add_argument(
+            "-j", "--json", action="store_true", help="Output in JSON format"
+        )
+        p.add_argument(
+            "--format",
+            choices=["text", "json", "yaml"],
+            default=None,
+            help="Output format: 'text', 'json', or 'yaml'",
+        )
+    for att_p in set(att_sub.choices.values()):
+        att_p.add_argument(
+            "-j", "--json", action="store_true", help="Output in JSON format"
+        )
+        att_p.add_argument(
+            "--format",
+            choices=["text", "json", "yaml"],
+            default=None,
+            help="Output format: 'text', 'json', or 'yaml'",
+        )
 
     if argcomplete:
         argcomplete.autocomplete(parser)
@@ -580,6 +612,21 @@ Authentication:
     args = parser.parse_args()
     if "--simple-output" in sys.argv or getattr(args, "simple_output", False):
         args.simple_output = True
+
+    if (
+        "--json" in sys.argv
+        or "-j" in sys.argv
+        or getattr(args, "json", False)
+        or getattr(args, "format", None) == "json"
+    ):
+        args.format = "json"
+        args.json = True
+    elif getattr(args, "format", None) == "yaml":
+        args.format = "yaml"
+        args.json = False
+    else:
+        args.format = "text"
+        args.json = False
 
     config = load_config(args.config_file)
 
@@ -604,10 +651,9 @@ Authentication:
     # Instantiate RedHatAPIClient before running commands
     from rh_support_lib.api import RedHatAPIClient
 
-    if args.command != "tui":
+    if args.command != "tui" and getattr(args, "format", "text") == "text":
         print("Authenticating...")
     api_client = RedHatAPIClient(args.token_file)
-
     if args.command == "attach":
         cmd_attach(args, api_client)
     elif args.command == "download":

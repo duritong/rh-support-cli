@@ -50,10 +50,20 @@ def cmd_attachment_list(args, api_client):
     except Exception as e:  # noqa: BLE001
         sys.exit(f"Error fetching attachments: {e}")
 
+    fmt = getattr(args, "format", "text")
+    if fmt in ("json", "yaml") or getattr(args, "json", False):
+        from rh_support_lib.utils import format_structured_output
+
+        print(
+            format_structured_output(
+                attachments, fmt="yaml" if fmt == "yaml" else "json"
+            )
+        )
+        return
+
     if not attachments:
         print(f"No attachments found for Case #{case_num}.")
         return
-
     if simple_output:
         print(f"Attachments for Case #{case_num}:")
         print(
@@ -135,12 +145,29 @@ def cmd_attachment_download(args, api_client):
         sys.exit("Error: Attachment ID (--attachment / -a) is required.")
 
     target_path = getattr(args, "output", None)
-    print(f"Downloading attachment '{att_id}' from Case #{case_num}...")
+    fmt = getattr(args, "format", "text")
+    is_structured = fmt in ("json", "yaml") or getattr(args, "json", False)
+    if not is_structured:
+        print(f"Downloading attachment '{att_id}' from Case #{case_num}...")
     try:
         saved_path = service.download_attachment(
             case_num, att_id, target_path=target_path
         )
-        print(f"Successfully downloaded attachment to: {saved_path}")
+        if is_structured:
+            from rh_support_lib.utils import format_structured_output
+
+            print(
+                format_structured_output(
+                    {
+                        "case_number": case_num,
+                        "attachment_id": att_id,
+                        "saved_path": saved_path,
+                    },
+                    fmt="yaml" if fmt == "yaml" else "json",
+                )
+            )
+        else:
+            print(f"Successfully downloaded attachment to: {saved_path}")
     except Exception as e:  # noqa: BLE001
         sys.exit(f"Error downloading attachment: {e}")
 
@@ -180,6 +207,15 @@ def cmd_attachment_status(args, api_client):
         statuses = service.get_attachment_status(case_num, att_id)
     except Exception as e:  # noqa: BLE001
         sys.exit(f"Error fetching attachment status: {e}")
+
+    fmt = getattr(args, "format", "text")
+    if fmt in ("json", "yaml") or getattr(args, "json", False):
+        from rh_support_lib.utils import format_structured_output
+
+        print(
+            format_structured_output(statuses, fmt="yaml" if fmt == "yaml" else "json")
+        )
+        return
 
     for st in statuses:
         fname = st.get("fileName", "Unknown")

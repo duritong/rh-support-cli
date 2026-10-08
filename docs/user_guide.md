@@ -386,12 +386,30 @@ Apply a template over an existing case. Only fields that differ will be updated:
 ```bash
 rh-support-cli apply -c 12345678 -t prod-standard --dry-run
 ```
+### Machine-Readable Output (`--json` & `--format`)
+For shell scripting, Ansible playbooks, and pipe processing with `jq`, any CLI command supports structured machine-readable outputs:
+*   **`--json` / `-j`**: Output formatted JSON with zero terminal noise (suppresses authentication headers and banners).
+*   **`--format <text|json|yaml>`**: Choose between standard `text`, pure `json`, or parseable `yaml`.
+
+```bash
+# Extract case numbers of all open tickets:
+rh-support-cli list --status open --json | jq -r '.[].case_number'
+
+# Inspect full case details as structured YAML:
+rh-support-cli show -c 12345678 --format yaml
+
+# List attachments of a case as JSON:
+rh-support-cli list-attachments 12345678 --json | jq '.[].uuid'
+
+# Export template definitions:
+rh-support-cli list-templates --json
+```
+
 ### Custom Simple Output Fallback
 If you are pipe-logging or working in a terminal that doesn't support rich formatting, pass the global `--simple-output` flag to strip all terminal escape colors and layout borders:
 ```bash
 rh-support-cli --simple-output show -c 12345678
 ```
-
 ## 6. Interactive TUI Mode (`tui`)
 
 Launch a full split-pane interactive dashboard to manage your cases directly inside your terminal:

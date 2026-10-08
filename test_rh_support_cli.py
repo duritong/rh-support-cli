@@ -4066,6 +4066,71 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         self.assertEqual(len(products_single), 1)
         self.assertEqual(products_single[0].name, "Red Hat Enterprise Linux")
 
+    def test_json_and_yaml_list_output(self):
+        """Test listing cases in machine-readable JSON and YAML format without logging noise."""
+        import json
+
+        import yaml
+
+        # 1. JSON output
+        res_json = self.run_cli(["list", "--json"])
+        self.assertEqual(res_json.returncode, 0)
+        self.assertNotIn("Authenticating...", res_json.stdout)
+        self.assertNotIn("Fetching cases...", res_json.stdout)
+        data = json.loads(res_json.stdout)
+        self.assertIsInstance(data, list)
+        self.assertGreater(len(data), 0)
+        self.assertIn("case_number", data[0])
+        self.assertIn("status", data[0])
+
+        # 2. YAML output
+        res_yaml = self.run_cli(["list", "--format", "yaml"])
+        self.assertEqual(res_yaml.returncode, 0)
+        self.assertNotIn("Authenticating...", res_yaml.stdout)
+        data_yaml = yaml.safe_load(res_yaml.stdout)
+        self.assertIsInstance(data_yaml, list)
+        self.assertIn("case_number", data_yaml[0])
+
+    def test_json_and_yaml_show_output(self):
+        """Test showing case details in machine-readable JSON and YAML format."""
+        import json
+
+        import yaml
+
+        # 1. JSON output
+        res_json = self.run_cli(["show", "-c", "12345", "--json"])
+        self.assertEqual(res_json.returncode, 0)
+        self.assertNotIn("Authenticating...", res_json.stdout)
+        self.assertNotIn("Fetching case", res_json.stdout)
+        data = json.loads(res_json.stdout)
+        self.assertIsInstance(data, dict)
+        self.assertIn("case", data)
+        self.assertIn("description", data)
+        self.assertIn("comments", data)
+        self.assertIn("attachments", data)
+        self.assertEqual(data["case"]["case_number"], "12345")
+
+        # 2. YAML output
+        res_yaml = self.run_cli(["show", "-c", "12345", "--format", "yaml"])
+        self.assertEqual(res_yaml.returncode, 0)
+        data_yaml = yaml.safe_load(res_yaml.stdout)
+        self.assertIsInstance(data_yaml, dict)
+        self.assertIn("case", data_yaml)
+        self.assertIn("comments", data_yaml)
+
+    def test_json_attachment_list_output(self):
+        """Test listing attachments in machine-readable JSON format."""
+        import json
+
+        res_json = self.run_cli(["list-attachments", "12345", "--json"])
+        self.assertEqual(res_json.returncode, 0)
+        self.assertNotIn("Authenticating...", res_json.stdout)
+        data = json.loads(res_json.stdout)
+        self.assertIsInstance(data, list)
+        self.assertGreater(len(data), 0)
+        self.assertIn("uuid", data[0])
+        self.assertIn("file_name", data[0])
+
 
 if __name__ == "__main__":
     unittest.main()

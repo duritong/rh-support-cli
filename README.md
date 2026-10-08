@@ -56,8 +56,10 @@ rh-support-cli [global options] <subcommand> [options]
 ```
 
 **Global Options:**
-- `--token-file`: Path to file containing the offline token.
+- `-j`, `--json`: Output structured results in JSON format (silences banner logs for clean pipe processing).
+- `--format`: Output format: `text` (default), `json`, or `yaml`.
 - `--simple-output`: Disable colored output and visual indicators.
+- `--token-file`: Path to file containing the offline token.
 
 ### 1. List Cases (`list`)
 

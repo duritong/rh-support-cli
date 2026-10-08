@@ -176,13 +176,23 @@ def cmd_list_templates(args, config):
     except OSError as e:
         sys.exit(f"Error listing template files: {e}")
 
+    fmt = getattr(args, "format", "text")
+    is_structured = fmt in ("json", "yaml") or getattr(args, "json", False)
+
     if not files:
+        if is_structured:
+            from rh_support_lib.utils import format_structured_output
+
+            print(format_structured_output([], fmt="yaml" if fmt == "yaml" else "json"))
+            sys.exit(0)
         print(f"No templates found in {templates_dir}")
         sys.exit(0)
 
     files.sort()
-    print(f"Found {len(files)} template(s) in {templates_dir}:\n")
+    if not is_structured:
+        print(f"Found {len(files)} template(s) in {templates_dir}:\n")
 
+    records = []
     for f in files:
         path = os.path.join(templates_dir, f)
         name = os.path.splitext(f)[0]
@@ -229,6 +239,18 @@ def cmd_list_templates(args, config):
             for k, v in data.items()
             if k not in special_keys and not k.startswith("_")
         }
+
+        records.append(
+            {
+                "name": name,
+                "file": f,
+                "description": description,
+                "fields": fields,
+                "includes": includes,
+            }
+        )
+        if is_structured:
+            continue
 
         # Colorize and print
         if args.simple_output:
@@ -277,3 +299,11 @@ def cmd_list_templates(args, config):
                 )
             )
             console.print()
+
+    if is_structured:
+        from rh_support_lib.utils import format_structured_output
+
+        print(
+            format_structured_output(records, fmt="yaml" if fmt == "yaml" else "json")
+        )
+        sys.exit(0)
