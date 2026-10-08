@@ -3568,36 +3568,34 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         try:
             state_file = os.path.join(temp_dir, "state.yaml")
             svc = StateService(state_file=state_file)
+            self.assertEqual(svc.get_tui_layout("testuser"), "horizontal")
+            svc.set_tui_layout("testuser", "vertical")
             self.assertEqual(svc.get_tui_layout("testuser"), "vertical")
             svc.set_tui_layout("testuser", "horizontal")
             self.assertEqual(svc.get_tui_layout("testuser"), "horizontal")
             svc.set_tui_layout("testuser", "mailbox")
             self.assertEqual(svc.get_tui_layout("testuser"), "horizontal")
-            svc.set_tui_layout("testuser", "vertical")
-            self.assertEqual(svc.get_tui_layout("testuser"), "vertical")
         finally:
             shutil.rmtree(temp_dir)
 
-        # 2. Headless SupportApp with explicit layout="horizontal"
+        # 2. Headless SupportApp defaulting to horizontal mailbox
         async def run_layout_test():
-            app = SupportApp(
-                token="mock_access_token_123", config={}, layout="horizontal"
-            )
+            app = SupportApp(token="mock_access_token_123", config={})
             async with app.run_test() as pilot:
                 self.assertEqual(app.layout, "horizontal")
-                self.assertIn("layout-horizontal", app.screen.classes)
+                self.assertNotIn("layout-vertical", app.screen.classes)
 
                 # Toggle to vertical
                 app.action_toggle_layout()
                 await pilot.pause()
                 self.assertEqual(app.layout, "vertical")
-                self.assertNotIn("layout-horizontal", app.screen.classes)
+                self.assertIn("layout-vertical", app.screen.classes)
 
                 # Toggle back to horizontal
                 app.action_toggle_layout()
                 await pilot.pause()
                 self.assertEqual(app.layout, "horizontal")
-                self.assertIn("layout-horizontal", app.screen.classes)
+                self.assertNotIn("layout-vertical", app.screen.classes)
 
         asyncio.run(run_layout_test())
 

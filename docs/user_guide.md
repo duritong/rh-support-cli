@@ -378,13 +378,13 @@ rh-support-cli tui
 ```
 
 ### CLI Options:
-*   `-l <layout>` / `--layout <layout>`: Select TUI split layout (`vertical` for side-by-side or `horizontal` / `mailbox` for top-and-bottom mailbox style).
+*   `-l <layout>` / `--layout <layout>`: Select TUI split layout (`horizontal` / `mailbox` for default mailbox style or `vertical` for side-by-side).
 *   `-b <bookmark_name>` / `--bookmark <bookmark_name>`: Launch the TUI using a specific bookmark of filters on startup instead of the default bookmark.
 *   `--no-default-bookmark`: Launch the TUI completely unfiltered, loading all cases on startup.
 
 ### Core Features & Layout Modes
+*   **Horizontal Split (Mailbox Style - Default)**: Full-width case list positioned across the top (like an email inbox), with expansive case details and comment thread below. Ideal for terminal multiplexers (`tmux`/`screen`) and widescreen monitors.
 *   **Vertical Split (Side-by-Side)**: Case table on the left, full rich case details, descriptions (fully rendered Markdown), and complete scrollable comments thread on the right.
-*   **Horizontal Split (Mailbox Style)**: Full-width case list positioned across the top (like an email inbox), with expansive case details and comment thread below. Ideal for terminal multiplexers (`tmux`/`screen`) and widescreen monitors.
 *   **Compact Zero-Margin Panes**: Panes sit flush against each other with zero margin gap, maximizing terminal columns and rows for case text and tables.
 *   **Persistent Layout Preference**: Toggling layouts or configuring `default_layout: horizontal` / `tui_layout: horizontal` in `~/.config/rh-support-cli/config.yaml` or `state.yaml` automatically preserves your preferred view.
 *   **Contextual Command Buttons**: Interactive action buttons (`Comment (C)`, `Template (T)`, `Bookmark (B)`, `Refresh (R)`) for easy mouse-clicks or keyboard legends.

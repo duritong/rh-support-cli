@@ -559,16 +559,16 @@ class StateService:
         self.save_state(data)
 
     def get_tui_layout(self, user: str) -> str:
-        """Returns persistent TUI layout for user ('vertical' or 'horizontal')."""
+        """Returns persistent TUI layout for user ('horizontal' or 'vertical')."""
         data = self.load_state()
         user_state = self._get_user_state(data, user)
-        return user_state.get("tui_layout", "vertical")
+        return user_state.get("tui_layout", "horizontal")
 
     def set_tui_layout(self, user: str, layout: str) -> None:
-        """Sets persistent TUI layout for user ('vertical' or 'horizontal')."""
+        """Sets persistent TUI layout for user ('horizontal' or 'vertical')."""
         data = self.load_state()
         user_state = self._get_user_state(data, user)
         user_state["tui_layout"] = (
-            "horizontal" if layout in ("horizontal", "mailbox") else "vertical"
+            "vertical" if layout in ("vertical", "vsplit") else "horizontal"
         )
         self.save_state(data)

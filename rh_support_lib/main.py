@@ -522,7 +522,7 @@ Authentication:
         "-l",
         "--layout",
         choices=["vertical", "horizontal", "mailbox"],
-        help="Split layout: 'vertical' (side-by-side) or 'horizontal' / 'mailbox' (top-and-bottom)",
+        help="Split layout: 'horizontal' / 'mailbox' (default, top-and-bottom) or 'vertical' (side-by-side)",
     )
 
     # Mock Portal Subcommand

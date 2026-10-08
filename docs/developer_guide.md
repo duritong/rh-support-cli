@@ -49,10 +49,10 @@ The project is structured as a Python CLI wrapper around the Red Hat Support Cas
 *   **No-Auth Execution Paths**: Commands that only inspect local resources (like `list-templates` and `completion`) are routed before OIDC token fetching in `main.py`, providing fast, completely offline execution.
 The interactive dashboard is implemented using the **`Textual`** reactive framework. 
 
-### Responsive Dual-Layout (Vertical vs Horizontal Mailbox)
+### Responsive Dual-Layout (Horizontal Mailbox Default vs Vertical)
 The TUI supports two responsive viewing topologies:
-1.  **Vertical Split (`Screen`)**: Side-by-side (`grid-columns: 2fr 3fr`), ideal for standard terminal windows.
-2.  **Horizontal Split (`Screen.layout-horizontal`)**: Mailbox style (`grid-rows: 2fr 3fr; grid-columns: 1fr`), positioning a full-width case table across the top and case details below. Ideal for terminal multiplexers (`tmux`/`screen`) and wide viewports.
+1.  **Horizontal Split (`Screen` - Default)**: Mailbox style (`grid-rows: 2fr 3fr; grid-columns: 1fr`), positioning a full-width case table across the top and case details below. Ideal for terminal multiplexers (`tmux`/`screen`) and wide viewports.
+2.  **Vertical Split (`Screen.layout-vertical`)**: Side-by-side (`grid-columns: 2fr 3fr`), ideal for standard terminal orientations.
 Panes utilize compact zero-margin boundaries (`margin: 0; padding: 0 1;`) to maximize visible information density, with single-pane zoom (`f` / `focus_pane`) seamlessly expanding whichever pane is active across the entire viewport in both modes.
 
 ### Dynamic Container View-Swapping

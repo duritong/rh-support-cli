@@ -285,11 +285,12 @@ rh-support-cli updates --mark-read
 Launches a beautiful, interactive Terminal User Interface (TUI) to browse and manage your Red Hat support cases directly inside your terminal session.
 
 **Options:**
-- `-l`, `--layout`: Split layout: `vertical` (side-by-side) or `horizontal` / `mailbox` (top-and-bottom mailbox style)
+- `-l`, `--layout`: Split layout: `horizontal` / `mailbox` (default mailbox style) or `vertical` (side-by-side)
 - `-b`, `--bookmark`: Use a preset bookmark of filters on startup instead of the default bookmark
 - `--no-default-bookmark`: Do not load any default bookmark on startup (loads all cases unfiltered)
+
 **Features:**
-- **Dual Layout Topologies (Vertical & Horizontal Mailbox)**: Switch between vertical split (side-by-side) and horizontal split (mailbox style with a full-width case list on top and details below). Toggle dynamically at any time using **`v`** or **`l`**, or set via `--layout <vertical|horizontal|mailbox>`.
+- **Dual Layout Topologies (Horizontal Mailbox Default & Vertical)**: Features a mailbox-style layout by default (full-width case list on top and details below, maximizing wide terminals and multiplexers). Toggle dynamically to vertical side-by-side split at any time using **`v`** or **`l`**, or set via `--layout <horizontal|mailbox|vertical>`.
 - **Compact Zero-Margin Panes**: Panes sit flush with zero margin gap between borders, maximizing visible columns and rows for tables, logs, and comments.
 - **Asynchronous Background Processing**: Keeps the UI highly responsive by loading cases and updates asynchronously.
 - **Vim / Arrow Navigation**: Navigate intuitively with standard keyboard binds.

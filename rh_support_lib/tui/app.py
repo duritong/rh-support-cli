@@ -359,50 +359,54 @@ class SupportApp(App):
     CSS = """
     Screen {
         layout: grid;
-        grid-size: 2;
-        grid-columns: 2fr 3fr;
-        scrollbar-size: 1 1;
-    }
-    Screen.layout-horizontal {
-        layout: grid;
         grid-size: 1 2;
         grid-rows: 2fr 3fr;
         grid-columns: 1fr;
         scrollbar-size: 1 1;
     }
-    Screen.layout-horizontal.commenting {
+    Screen.commenting {
         grid-rows: 1fr 2fr;
     }
-    Screen.focused-left, Screen.layout-horizontal.focused-left {
+    Screen.layout-vertical {
+        layout: grid;
+        grid-size: 2;
+        grid-columns: 2fr 3fr;
+        grid-rows: 1fr;
+        scrollbar-size: 1 1;
+    }
+    Screen.layout-vertical.commenting {
+        grid-rows: 1fr;
+    }
+    Screen.focused-left, Screen.layout-vertical.focused-left {
         layout: vertical;
     }
-    Screen.focused-left #right-column-container, Screen.layout-horizontal.focused-left #right-column-container {
+    Screen.focused-left #right-column-container, Screen.layout-vertical.focused-left #right-column-container {
         display: none;
     }
-    Screen.focused-left #case-list-container, Screen.layout-horizontal.focused-left #case-list-container {
+    Screen.focused-left #case-list-container, Screen.layout-vertical.focused-left #case-list-container {
         width: 100%;
         height: 100%;
     }
-    Screen.focused-right, Screen.layout-horizontal.focused-right {
+    Screen.focused-right, Screen.layout-vertical.focused-right {
         layout: vertical;
     }
-    Screen.focused-right #case-list-container, Screen.layout-horizontal.focused-right #case-list-container {
+    Screen.focused-right #case-list-container, Screen.layout-vertical.focused-right #case-list-container {
         display: none;
     }
-    Screen.focused-right #right-column-container, Screen.layout-horizontal.focused-right #right-column-container {
+    Screen.focused-right #right-column-container, Screen.layout-vertical.focused-right #right-column-container {
         width: 100%;
         height: 100%;
     }
-    Screen.focused-comment, Screen.layout-horizontal.focused-comment {
+    Screen.focused-comment, Screen.layout-vertical.focused-comment {
         layout: vertical;
     }
-    Screen.focused-comment #case-list-container, Screen.layout-horizontal.focused-comment #case-list-container {
+    Screen.focused-comment #case-list-container, Screen.layout-vertical.focused-comment #case-list-container {
         display: none;
     }
-    Screen.focused-comment #case-detail-container, Screen.layout-horizontal.focused-comment #case-detail-container {
+    Screen.focused-comment #case-detail-container, Screen.layout-vertical.focused-comment #case-detail-container {
         display: none;
     }
-    Screen.focused-comment #comment-pane-container, Screen.layout-horizontal.focused-comment #comment-pane-container {
+    Screen.focused-comment #comment-pane-container, Screen.layout-vertical.focused-comment #comment-pane-container {
         width: 100%;
         height: 100%;
         display: block;
@@ -583,10 +587,10 @@ class SupportApp(App):
             or (config.get("tui_layout") if config else None)
             or (config.get("layout") if config else None)
             or saved_layout
-            or "vertical"
+            or "horizontal"
         ).lower()
         self.layout = (
-            "horizontal" if initial_layout in ("horizontal", "mailbox") else "vertical"
+            "vertical" if initial_layout in ("vertical", "vsplit") else "horizontal"
         )
 
     def compose(self) -> ComposeResult:
@@ -609,8 +613,8 @@ class SupportApp(App):
         table = self.query_one("#case-table", DataTable)
         table.add_columns("NUMBER", "TITLE", "SEVERITY", "STATUS")
         table.cursor_type = "row"
-        if self.layout == "horizontal":
-            self.screen.add_class("layout-horizontal")
+        if self.layout == "vertical":
+            self.screen.add_class("layout-vertical")
         self.run_worker(self.fetch_cases, thread=True)
 
     def fetch_cases(self) -> None:
@@ -1145,13 +1149,13 @@ class SupportApp(App):
         self.update_case_table_row(case_id)
 
     def action_toggle_layout(self) -> None:
-        """Toggle between vertical split (side-by-side) and horizontal split (mailbox style)."""
-        if "layout-horizontal" in self.screen.classes:
-            self.screen.remove_class("layout-horizontal")
-            self.layout = "vertical"
-        else:
-            self.screen.add_class("layout-horizontal")
+        """Toggle between horizontal split (mailbox style) and vertical split (side-by-side)."""
+        if "layout-vertical" in self.screen.classes:
+            self.screen.remove_class("layout-vertical")
             self.layout = "horizontal"
+        else:
+            self.screen.add_class("layout-vertical")
+            self.layout = "vertical"
         with contextlib.suppress(Exception):
             user = self.case_service.get_current_user()
             self.case_service.state_service.set_tui_layout(user, self.layout)
