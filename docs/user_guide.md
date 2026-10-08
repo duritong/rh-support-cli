@@ -251,7 +251,7 @@ rh-support-cli close -c 12345678 -t close_case
     rh-support-cli attachment -c 12345678 status [-a <ATTACHMENT_UUID>]
     ```
 ### Following & Tracking Cases Locally (`follow` / `unfollow` / `following`)
-Because remote watcher APIs are no longer part of Red Hat's CRM platform, the CLI maintains local case tracking inside `~/.config/rh-support-cli/state.yaml`. Followed cases are monitored across local sessions, synced with remote updates, and flagged with visual indicators:
+Because remote watcher APIs are no longer part of Red Hat's CRM platform, the CLI maintains local case tracking inside `~/.local/state/rh-support-cli/state.yaml` (or via `$XDG_STATE_HOME`). Followed cases are monitored across local sessions, synced with remote updates, and flagged with visual indicators:
 
 *   **Follow a single case**:
     ```bash
@@ -351,7 +351,7 @@ Both the CLI and TUI provide clear visual cues for tracked cases:
     ```
 
 ### Local State & Cache Management (`state.yaml`)
-Operational state (such as followed cases, sync checkpoints, pinned tickets, and local tags) is managed in `~/.config/rh-support-cli/state.yaml` (or via `RH_SUPPORT_STATE` / `XDG_CONFIG_HOME`). It uses safe atomic file operations and scopes metadata per SSO identity.
+Operational state (such as followed cases, sync checkpoints, pinned tickets, and local tags) is managed in `~/.local/state/rh-support-cli/state.yaml` (or via `RH_SUPPORT_STATE` / `XDG_STATE_HOME`, with automatic fallback to legacy `XDG_CONFIG_HOME`). It uses safe atomic file operations and scopes metadata per SSO identity.
 
 ### Listing local templates
 List all configured local templates, including their private descriptions and target fields. This command runs **completely offline**:

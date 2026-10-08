@@ -51,13 +51,30 @@ class StateService:
                 "state.yaml",
             )
 
-        xdg_config = os.environ.get("XDG_CONFIG_HOME")
-        if xdg_config:
+        # XDG State Specification: $XDG_STATE_HOME/rh-support-cli/state.yaml (default: ~/.local/state/rh-support-cli/state.yaml)
+        xdg_state = os.environ.get("XDG_STATE_HOME")
+        if xdg_state:
             return os.path.join(
-                os.path.expanduser(xdg_config), "rh-support-cli", "state.yaml"
+                os.path.expanduser(xdg_state), "rh-support-cli", "state.yaml"
             )
 
-        return os.path.expanduser("~/.config/rh-support-cli/state.yaml")
+        default_state_path = os.path.expanduser(
+            "~/.local/state/rh-support-cli/state.yaml"
+        )
+
+        # Backward compatibility: check if legacy state file exists under config directory
+        xdg_config = os.environ.get("XDG_CONFIG_HOME")
+        legacy_config_path = (
+            os.path.join(os.path.expanduser(xdg_config), "rh-support-cli", "state.yaml")
+            if xdg_config
+            else os.path.expanduser("~/.config/rh-support-cli/state.yaml")
+        )
+        if not os.path.exists(default_state_path) and os.path.exists(
+            legacy_config_path
+        ):
+            return legacy_config_path
+
+        return default_state_path
 
     def load_state(self) -> dict[str, Any]:
         """Loads state data from the YAML state file."""

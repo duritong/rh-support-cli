@@ -233,7 +233,7 @@ rh-support-cli list-templates
 
 ### 10. Following & Tracking Cases Locally (`follow` / `unfollow` / `following`)
 
-Maintain a local tracking register in `~/.config/rh-support-cli/state.yaml` to monitor support tickets across CLI and TUI sessions:
+Maintain a local tracking register in `~/.local/state/rh-support-cli/state.yaml` (or via `$XDG_STATE_HOME`) to monitor support tickets across CLI and TUI sessions:
 
 ```bash
 # Follow one or more cases

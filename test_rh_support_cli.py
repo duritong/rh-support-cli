@@ -802,13 +802,15 @@ class TestRhSupportCli(unittest.TestCase):
         # Avoid truncation in list output
         self.env["COLUMNS"] = "200"
 
-        # Isolate cache and config for every test
+        # Isolate cache, config, and state for every test
         import tempfile
 
         self.test_cache_dir = tempfile.mkdtemp()
         self.env["XDG_CACHE_HOME"] = self.test_cache_dir
         self.test_config_dir = tempfile.mkdtemp()
         self.env["XDG_CONFIG_HOME"] = self.test_config_dir
+        self.test_state_dir = tempfile.mkdtemp()
+        self.env["XDG_STATE_HOME"] = self.test_state_dir
 
         self.cli_path = os.path.abspath("rh-support-cli.py")
 
@@ -819,6 +821,8 @@ class TestRhSupportCli(unittest.TestCase):
             shutil.rmtree(self.test_cache_dir)
         if os.path.exists(self.test_config_dir):
             shutil.rmtree(self.test_config_dir)
+        if os.path.exists(self.test_state_dir):
+            shutil.rmtree(self.test_state_dir)
 
     def run_cli(self, args, input=None):
         """Helper to run the CLI script as a subprocess"""
@@ -3319,8 +3323,10 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         temp_home = tempfile.mkdtemp()
         orig_home = self.env.get("HOME")
         orig_config = self.env.get("XDG_CONFIG_HOME")
+        orig_state = self.env.get("XDG_STATE_HOME")
         self.env["HOME"] = temp_home
         self.env["XDG_CONFIG_HOME"] = os.path.join(temp_home, ".config")
+        self.env["XDG_STATE_HOME"] = os.path.join(temp_home, ".local", "state")
         try:
             config_dir = os.path.join(temp_home, ".config", "rh-support-cli")
             os.makedirs(config_dir, exist_ok=True)
@@ -3355,6 +3361,8 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 self.env["HOME"] = orig_home
             if orig_config:
                 self.env["XDG_CONFIG_HOME"] = orig_config
+            if orig_state:
+                self.env["XDG_STATE_HOME"] = orig_state
             shutil.rmtree(temp_home)
 
     def test_state_service_tracked_and_checkpoints(self):
@@ -3429,8 +3437,10 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         temp_home = tempfile.mkdtemp()
         orig_home = self.env.get("HOME")
         orig_config = self.env.get("XDG_CONFIG_HOME")
+        orig_state = self.env.get("XDG_STATE_HOME")
         self.env["HOME"] = temp_home
         self.env["XDG_CONFIG_HOME"] = os.path.join(temp_home, ".config")
+        self.env["XDG_STATE_HOME"] = os.path.join(temp_home, ".local", "state")
         try:
             # 1. Follow a case first
             res_f = self.run_cli(["follow", "12345"])
@@ -3465,6 +3475,8 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 self.env["HOME"] = orig_home
             if orig_config:
                 self.env["XDG_CONFIG_HOME"] = orig_config
+            if orig_state:
+                self.env["XDG_STATE_HOME"] = orig_state
             shutil.rmtree(temp_home)
 
     def test_updates_and_show_checkpoint(self):
@@ -3475,8 +3487,10 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         temp_home = tempfile.mkdtemp()
         orig_home = self.env.get("HOME")
         orig_config = self.env.get("XDG_CONFIG_HOME")
+        orig_state = self.env.get("XDG_STATE_HOME")
         self.env["HOME"] = temp_home
         self.env["XDG_CONFIG_HOME"] = os.path.join(temp_home, ".config")
+        self.env["XDG_STATE_HOME"] = os.path.join(temp_home, ".local", "state")
         try:
             # 1. Follow case 12345
             res_f = self.run_cli(["follow", "12345"])
@@ -3484,7 +3498,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
             # 2. Manually set older read checkpoint in state.yaml to simulate unread comments and status change
             state_path = os.path.join(
-                temp_home, ".config", "rh-support-cli", "state.yaml"
+                temp_home, ".local", "state", "rh-support-cli", "state.yaml"
             )
             user = self.env.get("REDHAT_SUPPORT_USERNAME") or self.env.get(
                 "USER", "jdeveloper"
@@ -3552,6 +3566,8 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 self.env["HOME"] = orig_home
             if orig_config:
                 self.env["XDG_CONFIG_HOME"] = orig_config
+            if orig_state:
+                self.env["XDG_STATE_HOME"] = orig_state
             shutil.rmtree(temp_home)
 
     def test_tui_layout_horizontal_mailbox_and_persistence(self):
@@ -3639,6 +3655,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             with patch.dict(
                 os.environ,
                 {
+                    "XDG_STATE_HOME": temp_dir,
                     "XDG_CONFIG_HOME": temp_dir,
                     "RH_GRAPHQL_URL": f"{self.base_url}/graphql",
                 },
@@ -3731,6 +3748,56 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 asyncio.run(run_test())
         finally:
             rh_support_lib.constants.GRAPHQL_URL = orig_gql
+            shutil.rmtree(temp_dir)
+
+    def test_state_service_xdg_state_path_resolution(self):
+        """Test StateService XDG state path resolution and fallback mechanisms."""
+        import shutil
+        import tempfile
+        from unittest.mock import patch
+
+        from rh_support_lib.services.state import StateService
+
+        # 1. Defaults to ~/.local/state/rh-support-cli/state.yaml
+        temp_fresh = tempfile.mkdtemp()
+        try:
+            with patch.dict(os.environ, {"HOME": temp_fresh}, clear=True):
+                resolved = StateService._resolve_state_path()
+                self.assertTrue(
+                    resolved.endswith(
+                        os.path.join(".local", "state", "rh-support-cli", "state.yaml")
+                    )
+                )
+        finally:
+            shutil.rmtree(temp_fresh)
+        # 2. Honors XDG_STATE_HOME
+        with patch.dict(os.environ, {"XDG_STATE_HOME": "/custom/state"}):
+            resolved = StateService._resolve_state_path()
+            self.assertEqual(resolved, "/custom/state/rh-support-cli/state.yaml")
+
+        # 3. Honors explicit state_file and RH_SUPPORT_STATE
+        with patch.dict(os.environ, {"RH_SUPPORT_STATE": "/custom/env/state.yaml"}):
+            resolved = StateService._resolve_state_path()
+            self.assertEqual(resolved, "/custom/env/state.yaml")
+        resolved = StateService._resolve_state_path(state_file="/explicit/state.yaml")
+        self.assertEqual(resolved, "/explicit/state.yaml")
+
+        # 4. Backward-compatible fallback to config dir if legacy state file exists
+        temp_dir = tempfile.mkdtemp()
+        try:
+            legacy_dir = os.path.join(temp_dir, "config", "rh-support-cli")
+            os.makedirs(legacy_dir, exist_ok=True)
+            legacy_file = os.path.join(legacy_dir, "state.yaml")
+            with open(legacy_file, "w") as f:
+                f.write("version: 1\n")
+            with patch.dict(
+                os.environ,
+                {"XDG_CONFIG_HOME": os.path.join(temp_dir, "config")},
+                clear=True,
+            ):
+                resolved = StateService._resolve_state_path()
+                self.assertEqual(resolved, legacy_file)
+        finally:
             shutil.rmtree(temp_dir)
 
 
