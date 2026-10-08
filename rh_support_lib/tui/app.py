@@ -352,6 +352,10 @@ class SupportApp(App):
         ("v", "toggle_layout", "Split (H/V)"),
         Binding("l", "toggle_layout", "Toggle Layout", show=False),
         ("f", "focus_pane", "Focus Pane"),
+        Binding("ctrl+up", "focus_top", "Focus Top", priority=True),
+        Binding("ctrl+down", "focus_bottom", "Focus Bottom", priority=True),
+        Binding("ctrl+left", "focus_left", "Focus Left", priority=True),
+        Binding("ctrl+right", "focus_right", "Focus Right", priority=True),
         Binding("escape", "escape_action", "Cancel/Unfocus", show=False),
         Binding("ctrl+x", "exit_commenting", "Cancel Commenting", show=False),
     ]
@@ -424,6 +428,9 @@ class SupportApp(App):
         margin: 0;
         padding: 0;
         height: 100%;
+    }
+    #case-list-container:focus-within {
+        border: double cyan;
     }
     #right-column-container {
         height: 100%;
@@ -1516,6 +1523,54 @@ class SupportApp(App):
         self.screen.remove_class("focused-left")
         self.screen.remove_class("focused-right")
         self.screen.remove_class("focused-comment")
+
+    def focus_list_pane(self) -> None:
+        """Focus the case list table (top pane in horizontal, left pane in vertical)."""
+        with contextlib.suppress(Exception):
+            table = self.query_one("#case-table", DataTable)
+            table.focus()
+            if self.screen.has_class("focused-right") or self.screen.has_class(
+                "focused-comment"
+            ):
+                self.screen.remove_class("focused-right")
+                self.screen.remove_class("focused-comment")
+                self.screen.add_class("focused-left")
+
+    def focus_details_pane(self) -> None:
+        """Focus the details pane (bottom pane in horizontal, right pane in vertical)."""
+        with contextlib.suppress(Exception):
+            if self.screen.has_class("commenting"):
+                with contextlib.suppress(Exception):
+                    self.query_one("#tui-comment-textarea", TextArea).focus()
+                    if self.screen.has_class("focused-left") or self.screen.has_class(
+                        "focused-right"
+                    ):
+                        self.screen.remove_class("focused-left")
+                        self.screen.remove_class("focused-right")
+                        self.screen.add_class("focused-comment")
+                    return
+            detail_container = self.query_one(
+                "#case-detail-container", FocusableContainer
+            )
+            detail_container.focus()
+            if self.screen.has_class("focused-left") or self.screen.has_class(
+                "focused-comment"
+            ):
+                self.screen.remove_class("focused-left")
+                self.screen.remove_class("focused-comment")
+                self.screen.add_class("focused-right")
+
+    def action_focus_top(self) -> None:
+        self.focus_list_pane()
+
+    def action_focus_bottom(self) -> None:
+        self.focus_details_pane()
+
+    def action_focus_left(self) -> None:
+        self.focus_list_pane()
+
+    def action_focus_right(self) -> None:
+        self.focus_details_pane()
 
     def action_escape_action(self) -> None:
         """Handles Escape key: either exits fullscreen focus mode or exits commenting mode."""

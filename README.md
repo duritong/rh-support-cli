@@ -294,6 +294,7 @@ Launches a beautiful, interactive Terminal User Interface (TUI) to browse and ma
 - **Compact Zero-Margin Panes**: Panes sit flush with zero margin gap between borders, maximizing visible columns and rows for tables, logs, and comments.
 - **Asynchronous Background Processing**: Keeps the UI highly responsive by loading cases and updates asynchronously.
 - **Vim / Arrow Navigation**: Navigate intuitively with standard keyboard binds.
+- **Directional Pane Switching**: Switch focus between top and bottom panes using **`Ctrl+Up`** / **`Ctrl+Down`** in horizontal split mode, and between left and right panes using **`Ctrl+Left`** / **`Ctrl+Right`** in vertical mode.
 - **Single-Pane Focus / Zoom**:
   - Highlight either the case list on the left or case details on the right, and press **`f`** to "zoom" that panel into fullscreen mode (fully hiding the other pane to maximize reading space).
   - **Intuitive Toggling**: Press **`f`** again or press **`Escape`** to instantly exit single-pane mode and restore the standard dual-pane split dashboard layout!

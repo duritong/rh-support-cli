@@ -403,6 +403,8 @@ Toggle focus between the case list and details pane using **`Tab`** or **`Shift+
 | **`v` / `l`** | Toggle split layout between vertical (side-by-side) and horizontal (mailbox style) |
 | **`w`** | Toggle follow/unfollow for the currently selected case |
 | **`m`** | Explicitly mark the currently selected case as read |
+| **`Ctrl+Up` / `Ctrl+Down`** | Switch focus between top (case list) and bottom (details/comment) panes in horizontal split |
+| **`Ctrl+Left` / `Ctrl+Right`** | Switch focus between left (case list) and right (details/comment) panes in vertical split |
 | **`f`** | Zoom / Focus on the active pane (press again to exit fullscreen) |
 | **`Escape`** | Exit fullscreen focus mode (unfocus layout) |
 | **`Ctrl+X`** | Close / Cancel commenting from anywhere inside the TUI (Comment Pane) |

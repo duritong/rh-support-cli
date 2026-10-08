@@ -3556,7 +3556,6 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
     def test_tui_layout_horizontal_mailbox_and_persistence(self):
         """Test TUI horizontal split (mailbox) layout initialization, toggle action, and persistence."""
-        import asyncio
         import shutil
         import tempfile
 
@@ -3585,19 +3584,39 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 self.assertEqual(app.layout, "horizontal")
                 self.assertNotIn("layout-vertical", app.screen.classes)
 
-                # Toggle to vertical
+                # 3. Test pane switching with ctrl-arrows in horizontal split
+                await pilot.press("ctrl+down")
+                self.assertTrue(
+                    app.focused.id == "case-detail-container"
+                    or app.query_one("#case-detail-container").has_focus
+                )
+                await pilot.press("ctrl+up")
+                self.assertTrue(
+                    app.focused.id == "case-table"
+                    or app.query_one("#case-table").has_focus
+                )
+
+                # 4. Toggle to vertical split and test ctrl-left / ctrl-right
                 app.action_toggle_layout()
                 await pilot.pause()
                 self.assertEqual(app.layout, "vertical")
                 self.assertIn("layout-vertical", app.screen.classes)
+                await pilot.press("ctrl+right")
+                self.assertTrue(
+                    app.focused.id == "case-detail-container"
+                    or app.query_one("#case-detail-container").has_focus
+                )
+                await pilot.press("ctrl+left")
+                self.assertTrue(
+                    app.focused.id == "case-table"
+                    or app.query_one("#case-table").has_focus
+                )
 
-                # Toggle back to horizontal
+                # 5. Toggle back to horizontal
                 app.action_toggle_layout()
                 await pilot.pause()
                 self.assertEqual(app.layout, "horizontal")
                 self.assertNotIn("layout-vertical", app.screen.classes)
-
-        asyncio.run(run_layout_test())
 
     def test_tui_mark_read_removes_visual_unread_indicator(self):
         """Test that pressing 'm' in TUI removes the unread indicator from table and details divider."""
