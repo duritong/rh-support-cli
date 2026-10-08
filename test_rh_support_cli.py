@@ -281,26 +281,60 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header("Content-type", "application/json")
                 self.end_headers()
-                edges = [
-                    {
-                        "node": {
-                            "Id": "01tRHEL",
-                            "Name": {"value": "Red Hat Enterprise Linux"},
-                            "VersionName__c": {"value": "9.0"},
-                            "Family": {"value": "Linux"},
-                            "ParentProduct__c": {"value": None},
+                after_val = variables.get("after")
+                if after_val == "page1_cursor":
+                    edges = [
+                        {
+                            "node": {
+                                "Id": "01tOPENSHIFT",
+                                "Name": {
+                                    "value": "Red Hat OpenShift Container Platform"
+                                },
+                                "VersionName__c": {"value": "4.12"},
+                                "Family": {"value": "Cloud"},
+                                "ParentProduct__c": {"value": None},
+                            }
                         }
-                    },
-                    {
-                        "node": {
-                            "Id": "01tOPENSHIFT",
-                            "Name": {"value": "Red Hat OpenShift Container Platform"},
-                            "VersionName__c": {"value": "4.12"},
-                            "Family": {"value": "Cloud"},
-                            "ParentProduct__c": {"value": None},
+                    ]
+                    page_info = {"hasNextPage": False, "endCursor": "page2_cursor"}
+                elif variables.get("first") == 1:
+                    edges = [
+                        {
+                            "node": {
+                                "Id": "01tRHEL",
+                                "Name": {"value": "Red Hat Enterprise Linux"},
+                                "VersionName__c": {"value": "9.0"},
+                                "Family": {"value": "Linux"},
+                                "ParentProduct__c": {"value": None},
+                            }
                         }
-                    },
-                ]
+                    ]
+                    page_info = {"hasNextPage": True, "endCursor": "page1_cursor"}
+                else:
+                    edges = [
+                        {
+                            "node": {
+                                "Id": "01tRHEL",
+                                "Name": {"value": "Red Hat Enterprise Linux"},
+                                "VersionName__c": {"value": "9.0"},
+                                "Family": {"value": "Linux"},
+                                "ParentProduct__c": {"value": None},
+                            }
+                        },
+                        {
+                            "node": {
+                                "Id": "01tOPENSHIFT",
+                                "Name": {
+                                    "value": "Red Hat OpenShift Container Platform"
+                                },
+                                "VersionName__c": {"value": "4.12"},
+                                "Family": {"value": "Cloud"},
+                                "ParentProduct__c": {"value": None},
+                            }
+                        },
+                    ]
+                    page_info = {"hasNextPage": False, "endCursor": None}
+
                 resp_data = {
                     "data": {
                         "redhat_support_uiapi": {
@@ -308,10 +342,7 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                                 "RedHatSupportProduct2": {
                                     "totalCount": len(edges),
                                     "edges": edges,
-                                    "pageInfo": {
-                                        "hasNextPage": False,
-                                        "endCursor": None,
-                                    },
+                                    "pageInfo": page_info,
                                 }
                             }
                         }
@@ -353,6 +384,73 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header("Content-type", "application/json")
                 self.end_headers()
+                after_val = variables.get("after")
+                if case_num == "888888":
+                    if after_val == "comm_page1_cursor":
+                        comment_edges = [
+                            {
+                                "node": {
+                                    "Id": "comment_page2",
+                                    "Body__c": {"value": "Comment on page 2"},
+                                    "CreatedBy": {"Name": {"value": "Red Hat Support"}},
+                                    "LastModifiedByName__c": {
+                                        "value": "Red Hat Support"
+                                    },
+                                    "IsAssociate__c": {"value": True},
+                                    "IsCustomer__c": {"value": False},
+                                    "CreatedDate": {"value": "2026-08-20T12:00:00Z"},
+                                }
+                            }
+                        ]
+                        page_info = {
+                            "hasNextPage": False,
+                            "endCursor": "comm_page2_cursor",
+                        }
+                    else:
+                        comment_edges = [
+                            {
+                                "node": {
+                                    "Id": "comment_page1",
+                                    "Body__c": {"value": "Comment on page 1"},
+                                    "CreatedBy": {"Name": {"value": "Customer"}},
+                                    "LastModifiedByName__c": {"value": "Customer"},
+                                    "IsAssociate__c": {"value": False},
+                                    "IsCustomer__c": {"value": True},
+                                    "CreatedDate": {"value": "2026-08-20T10:00:00Z"},
+                                }
+                            }
+                        ]
+                        page_info = {
+                            "hasNextPage": True,
+                            "endCursor": "comm_page1_cursor",
+                        }
+                else:
+                    comment_edges = [
+                        {
+                            "node": {
+                                "Id": "comment_1",
+                                "Body__c": {"value": "Comment 1"},
+                                "LastModifiedByName__c": {"value": "Red Hat Support"},
+                                "IsAssociate__c": {"value": True},
+                                "IsCustomer__c": {"value": False},
+                                "CreatedDate": {"value": "2023-01-02T10:00:00Z"},
+                            }
+                        },
+                        {
+                            "node": {
+                                "Id": "comment_2",
+                                "Body__c": {"value": "Comment 2"},
+                                "LastModifiedByName__c": {"value": "Customer"},
+                                "IsAssociate__c": {"value": False},
+                                "IsCustomer__c": {"value": False},
+                                "Visibility__c": {"value": "Internal"},
+                                "isPublic": False,
+                                "CreatedDate": {"value": "2023-01-03T10:00:00Z"},
+                            }
+                        },
+                    ]
+                    page_info = {"hasNextPage": False, "endCursor": None}
+
                 node = {
                     "Id": f"500{case_num}",
                     "CaseNumber__c": {"value": str(case_num)},
@@ -389,33 +487,8 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                     "LastModifiedDate": {"value": "2023-01-02T10:00:00Z"},
                     "LastModifiedBy": {"Name": {"value": "user123"}},
                     "CaseComments__r": {
-                        "edges": [
-                            {
-                                "node": {
-                                    "Id": "comment_1",
-                                    "Body__c": {"value": "Comment 1"},
-                                    "LastModifiedByName__c": {
-                                        "value": "Red Hat Support"
-                                    },
-                                    "IsAssociate__c": {"value": True},
-                                    "IsCustomer__c": {"value": False},
-                                    "CreatedDate": {"value": "2023-01-02T10:00:00Z"},
-                                }
-                            },
-                            {
-                                "node": {
-                                    "Id": "comment_2",
-                                    "Body__c": {"value": "Comment 2"},
-                                    "LastModifiedByName__c": {"value": "Customer"},
-                                    "IsAssociate__c": {"value": False},
-                                    "IsCustomer__c": {"value": False},
-                                    "Visibility__c": {"value": "Internal"},
-                                    "isPublic": False,
-                                    "CreatedDate": {"value": "2023-01-03T10:00:00Z"},
-                                }
-                            },
-                        ],
-                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "edges": comment_edges,
+                        "pageInfo": page_info,
                     },
                 }
                 resp_data = {
@@ -476,30 +549,77 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header("Content-type", "application/json")
                 self.end_headers()
-                edges = [
-                    {
-                        "node": {
-                            "Id": "500FILTER_TEST",
-                            "CaseNumber__c": {"value": "FILTER_TEST"},
-                            "Subject": {"value": summary_str},
-                            "Status": {"value": "Waiting on Red Hat"},
-                            "Priority": {"value": "2 (High)"},
-                            "CreatedDate": {"value": "2026-07-10T14:30:00Z"},
-                            "LastModifiedDate": {"value": "2026-07-11T09:15:00Z"},
-                        },
-                        "cursor": "cursor_filter_test",
+                after_val = variables.get("after")
+                if "ACC=PAGINATE" in summary_str:
+                    if after_val == "case_page1_cursor":
+                        edges = [
+                            {
+                                "node": {
+                                    "Id": "500CASE_PAGE2",
+                                    "CaseNumber__c": {"value": "CASE_PAGE2"},
+                                    "Subject": {"value": "Page 2 Case"},
+                                    "Status": {"value": "In Progress"},
+                                    "Priority": {"value": "3 (Normal)"},
+                                    "CreatedDate": {"value": "2026-07-10T14:30:00Z"},
+                                    "LastModifiedDate": {
+                                        "value": "2026-07-11T09:15:00Z"
+                                    },
+                                },
+                                "cursor": "case_page2_cursor",
+                            }
+                        ]
+                        page_info = {
+                            "hasNextPage": False,
+                            "endCursor": "case_page2_cursor",
+                        }
+                    else:
+                        edges = [
+                            {
+                                "node": {
+                                    "Id": "500CASE_PAGE1",
+                                    "CaseNumber__c": {"value": "CASE_PAGE1"},
+                                    "Subject": {"value": "Page 1 Case"},
+                                    "Status": {"value": "Waiting on Red Hat"},
+                                    "Priority": {"value": "2 (High)"},
+                                    "CreatedDate": {"value": "2026-07-10T14:30:00Z"},
+                                    "LastModifiedDate": {
+                                        "value": "2026-07-11T09:15:00Z"
+                                    },
+                                },
+                                "cursor": "case_page1_cursor",
+                            }
+                        ]
+                        page_info = {
+                            "hasNextPage": True,
+                            "endCursor": "case_page1_cursor",
+                        }
+                else:
+                    edges = [
+                        {
+                            "node": {
+                                "Id": "500FILTER_TEST",
+                                "CaseNumber__c": {"value": "FILTER_TEST"},
+                                "Subject": {"value": summary_str},
+                                "Status": {"value": "Waiting on Red Hat"},
+                                "Priority": {"value": "2 (High)"},
+                                "CreatedDate": {"value": "2026-07-10T14:30:00Z"},
+                                "LastModifiedDate": {"value": "2026-07-11T09:15:00Z"},
+                            },
+                            "cursor": "cursor_filter_test",
+                        }
+                    ]
+                    page_info = {
+                        "hasNextPage": False,
+                        "endCursor": "cursor_filter_test",
                     }
-                ]
+
                 resp_data = {
                     "data": {
                         "redhat_support_uiapi": {
                             "query": {
                                 "RedHatSupportCase": {
                                     "edges": edges,
-                                    "pageInfo": {
-                                        "hasNextPage": False,
-                                        "endCursor": "cursor_filter_test",
-                                    },
+                                    "pageInfo": page_info,
                                 }
                             }
                         }
@@ -3810,6 +3930,87 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 self.assertFalse(os.path.exists(legacy_file))
         finally:
             shutil.rmtree(temp_dir)
+
+    def test_case_comments_auto_exhaustion_pagination(self):
+        """Test that get_case_details automatically exhausts multi-page comments."""
+        from rh_support_lib.api import LegacyAPIClient
+        from rh_support_lib.services.cases import CaseService
+
+        api_client = LegacyAPIClient("mock_access_token_123")
+        case_service = CaseService(api_client, graphql_url=f"{self.base_url}/graphql")
+
+        # 1. Fetch case 888888 with all_comments=True (default) -> should fetch page 1 and page 2
+        details = case_service.get_case_details(
+            "888888", first_comments=1, all_comments=True
+        )
+        self.assertIsNotNone(details)
+        self.assertEqual(len(details.comments), 2)
+        self.assertEqual(details.comments[0].body, "Comment on page 1")
+        self.assertEqual(details.comments[1].body, "Comment on page 2")
+
+        # 2. Fetch case 888888 with all_comments=False, max_comments=1 -> should fetch only page 1
+        details_single = case_service.get_case_details(
+            "888888", first_comments=1, all_comments=False, max_comments=1
+        )
+        self.assertIsNotNone(details_single)
+        self.assertEqual(len(details_single.comments), 1)
+        self.assertEqual(details_single.comments[0].body, "Comment on page 1")
+
+    def test_case_list_pagination_all_and_limit(self):
+        """Test that list_cases and CLI --all and --limit handle multi-page case pagination."""
+        from rh_support_lib.api import LegacyAPIClient
+        from rh_support_lib.services.cases import CaseService
+
+        api_client = LegacyAPIClient("mock_access_token_123")
+        case_service = CaseService(api_client, graphql_url=f"{self.base_url}/graphql")
+
+        # 1. Direct CaseService list_cases with all_pages=True
+        cases_all = case_service.list_cases(account="PAGINATE", all_pages=True)
+        self.assertEqual(len(cases_all), 2)
+        case_numbers = [c.case_number for c in cases_all]
+        self.assertIn("CASE_PAGE1", case_numbers)
+        self.assertIn("CASE_PAGE2", case_numbers)
+
+        # 2. Direct CaseService list_cases with limit=1
+        cases_limited = case_service.list_cases(account="PAGINATE", limit=1)
+        self.assertEqual(len(cases_limited), 1)
+        self.assertEqual(cases_limited[0].case_number, "CASE_PAGE1")
+
+        # 3. CLI list --all
+        res_cli_all = self.run_cli(
+            ["--simple-output", "list", "--account", "PAGINATE", "--all"]
+        )
+        self.assertEqual(res_cli_all.returncode, 0)
+        self.assertIn("CASE_PAGE1", res_cli_all.stdout)
+        self.assertIn("CASE_PAGE2", res_cli_all.stdout)
+
+        # 4. CLI list --limit 1
+        res_cli_lim = self.run_cli(
+            ["--simple-output", "list", "--account", "PAGINATE", "--limit", "1"]
+        )
+        self.assertEqual(res_cli_lim.returncode, 0)
+        self.assertIn("CASE_PAGE1", res_cli_lim.stdout)
+        self.assertNotIn("CASE_PAGE2", res_cli_lim.stdout)
+
+    def test_active_products_pagination(self):
+        """Test that get_active_products loops through pages when all_pages=True."""
+        from rh_support_lib.api import LegacyAPIClient
+        from rh_support_lib.services.cases import CaseService
+
+        api_client = LegacyAPIClient("mock_access_token_123")
+        case_service = CaseService(api_client, graphql_url=f"{self.base_url}/graphql")
+
+        # Request with first=1, all_pages=True -> mock returns page 1 (RHEL) then page 2 (OpenShift)
+        products = case_service.get_active_products(first=1, all_pages=True)
+        self.assertEqual(len(products), 2)
+        product_names = [p.name for p in products]
+        self.assertIn("Red Hat Enterprise Linux", product_names)
+        self.assertIn("Red Hat OpenShift Container Platform", product_names)
+
+        # Request with first=1, all_pages=False -> returns only page 1
+        products_single = case_service.get_active_products(first=1, all_pages=False)
+        self.assertEqual(len(products_single), 1)
+        self.assertEqual(products_single[0].name, "Red Hat Enterprise Linux")
 
 
 if __name__ == "__main__":

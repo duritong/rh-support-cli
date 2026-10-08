@@ -535,6 +535,8 @@ class CaseService:
         owner: str | None = None,
         first: int = 100,
         after: str | None = None,
+        all_pages: bool = False,
+        limit: int | None = None,
     ) -> list[Case]:
         return self._list_cases_graphql(
             account=account,
@@ -543,6 +545,8 @@ class CaseService:
             owner=owner,
             first=first,
             after=after,
+            all_pages=all_pages,
+            limit=limit,
         )
 
     def _list_cases_graphql(
@@ -553,6 +557,8 @@ class CaseService:
         owner: str | None = None,
         first: int = 100,
         after: str | None = None,
+        all_pages: bool = False,
+        limit: int | None = None,
     ) -> list[Case]:
         where: dict[str, Any] = {}
 
@@ -582,64 +588,98 @@ class CaseService:
         if owner:
             where["Owner"] = {"Name": {"eq": owner}}
 
-        variables = {
-            "where": where if where else None,
-            "first": first,
-            "after": after,
-        }
-
-        data = self.api_client.execute_graphql(
-            GQL_GET_CASES_BY_FILTERS, variables, url=self.graphql_url
-        )
-        uiapi = data.get("redhat_support_uiapi") or {}
-        query_data = uiapi.get("query") or {}
-        case_container = query_data.get("RedHatSupportCase") or {}
-        edges = case_container.get("edges") or []
-
         cases = []
         user = self.get_current_user()
         tracked_map = self.state_service.get_tracked_cases(user)
+        current_after = after
 
-        for edge in edges:
-            node = edge.get("node")
-            if node:
-                c = self._normalize_case_node(node)
-                # Auto-track owned cases (Option B)
-                if (c.contact_sso and c.contact_sso.lower() == user.lower()) or (
-                    c.owner and c.owner.lower() == user.lower()
-                ):
-                    self.state_service.register_owned_case(
-                        user=user,
-                        case_number=c.case_number,
-                        summary=c.summary,
-                        account_number=c.account_number,
-                        status=c.status,
-                        severity=c.severity,
-                        last_modified_date=c.last_modified_date,
-                    )
+        while True:
+            batch_size = min(first, limit - len(cases)) if limit else first
+            if batch_size <= 0:
+                break
 
-                # Annotate tracking & unread badges
-                tc = tracked_map.get(c.case_number)
-                if tc:
-                    c.is_followed = tc.relationship in ("followed", "both")
-                    c.has_unread = (
-                        tc.latest_known.unread_comment_count > 0
-                        or tc.latest_known.status_changed
-                    )
-                    c.unread_count = tc.latest_known.unread_comment_count
-                    c.status_changed = tc.latest_known.status_changed
-                    if tc.read_checkpoint and tc.read_checkpoint.status:
-                        c.old_status = tc.read_checkpoint.status
-                cases.append(c)
+            variables = {
+                "where": where if where else None,
+                "first": batch_size,
+                "after": current_after,
+            }
+
+            data = self.api_client.execute_graphql(
+                GQL_GET_CASES_BY_FILTERS, variables, url=self.graphql_url
+            )
+            uiapi = data.get("redhat_support_uiapi") or {}
+            query_data = uiapi.get("query") or {}
+            case_container = query_data.get("RedHatSupportCase") or {}
+            edges = case_container.get("edges") or []
+
+            if not edges:
+                break
+
+            for edge in edges:
+                node = edge.get("node")
+                if node:
+                    c = self._normalize_case_node(node)
+                    # Auto-track owned cases (Option B)
+                    if (c.contact_sso and c.contact_sso.lower() == user.lower()) or (
+                        c.owner and c.owner.lower() == user.lower()
+                    ):
+                        self.state_service.register_owned_case(
+                            user=user,
+                            case_number=c.case_number,
+                            summary=c.summary,
+                            account_number=c.account_number,
+                            status=c.status,
+                            severity=c.severity,
+                            last_modified_date=c.last_modified_date,
+                        )
+
+                    # Annotate tracking & unread badges
+                    tc = tracked_map.get(c.case_number)
+                    if tc:
+                        c.is_followed = tc.relationship in ("followed", "both")
+                        c.has_unread = (
+                            tc.latest_known.unread_comment_count > 0
+                            or tc.latest_known.status_changed
+                        )
+                        c.unread_count = tc.latest_known.unread_comment_count
+                        c.status_changed = tc.latest_known.status_changed
+                        if tc.read_checkpoint and tc.read_checkpoint.status:
+                            c.old_status = tc.read_checkpoint.status
+                    cases.append(c)
+
+            page_info = case_container.get("pageInfo") or {}
+            has_next = page_info.get("hasNextPage", False)
+            end_cursor = page_info.get("endCursor")
+
+            if not has_next or not end_cursor:
+                break
+            if not all_pages and (limit is None or len(cases) >= limit):
+                break
+
+            current_after = end_cursor
+
         return cases
 
     def get_case_details(
-        self, case_number: str, first_comments: int = 200
+        self,
+        case_number: str,
+        first_comments: int = 200,
+        all_comments: bool = True,
+        max_comments: int | None = None,
     ) -> CaseDetails | None:
-        return self._get_case_details_graphql(case_number, first_comments)
+        return self._get_case_details_graphql(
+            case_number=case_number,
+            first_comments=first_comments,
+            all_comments=all_comments,
+            max_comments=max_comments,
+        )
 
     def _get_case_details_graphql(
-        self, case_number: str, first_comments: int = 200
+        self,
+        case_number: str,
+        first_comments: int = 200,
+        all_comments: bool = True,
+        max_comments: int | None = None,
     ) -> CaseDetails | None:
         variables = {
             "caseNumber": str(case_number),
@@ -673,6 +713,48 @@ class CaseService:
         for c_edge in comment_edges:
             c_node = c_edge.get("node") or {}
             comments.append(self._normalize_comment_node(c_node))
+
+        # Paginate subsequent comments if hasNextPage is True
+        page_info = comments_container.get("pageInfo") or {}
+        has_next = page_info.get("hasNextPage", False)
+        end_cursor = page_info.get("endCursor")
+
+        while (
+            has_next
+            and end_cursor
+            and (all_comments or (max_comments and len(comments) < max_comments))
+        ):
+            batch_size = (
+                min(first_comments, max_comments - len(comments))
+                if max_comments
+                else first_comments
+            )
+            next_vars = {
+                "caseNumber": str(case_number),
+                "first": batch_size,
+                "after": end_cursor,
+            }
+            next_data = self.api_client.execute_graphql(
+                GQL_GET_CASE_AND_COMMENTS, next_vars, url=self.graphql_url
+            )
+            next_uiapi = next_data.get("redhat_support_uiapi") or {}
+            next_query = next_uiapi.get("query") or {}
+            next_cases = next_query.get("RedHatSupportCase") or {}
+            next_edges = next_cases.get("edges") or []
+            if not next_edges:
+                break
+            next_node = next_edges[0].get("node") or {}
+            next_comments_container = next_node.get("CaseComments__r") or {}
+            next_comment_edges = next_comments_container.get("edges") or []
+            if not next_comment_edges:
+                break
+            for c_edge in next_comment_edges:
+                c_node = c_edge.get("node") or {}
+                comments.append(self._normalize_comment_node(c_node))
+
+            next_page_info = next_comments_container.get("pageInfo") or {}
+            has_next = next_page_info.get("hasNextPage", False)
+            end_cursor = next_page_info.get("endCursor")
 
         return CaseDetails(
             case=case_obj,
@@ -814,57 +896,75 @@ class CaseService:
             .get("RedHatSupportRecord", {})
         )
 
-    def get_active_products(self, first: int = 200) -> list[ProductItem]:
+    def get_active_products(
+        self, first: int = 200, all_pages: bool = True
+    ) -> list[ProductItem]:
         """Fetches active products from the product catalog."""
-        return self._get_active_products_graphql(first)
+        return self._get_active_products_graphql(first=first, all_pages=all_pages)
 
-    def _get_active_products_graphql(self, first: int = 200) -> list[ProductItem]:
-        variables = {"first": first, "after": None}
-        data = self.api_client.execute_graphql(
-            GQL_GET_ACTIVE_PRODUCTS, variables, url=self.graphql_url
-        )
-
-        edges = (
-            data.get("redhat_support_uiapi", {})
-            .get("query", {})
-            .get("RedHatSupportProduct2", {})
-            .get("edges", [])
-        )
-
+    def _get_active_products_graphql(
+        self, first: int = 200, all_pages: bool = True
+    ) -> list[ProductItem]:
         products = []
-        for edge in edges:
-            node = edge.get("node") or {}
-            p_id = node.get("Id", "")
-            p_name = (
-                node.get("Name", {}).get("value", "")
-                if isinstance(node.get("Name"), dict)
-                else node.get("name", "")
-            )
-            p_version = (
-                node.get("VersionName__c", {}).get("value", "")
-                if isinstance(node.get("VersionName__c"), dict)
-                else ""
-            )
-            p_family = (
-                node.get("Family", {}).get("value", "")
-                if isinstance(node.get("Family"), dict)
-                else ""
-            )
-            p_parent = (
-                node.get("ParentProduct__c", {}).get("value")
-                if isinstance(node.get("ParentProduct__c"), dict)
-                else None
+        current_after = None
+
+        while True:
+            variables = {"first": first, "after": current_after}
+            data = self.api_client.execute_graphql(
+                GQL_GET_ACTIVE_PRODUCTS, variables, url=self.graphql_url
             )
 
-            products.append(
-                ProductItem(
-                    id=str(p_id),
-                    name=p_name,
-                    version_name=p_version or "",
-                    family=p_family or "",
-                    parent_id=p_parent,
-                )
+            container = (
+                data.get("redhat_support_uiapi", {})
+                .get("query", {})
+                .get("RedHatSupportProduct2", {})
             )
+            edges = container.get("edges", [])
+            if not edges:
+                break
+            for edge in edges:
+                node = edge.get("node") or {}
+                p_id = node.get("Id", "")
+                p_name = (
+                    node.get("Name", {}).get("value", "")
+                    if isinstance(node.get("Name"), dict)
+                    else node.get("name", "")
+                )
+                p_version = (
+                    node.get("VersionName__c", {}).get("value", "")
+                    if isinstance(node.get("VersionName__c"), dict)
+                    else ""
+                )
+                p_family = (
+                    node.get("Family", {}).get("value", "")
+                    if isinstance(node.get("Family"), dict)
+                    else ""
+                )
+                p_parent = (
+                    node.get("ParentProduct__c", {}).get("value")
+                    if isinstance(node.get("ParentProduct__c"), dict)
+                    else None
+                )
+
+                products.append(
+                    ProductItem(
+                        id=str(p_id),
+                        name=p_name,
+                        version_name=p_version or "",
+                        family=p_family or "",
+                        parent_id=p_parent,
+                    )
+                )
+
+            page_info = container.get("pageInfo") or {}
+            has_next = page_info.get("hasNextPage", False)
+            end_cursor = page_info.get("endCursor")
+
+            if not all_pages or not has_next or not end_cursor:
+                break
+
+            current_after = end_cursor
+
         return products
 
     def resolve_case_lookups(

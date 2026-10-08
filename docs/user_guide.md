@@ -213,6 +213,23 @@ rh-support-cli tui
 
 The `--graphql` flag remains supported as an optional alias. Custom endpoint URLs can be configured via environment variables `RH_GRAPHQL_URL` and `RH_ATTACHMENT_API_URL`.
 
+### GraphQL Pagination & Large Dataset Handling
+Red Hat's GraphQL CRM endpoints utilize Relay-style cursor connections for large datasets:
+*   **Listing Cases (`list`)**:
+    *   By default, `rh-support-cli list` fetches up to 100 cases (`first: 100`).
+    *   **`--all`**: Automatically iterates through all pages via cursor tokens (`pageInfo.endCursor`) until the full matching result set is exhausted.
+    *   **`--limit <N>`**: Sets the maximum number of cases to retrieve, automatically paginating across batches until the limit is reached or all cases are fetched.
+    ```bash
+    # Fetch all open cases across all pages:
+    rh-support-cli list --status open --all
+
+    # Fetch up to 250 cases for an account:
+    rh-support-cli list --account 12345678 --limit 250
+    ```
+*   **Case Comments (`show`)**:
+    *   When showing a case or viewing details in the TUI, comment threads automatically exhaust all pages via Relay cursors. Extensive ticket histories are completely retrieved and displayed without truncation.
+*   **Product Catalog (`create`)**:
+    *   The interactive product selector automatically paginates through active products to present the complete catalog.
 ### Closing a Case (`close`)
 The `close` subcommand operates identically to `comment`, but automatically sets the case status to `closed`:
 

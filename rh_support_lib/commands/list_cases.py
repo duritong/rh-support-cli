@@ -85,11 +85,15 @@ def cmd_list(args, api_client, config=None):
             )
         else:
             print("Fetching cases...")
+            all_pages_flag = bool(getattr(args, "all", False))
+            limit_val = getattr(args, "limit", None)
             cases = service.list_cases(
                 account=str(acc) if acc else None,
                 status=mapped_statuses,
                 severity=mapped_sevs,
                 owner=str(own) if own else None,
+                all_pages=all_pages_flag,
+                limit=limit_val,
             )
     except Exception as e:  # noqa: BLE001
         sys.exit(f"Network Error: {e}")

@@ -70,7 +70,8 @@ Lists support cases with options to filter by account, status, severity, and own
 - `--owner`: Filter by owner
 - `--bookmark`: Use a filter bookmark from config (can be used multiple times)
 - `--no-default-bookmark`: Ignore default bookmark from config
-
+- `--all`: Fetch all matching cases across all pages (auto-paginates until exhausted)
+- `--limit`: Maximum number of cases to fetch (default: 100)
 **Examples:**
 
 *List all cases:*
@@ -85,7 +86,7 @@ rh-support-cli list --account 12345 --status "Waiting on Red Hat" --severity Hig
 
 ### 2. Show Case Details (`show`)
 
-Displays detailed information about a case, including description and comments. Output is piped to a pager by default.
+Displays detailed information about a case, including description and comments (automatically paginates through all comment batches to ensure complete thread history). Output is piped to a pager by default.
 
 **Options:**
 - `-c`, `--case`: The Case Number (required)

@@ -170,6 +170,16 @@ Authentication:
         action="store_true",
         help="Ignore default bookmark from config",
     )
+    parser_list.add_argument(
+        "--all",
+        action="store_true",
+        help="Fetch all matching cases across all pages",
+    )
+    parser_list.add_argument(
+        "--limit",
+        type=int,
+        help="Maximum number of cases to fetch (default: 100)",
+    )
 
     # Show Subcommand
     parser_show = subparsers.add_parser("show", help="Show case details")
