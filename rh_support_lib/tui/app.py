@@ -529,13 +529,13 @@ class SupportApp(App):
     #modal-buttons Button {
         margin: 0 1;
     }
-    #tui-action-row {
+    .tui-action-row {
         height: 1;
         margin-top: 0;
         margin-bottom: 1;
         align: center middle;
     }
-    #tui-action-row Button, #comment-pane-container Button {
+    .tui-action-row Button, #comment-pane-container Button {
         height: 1;
         min-width: 15;
         border: none;
@@ -566,6 +566,7 @@ class SupportApp(App):
         self.no_default_bookmark = no_default_bookmark
         self.cases: list[Case] = []
         self.selected_case_id: str | None = None
+        self.current_details: CaseDetails | None = None
         self.case_service = CaseService(self.api_client)
         self.attachment_service = AttachmentService(self.api_client)
 
@@ -679,15 +680,19 @@ class SupportApp(App):
                 key=num,
             )
 
-        container = self.query_one("#case-detail-container")
-        container.query("*").remove()
-        container.mount(Static("Select a case from the list."))
+        if not self.selected_case_id:
+            container = self.query_one("#case-detail-container")
+            container.query("*").remove()
+            container.mount(Static("Select a case from the list."))
 
     def update_case_table_row(self, case_num: str) -> None:
         with contextlib.suppress(Exception):
             table = self.query_one("#case-table", DataTable)
             for c in self.cases:
-                if str(c.case_number or c.id) == str(case_num):
+                c_num_str = str(c.case_number or c.id or "")
+                if c_num_str == str(case_num) or c_num_str.lstrip("0") == str(
+                    case_num
+                ).lstrip("0"):
                     status = c.status or ""
                     status_style = ""
                     if "Red Hat" in status or "red hat" in status.lower():
@@ -696,7 +701,7 @@ class SupportApp(App):
                         status_style = "bold green"
                     elif "closed" in status.lower():
                         status_style = "dim"
-                    num_text = Text(case_num, style=status_style)
+                    num_text = Text(c_num_str, style=status_style)
                     if getattr(c, "is_followed", False):
                         num_text.append(" ★", style="bold yellow")
                     if getattr(c, "has_unread", False):
@@ -704,7 +709,18 @@ class SupportApp(App):
                         num_text.append(f" ●{cnt}" if cnt else " ●", style="bold cyan")
                     cols = list(table.columns.keys())
                     if cols:
-                        table.update_cell(case_num, cols[0], num_text)
+                        target_key = None
+                        for r_k in table.rows:
+                            r_k_val = str(r_k.value)
+                            if r_k_val == c_num_str or r_k_val.lstrip(
+                                "0"
+                            ) == c_num_str.lstrip("0"):
+                                target_key = r_k
+                                break
+                        if target_key:
+                            table.update_cell(target_key, cols[0], num_text)
+                        else:
+                            table.update_cell(str(case_num), cols[0], num_text)
                     break
 
     def show_error(self, msg: str) -> None:
@@ -736,23 +752,23 @@ class SupportApp(App):
             lambda: self.fetch_case_details(self.selected_case_id), thread=True
         )
 
-    @on(Button.Pressed, "#tui-comment-btn")
+    @on(Button.Pressed, ".tui-comment-btn, #tui-comment-btn")
     def on_comment_click(self) -> None:
         self.action_add_comment()
 
-    @on(Button.Pressed, "#tui-attach-btn")
+    @on(Button.Pressed, ".tui-attach-btn, #tui-attach-btn")
     def on_attach_click(self) -> None:
         self.action_add_attachment()
 
-    @on(Button.Pressed, "#tui-template-btn")
+    @on(Button.Pressed, ".tui-template-btn, #tui-template-btn")
     def on_template_click(self) -> None:
         self.action_apply_template()
 
-    @on(Button.Pressed, "#tui-bookmark-btn")
+    @on(Button.Pressed, ".tui-bookmark-btn, #tui-bookmark-btn")
     def on_bookmark_click(self) -> None:
         self.action_select_bookmark()
 
-    @on(Button.Pressed, "#tui-refresh-btn")
+    @on(Button.Pressed, ".tui-refresh-btn, #tui-refresh-btn")
     def on_refresh_click(self) -> None:
         if self.selected_case_id:
             self.run_worker(
@@ -820,9 +836,9 @@ class SupportApp(App):
     def render_case_details(
         self, details: CaseDetails, attachments: list[Attachment]
     ) -> None:
+        self.current_details = details
         detail_container = self.query_one("#case-detail-container")
         detail_container.query("*").remove()
-
         case = details.case
         num = case.case_number or case.id or ""
         title = case.summary or ""
@@ -868,12 +884,16 @@ class SupportApp(App):
         # Header Action Buttons
         widgets.append(
             Horizontal(
-                Button("💬 Comment (C)", id="tui-comment-btn", variant="success"),
-                Button("📎 Attach (A)", id="tui-attach-btn", variant="primary"),
-                Button("📋 Template (T)", id="tui-template-btn", variant="primary"),
-                Button("🔖 Bookmark (B)", id="tui-bookmark-btn", variant="warning"),
-                Button("🔄 Refresh (R)", id="tui-refresh-btn", variant="default"),
-                id="tui-action-row",
+                Button("💬 Comment (C)", classes="tui-comment-btn", variant="success"),
+                Button("📎 Attach (A)", classes="tui-attach-btn", variant="primary"),
+                Button(
+                    "📋 Template (T)", classes="tui-template-btn", variant="primary"
+                ),
+                Button(
+                    "🔖 Bookmark (B)", classes="tui-bookmark-btn", variant="warning"
+                ),
+                Button("🔄 Refresh (R)", classes="tui-refresh-btn", variant="default"),
+                classes="tui-action-row",
             )
         )
 
@@ -953,7 +973,7 @@ class SupportApp(App):
                     f"[bold yellow]┈┈┈┈ 📍 Last read checkpoint ({ckpt_time}) │ ▼ {count_unread} unread below ┈┈┈┈[/]",
                     border_style="yellow",
                 )
-                widgets.append(Static(divider, id="tui-checkpoint-divider"))
+                widgets.append(Static(divider, classes="tui-checkpoint-divider"))
 
             c_date = c.created_date or ""
             c_by = c.created_by or "Unknown"
@@ -987,7 +1007,7 @@ class SupportApp(App):
 
             def scroll_to_divider() -> None:
                 with contextlib.suppress(Exception):
-                    div_widget = self.query_one("#tui-checkpoint-divider")
+                    div_widget = self.query_one(".tui-checkpoint-divider")
                     detail_container.scroll_to_widget(div_widget, top=True)
 
             self.call_after_refresh(scroll_to_divider)
@@ -1000,44 +1020,129 @@ class SupportApp(App):
             )
 
     def _auto_mark_read_dwell(self, case_num: str) -> None:
-        if self.selected_case_id != str(case_num):
+        if str(self.selected_case_id) != str(case_num) and str(
+            self.selected_case_id
+        ).lstrip("0") != str(case_num).lstrip("0"):
             return
         user = self.case_service.get_current_user()
-        self.case_service.state_service.mark_case_read(user, str(case_num))
+        status = None
+        severity = None
+        last_comm_id = None
+        last_comm_date = None
+        if self.current_details:
+            c_num = str(
+                self.current_details.case.case_number
+                or self.current_details.case.id
+                or ""
+            )
+            if c_num == str(case_num) or c_num.lstrip("0") == str(case_num).lstrip("0"):
+                status = self.current_details.case.status
+                severity = self.current_details.case.severity
+                if self.current_details.comments:
+                    last_comm = self.current_details.comments[-1]
+                    last_comm_id = last_comm.id
+                    last_comm_date = last_comm.created_date
+
+        self.case_service.state_service.mark_case_read(
+            user=user,
+            case_number=str(case_num),
+            status=status,
+            severity=severity,
+            last_comment_id=last_comm_id,
+            last_comment_date=last_comm_date,
+        )
         for c in self.cases:
-            if str(c.case_number or c.id) == str(case_num):
+            c_num = str(c.case_number or c.id or "")
+            if c_num == str(case_num) or c_num.lstrip("0") == str(case_num).lstrip("0"):
                 c.has_unread = False
                 c.unread_count = 0
+                c.status_changed = False
                 break
         self.update_case_table_row(str(case_num))
 
     def action_mark_read(self) -> None:
-        if not self.selected_case_id:
+        case_id = self.selected_case_id
+        if not case_id:
+            with contextlib.suppress(Exception):
+                table = self.query_one("#case-table", DataTable)
+                if (
+                    table
+                    and table.cursor_row is not None
+                    and table.cursor_row < len(table.rows)
+                ):
+                    row_keys = list(table.rows.keys())
+                    case_id = str(row_keys[table.cursor_row].value)
+        if not case_id:
             return
+
         user = self.case_service.get_current_user()
-        self.case_service.state_service.mark_case_read(user, self.selected_case_id)
-        for c in self.cases:
-            if str(c.case_number or c.id) == str(self.selected_case_id):
-                c.has_unread = False
-                c.unread_count = 0
-                break
-        self.update_case_table_row(self.selected_case_id)
-        self.run_worker(
-            lambda: self.fetch_case_details(self.selected_case_id), thread=True
+        status = None
+        severity = None
+        last_comm_id = None
+        last_comm_date = None
+        if self.current_details:
+            c_num = str(
+                self.current_details.case.case_number
+                or self.current_details.case.id
+                or ""
+            )
+            if c_num == str(case_id) or c_num.lstrip("0") == str(case_id).lstrip("0"):
+                status = self.current_details.case.status
+                severity = self.current_details.case.severity
+                if self.current_details.comments:
+                    last_comm = self.current_details.comments[-1]
+                    last_comm_id = last_comm.id
+                    last_comm_date = last_comm.created_date
+
+        self.case_service.state_service.mark_case_read(
+            user=user,
+            case_number=case_id,
+            status=status,
+            severity=severity,
+            last_comment_id=last_comm_id,
+            last_comment_date=last_comm_date,
         )
 
+        for c in self.cases:
+            c_num = str(c.case_number or c.id or "")
+            if c_num == str(case_id) or c_num.lstrip("0") == str(case_id).lstrip("0"):
+                c.has_unread = False
+                c.unread_count = 0
+                c.status_changed = False
+                break
+
+        self.update_case_table_row(case_id)
+
+        if self.selected_case_id and (
+            str(self.selected_case_id) == str(case_id)
+            or str(self.selected_case_id).lstrip("0") == str(case_id).lstrip("0")
+        ):
+            self.run_worker(
+                lambda: self.fetch_case_details(self.selected_case_id), thread=True
+            )
+
     def action_toggle_follow(self) -> None:
-        if not self.selected_case_id:
+        case_id = self.selected_case_id
+        if not case_id:
+            with contextlib.suppress(Exception):
+                table = self.query_one("#case-table", DataTable)
+                if (
+                    table
+                    and table.cursor_row is not None
+                    and table.cursor_row < len(table.rows)
+                ):
+                    row_keys = list(table.rows.keys())
+                    case_id = str(row_keys[table.cursor_row].value)
+        if not case_id:
             return
         user = self.case_service.get_current_user()
-        is_followed = self.case_service.state_service.toggle_follow(
-            user, self.selected_case_id
-        )
+        is_followed = self.case_service.state_service.toggle_follow(user, case_id)
         for c in self.cases:
-            if str(c.case_number or c.id) == str(self.selected_case_id):
+            c_num = str(c.case_number or c.id or "")
+            if c_num == str(case_id) or c_num.lstrip("0") == str(case_id).lstrip("0"):
                 c.is_followed = is_followed
                 break
-        self.update_case_table_row(self.selected_case_id)
+        self.update_case_table_row(case_id)
 
     def action_toggle_layout(self) -> None:
         """Toggle between vertical split (side-by-side) and horizontal split (mailbox style)."""

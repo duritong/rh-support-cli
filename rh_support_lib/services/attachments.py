@@ -18,7 +18,9 @@ class AttachmentService:
         base_url: str | None = None,
     ):
         self.api_client = api_client
-        self.base_url = (base_url or ATTACHMENT_API_URL).rstrip("/")
+        self.base_url = (
+            base_url or os.environ.get("RH_ATTACHMENT_API_URL") or ATTACHMENT_API_URL
+        ).rstrip("/")
 
     def list_attachments(
         self,

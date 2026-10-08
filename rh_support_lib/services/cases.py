@@ -351,7 +351,9 @@ class CaseService:
         state_service: StateService | None = None,
     ):
         self.api_client = api_client
-        self.graphql_url = graphql_url or GRAPHQL_URL
+        self.graphql_url = (
+            graphql_url or os.environ.get("RH_GRAPHQL_URL") or GRAPHQL_URL
+        )
         self.state_service = state_service or StateService()
 
     # --- NORMALIZATION HELPERS ---

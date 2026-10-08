@@ -428,9 +428,18 @@ class StateService:
         tracked_dict = user_state.setdefault("tracked_cases", {})
         c_num = str(case_number).strip()
         tc = tracked_dict.get(c_num)
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         if not tc or not isinstance(tc, dict):
-            return
-
+            tc = {
+                "relationship": "viewed",
+                "followed_at": "",
+                "summary": "",
+                "account_number": "",
+                "source": "cli",
+                "read_checkpoint": {},
+                "latest_known": {},
+            }
+            tracked_dict[c_num] = tc
         now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         lk = tc.get("latest_known", {})
         cp = tc.setdefault("read_checkpoint", {})
@@ -443,9 +452,7 @@ class StateService:
             or cp.get("last_read_comment_id", "")
         )
         cp["last_read_comment_date"] = (
-            last_comment_date
-            or lk.get("latest_comment_date")
-            or cp.get("last_read_comment_date", "")
+            last_comment_date or lk.get("latest_comment_date") or now_str
         )
         cp["marked_read_at"] = now_str
 

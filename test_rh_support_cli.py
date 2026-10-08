@@ -2563,7 +2563,16 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         import tempfile
         from unittest import mock
 
+        import rh_support_lib.constants
         from rh_support_lib.main import main
+
+        saved_constants = {
+            "API_URL": rh_support_lib.constants.API_URL,
+            "SSO_URL": rh_support_lib.constants.SSO_URL,
+            "GRAPHQL_URL": rh_support_lib.constants.GRAPHQL_URL,
+            "ATTACHMENT_API_URL": rh_support_lib.constants.ATTACHMENT_API_URL,
+        }
+        saved_env = os.environ.copy()
 
         # Use a writable mock corpus directory to verify mutation
         temp_corpus = tempfile.mkdtemp()
@@ -2660,6 +2669,10 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             )
 
         finally:
+            for k, v in saved_constants.items():
+                setattr(rh_support_lib.constants, k, v)
+            os.environ.clear()
+            os.environ.update(saved_env)
             shutil.rmtree(temp_corpus)
 
     def test_attachment_subcommands_list_and_status(self):
@@ -3587,6 +3600,121 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 self.assertIn("layout-horizontal", app.screen.classes)
 
         asyncio.run(run_layout_test())
+
+    def test_tui_mark_read_removes_visual_unread_indicator(self):
+        """Test that pressing 'm' in TUI removes the unread indicator from table and details divider."""
+        import asyncio
+        import shutil
+        import tempfile
+        from unittest.mock import patch
+
+        import rh_support_lib.constants
+        from rh_support_lib.models import Case, CaseComment, CaseDetails
+        from rh_support_lib.services.state import StateService
+        from rh_support_lib.tui.app import SupportApp
+
+        orig_gql = rh_support_lib.constants.GRAPHQL_URL
+        rh_support_lib.constants.GRAPHQL_URL = f"{self.base_url}/graphql"
+        temp_dir = tempfile.mkdtemp()
+        state_file = os.path.join(temp_dir, "rh-support-cli", "state.yaml")
+
+        try:
+            with patch.dict(
+                os.environ,
+                {
+                    "XDG_CONFIG_HOME": temp_dir,
+                    "RH_GRAPHQL_URL": f"{self.base_url}/graphql",
+                },
+            ):
+                svc = StateService(state_file=state_file)
+                app = SupportApp(token="mock_access_token_123", config={})
+                app.case_service.state_service = svc
+                user = app.case_service.get_current_user()
+
+                # Set an older checkpoint on case 12345
+                svc.add_tracked_case(
+                    user, "12345", relationship="followed", summary="Test Case"
+                )
+                data = svc.load_state()
+                u_state = svc._get_user_state(data, user)
+                u_state["tracked_cases"]["12345"]["read_checkpoint"] = {
+                    "last_read_comment_date": "2026-10-01T00:00:00Z",
+                    "last_read_comment_id": "comm_0",
+                    "status": "Waiting on Customer Action Required",
+                    "marked_read_at": "2026-10-01T00:00:00Z",
+                }
+                svc.save_state(data)
+
+                async def run_test():
+                    async with app.run_test() as pilot:
+                        await pilot.pause()
+                        c = Case(
+                            case_number="12345",
+                            summary="Test Case",
+                            status="Waiting on Red Hat",
+                            severity="High",
+                            has_unread=True,
+                            unread_count=1,
+                        )
+                        details = CaseDetails(
+                            case=c,
+                            description="Case Description",
+                            comments=[
+                                CaseComment(
+                                    id="comm_1",
+                                    body="New comment",
+                                    created_date="2026-10-08T09:00:00Z",
+                                    is_public=True,
+                                    created_by="Red Hat Support",
+                                )
+                            ],
+                        )
+                        app.cases = [c]
+                        app.populate_cases_table()
+                        table = app.query_one("#case-table")
+                        cols = list(table.columns.keys())
+
+                        # Check that table cell has unread badge
+                        cell_text = str(table.get_cell("12345", cols[0]))
+                        self.assertIn("●1", cell_text)
+
+                        # Mount details and verify divider is present
+                        app.selected_case_id = "12345"
+                        app.render_case_details(details, [])
+                        await pilot.pause()
+                        dividers_before = app.query(".tui-checkpoint-divider")
+                        self.assertEqual(len(dividers_before), 1)
+
+                        # Trigger 'm' (mark read)
+                        app.action_mark_read()
+                        await pilot.pause()
+
+                        # Table cell unread badge MUST be removed
+                        cell_after = str(table.get_cell("12345", cols[0]))
+                        self.assertNotIn("●", cell_after)
+                        self.assertFalse(c.has_unread)
+                        self.assertEqual(c.unread_count, 0)
+
+                        # Re-render details (as fetch_case_details does) and verify divider is gone
+                        app.render_case_details(details, [])
+                        await pilot.pause()
+                        dividers_after = app.query(".tui-checkpoint-divider")
+                        self.assertEqual(len(dividers_after), 0)
+
+                        # Verify checkpoint in state.yaml was advanced
+                        reloaded_tc = svc.get_tracked_cases(user).get("12345")
+                        self.assertEqual(
+                            reloaded_tc.read_checkpoint.last_read_comment_date,
+                            "2026-10-08T09:00:00Z",
+                        )
+                        self.assertEqual(
+                            reloaded_tc.read_checkpoint.status, "Waiting on Red Hat"
+                        )
+
+                asyncio.run(run_test())
+        finally:
+            rh_support_lib.constants.GRAPHQL_URL = orig_gql
+            shutil.rmtree(temp_dir)
 
 
 if __name__ == "__main__":
