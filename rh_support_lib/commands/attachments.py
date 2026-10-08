@@ -24,20 +24,22 @@ def cmd_attachment(args, api_client):
     elif subaction == "status":
         cmd_attachment_status(args, api_client)
     else:
-        # Default or fallback to list if case provided
-        if getattr(args, "case", None):
+        case_val = getattr(args, "case", None) or getattr(args, "case_pos", None)
+        if case_val:
+            args.case = str(case_val)
             cmd_attachment_list(args, api_client)
         else:
-            print(
+            sys.exit(
                 "Error: Please specify an attachment action: list, upload, download, delete, status."
             )
-            sys.exit(1)
 
 
 def cmd_attachment_list(args, api_client):
     """Lists attachments for a support case."""
     service = AttachmentService(api_client)
-    case_num = args.case
+    case_num = str(getattr(args, "case", None) or getattr(args, "case_pos", None) or "")
+    if not case_num:
+        sys.exit("Error: Case number is required (e.g. -c 12345678 or positional).")
     include_deleted = getattr(args, "include_deleted", False)
     simple_output = getattr(args, "simple_output", False)
 

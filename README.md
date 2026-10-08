@@ -157,7 +157,20 @@ Uploads a file to an existing support case.
 rh-support-cli attach -c 12345678 -f /tmp/sosreport.tar.xz
 ```
 
-### 6. Download an Attachment (`download`)
+### 6. List Attachments (`list-attachments` / `attachments`)
+
+Lists all file attachments uploaded to a support case, displaying their UUID, filename, size, uploader, date, and upload status.
+
+**Examples:**
+
+*List attachments using the shortcut or attachments command:*
+```bash
+rh-support-cli list-attachments 12345678
+rh-support-cli attachments 12345678
+rh-support-cli attachment -c 12345678 list
+```
+
+### 7. Download an Attachment (`download`)
 
 Downloads an attachment file from a support case.
 
@@ -173,7 +186,7 @@ Downloads an attachment file from a support case.
 rh-support-cli download -c 12345678 -a sosreport.tar.xz -o /tmp/sosreport.tar.xz
 ```
 
-### 7. Comment & Update Status (`comment`)
+### 8. Comment & Update Status (`comment`)
 Adds a comment to a case and optionally updates its status.
 
 **Options:**
@@ -193,7 +206,7 @@ rh-support-cli comment -c 12345678 -f response.txt
 rh-support-cli comment -c 12345678 -s closed
 ```
 
-### 8. Close a Case (`close`)
+### 9. Close a Case (`close`)
 
 Closes an existing support case with a comment. Works identically to `comment`, but automatically sets the status to `closed`.
 
@@ -216,7 +229,7 @@ rh-support-cli close -c 12345678
 rh-support-cli close -c 12345678 -f resolution.txt
 ```
 
-### 9. Apply Template (`apply`)
+### 10. Apply Template (`apply`)
 
 Applies a local YAML template over an existing support case. It compares the template fields with the case's current values, and performs the minimal required API requests to bring the case to the target state.
 
@@ -238,7 +251,7 @@ rh-support-cli apply -c 12345678 -t prod-standard --dry-run
 rh-support-cli apply -c 12345678 -t project-team --template-var team_lead=alice
 ```
 
-### 10. List Local Templates (`list-templates` / `list-template`)
+### 11. List Local Templates (`list-templates` / `list-template`)
 
 Lists all local templates stored in `~/.config/rh-support-cli/templates/` along with details like their description, fields they configure, and parent templates they include. **Note:** This command runs completely offline and bypasses authentication.
 
@@ -247,7 +260,7 @@ Lists all local templates stored in `~/.config/rh-support-cli/templates/` along 
 rh-support-cli list-templates
 ```
 
-### 11. Following & Tracking Cases Locally (`follow` / `unfollow` / `following`)
+### 12. Following & Tracking Cases Locally (`follow` / `unfollow` / `following`)
 
 Maintain a local tracking register in `~/.local/state/rh-support-cli/state.yaml` (or via `$XDG_STATE_HOME`) to monitor support tickets across CLI and TUI sessions:
 
@@ -264,7 +277,7 @@ rh-support-cli list --following
 rh-support-cli unfollow 12345678
 ```
 
-### 12. Synchronize Tracked Cases & Background Service (`sync`)
+### 13. Synchronize Tracked Cases & Background Service (`sync`)
 
 Poll the Red Hat GraphQL API across all followed and owned cases in parallel to detect remote updates:
 
@@ -281,7 +294,7 @@ systemctl --user daemon-reload
 systemctl --user enable --now rh-support-sync.timer
 ```
 
-### 13. Querying Unread Case Updates (`updates`)
+### 14. Querying Unread Case Updates (`updates`)
 
 Quickly inspect remote changes and new comments across tracked cases:
 
@@ -296,7 +309,7 @@ rh-support-cli updates --full
 rh-support-cli updates --mark-read
 ```
 
-### 14. Interactive Terminal User Interface (`tui`)
+### 15. Interactive Terminal User Interface (`tui`)
 
 Launches a beautiful, interactive Terminal User Interface (TUI) to browse and manage your Red Hat support cases directly inside your terminal session.
 

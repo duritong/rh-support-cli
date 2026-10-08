@@ -2840,6 +2840,23 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         self.assertIn("test_attachment.log", result_status.stdout)
         self.assertIn("COMPLETED", result_status.stdout)
 
+        # Calling attachments command without action defaults to list
+        result_default_list = self.run_cli(["attachments", "-c", "12345"])
+        self.assertEqual(result_default_list.returncode, 0)
+        self.assertIn("att_1001_uuid", result_default_list.stdout)
+
+        # Top-level list-attachments shortcut
+        result_shortcut = self.run_cli(["list-attachments", "12345"])
+        self.assertEqual(result_shortcut.returncode, 0)
+        self.assertIn("att_1001_uuid", result_shortcut.stdout)
+
+        # Verify 'show' command displays the attachments section with UUID and filename
+        result_show = self.run_cli(["show", "-c", "12345", "--no-pager"])
+        self.assertEqual(result_show.returncode, 0)
+        self.assertIn("ATTACHMENTS", result_show.stdout)
+        self.assertIn("att_1001_uuid", result_show.stdout)
+        self.assertIn("test_attachment.log", result_show.stdout)
+
     def test_attachment_upload_download_delete_cli(self):
         """Test uploading, downloading, and deleting an attachment via CLI"""
         import tempfile

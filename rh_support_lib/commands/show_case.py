@@ -31,6 +31,12 @@ def cmd_show(args, api_client):
     description = details.description
     comments = details.comments
 
+    from rh_support_lib.services.attachments import AttachmentService
+
+    try:
+        attachments = AttachmentService(api_client).list_attachments(str(num))
+    except Exception:  # noqa: BLE001
+        attachments = []
     user = service.get_current_user()
     tc = service.state_service.get_tracked_cases(user).get(str(num))
     if not tc and (
@@ -89,6 +95,22 @@ def cmd_show(args, api_client):
         if status_changed:
             lines.append(f"⚡ Status Changed: {old_status} -> {status}")
             lines.append("-" * 80)
+        if attachments:
+            lines.append(f"ATTACHMENTS ({len(attachments)}):\n")
+            lines.append(
+                f"{'UUID':<36}  {'FILE NAME':<30}  {'SIZE':<10}  {'UPLOADED BY':<20}  {'STATUS'}"
+            )
+            lines.append("-" * 110)
+            for a in attachments:
+                size_str = (
+                    f"{a.size_kb:.1f} KB"
+                    if a.size_kb < 1024
+                    else f"{a.size_kb / 1024.0:.1f} MB"
+                )
+                lines.append(
+                    f"{a.uuid:<36}  {a.file_name:<30}  {size_str:<10}  {a.created_by or 'Unknown':<20}  {a.upload_status}"
+                )
+            lines.append("\n" + "-" * 80)
         lines.append("DESCRIPTION:\n")
         lines.append(description)
         lines.append("\n" + "=" * 80 + "\n")
@@ -122,6 +144,7 @@ def cmd_show(args, api_client):
             pydoc.pager(output)
 
     else:
+        from rich.box import ROUNDED
         from rich.console import Console
         from rich.markdown import Markdown
         from rich.panel import Panel
@@ -164,6 +187,31 @@ def cmd_show(args, api_client):
             if status_changed:
                 diff_banner = f"[bold yellow]⚡ Status Changed:[/] {old_status} ➔ [bold green]{status}[/]"
                 con.print(Panel(diff_banner, border_style="yellow"))
+
+            if attachments:
+                con.print(f"\n[bold yellow]ATTACHMENTS ({len(attachments)}):[/]\n")
+                att_table = Table(
+                    box=ROUNDED, header_style="bold yellow", show_lines=False
+                )
+                att_table.add_column("UUID", style="dim", no_wrap=True)
+                att_table.add_column("Filename", style="bold white")
+                att_table.add_column("Size", justify="right", style="green")
+                att_table.add_column("Uploaded By", style="yellow")
+                att_table.add_column("Status", style="cyan")
+                for a in attachments:
+                    size_str = (
+                        f"{a.size_kb:.1f} KB"
+                        if a.size_kb < 1024
+                        else f"{a.size_kb / 1024.0:.1f} MB"
+                    )
+                    att_table.add_row(
+                        a.uuid,
+                        a.file_name,
+                        size_str,
+                        a.created_by or "Unknown",
+                        a.upload_status,
+                    )
+                con.print(att_table)
 
             con.print("\n[bold magenta]DESCRIPTION:[/]\n")
             con.print(Markdown(description))

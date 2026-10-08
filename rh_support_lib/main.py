@@ -281,6 +281,19 @@ Authentication:
             "status", help="Get upload status of case attachments"
         )
         p_att_stat.add_argument("-a", "--attachment", help="Attachment UUID (optional)")
+
+    # List Attachments Subcommand (shortcut)
+    parser_list_att = subparsers.add_parser(
+        "list-attachments", help="List all attachments for a support case (shortcut)"
+    )
+    parser_list_att.add_argument("case_pos", nargs="?", help="Case Number (positional)")
+    parser_list_att.add_argument("-c", "--case", help="Case Number")
+    parser_list_att.add_argument(
+        "--include-deleted", action="store_true", help="Include deleted files"
+    )
+    parser_list_att.add_argument(
+        "--simple-output", action="store_true", help="Disable colored output"
+    )
     # Create Subcommand
     parser_create = subparsers.add_parser("create", help="Create a new support case")
     parser_create.add_argument("--product", help="Product name")
@@ -600,6 +613,15 @@ Authentication:
     elif args.command == "download":
         cmd_download(args, api_client)
     elif args.command in ("attachment", "attachments"):
+        cmd_attachment(args, api_client)
+    elif args.command == "list-attachments":
+        case_val = getattr(args, "case", None) or getattr(args, "case_pos", None)
+        if not case_val:
+            sys.exit(
+                "Error: Case number is required (e.g. list-attachments 12345 or -c 12345)."
+            )
+        args.case = str(case_val)
+        args.attachment_action = "list"
         cmd_attachment(args, api_client)
     elif args.command == "create":
         cmd_create(args, api_client, config)

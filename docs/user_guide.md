@@ -247,6 +247,9 @@ rh-support-cli close -c 12345678 -t close_case
 ### Attachment Management (`attachment` / `attachments`)
 *   **List Attachments**:
     ```bash
+    rh-support-cli list-attachments 12345678
+    # or using the attachments group:
+    rh-support-cli attachments 12345678
     rh-support-cli attachment -c 12345678 list [--include-deleted]
     ```
 *   **Upload Attachments**:
