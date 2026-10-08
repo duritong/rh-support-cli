@@ -2550,6 +2550,25 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 attach_modal.dismiss("")
                 await pilot.pause()
 
+                # 6b. Test activating the file download modal
+                from rh_support_lib.models import Attachment
+
+                app.current_attachments = [
+                    Attachment(
+                        uuid="att_test_123",
+                        file_name="diag.tar.gz",
+                        size=1024,
+                        size_kb=1.0,
+                        created_date="2026-10-08T10:00:00Z",
+                    )
+                ]
+                app.action_download_attachment()
+                await pilot.pause()
+                download_modal = app.screen
+                self.assertIn("DownloadModal", str(download_modal))
+                download_modal.dismiss(None)
+                await pilot.pause()
+
                 # 7. Test TUI follow toggle and mark read actions
                 app.selected_case_id = "12345"
                 app.action_toggle_follow()
@@ -2858,6 +2877,24 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             self.assertIn("Successfully downloaded attachment to:", result_down.stdout)
             self.assertTrue(os.path.exists(dest_file))
             with open(dest_file, "r") as f:
+                self.assertEqual(f.read(), "System diagnostic log line 1\nLine 2")
+
+            # Download via top-level shortcut
+            dest_shortcut = os.path.join(temp_dir, "downloaded_shortcut.log")
+            res_shortcut = self.run_cli(
+                [
+                    "download",
+                    "-c",
+                    "12345",
+                    "-a",
+                    "att_test_uuid_123",
+                    "-o",
+                    dest_shortcut,
+                ]
+            )
+            self.assertEqual(res_shortcut.returncode, 0)
+            self.assertTrue(os.path.exists(dest_shortcut))
+            with open(dest_shortcut, "r") as f:
                 self.assertEqual(f.read(), "System diagnostic log line 1\nLine 2")
 
             # Delete with -y

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import contextlib
 import os
+import re
 from collections.abc import Callable
 
 import requests
@@ -94,6 +96,20 @@ class AttachmentService:
         Retrieves the presigned download URL for an attachment and downloads the file.
         Returns the local path of the downloaded file.
         """
+        # If attachment_id matches a filename rather than a UUID, resolve it from case attachments
+        if not re.match(
+            r"^[0-9a-fA-F-]{8,}$", attachment_id
+        ) and not attachment_id.startswith("att_"):
+            with contextlib.suppress(Exception):
+                attachments = self.list_attachments(case_number)
+                for a in attachments:
+                    if (
+                        a.file_name.lower() == attachment_id.lower()
+                        or a.uuid == attachment_id
+                    ):
+                        attachment_id = a.uuid
+                        break
+
         url = f"{self.base_url}/v3/cases/attachments/downloadFile/{case_number}/{attachment_id}"
         resp = self.api_client.get(url)
         resp.raise_for_status()

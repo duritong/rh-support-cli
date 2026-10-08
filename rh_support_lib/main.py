@@ -8,6 +8,7 @@ from rh_support_lib.commands.actions import (
     cmd_close,
     cmd_comment,
     cmd_completion,
+    cmd_download,
     cmd_link,
 )
 from rh_support_lib.commands.apply_template import cmd_apply, cmd_list_templates
@@ -215,6 +216,15 @@ Authentication:
     )
     parser_attach.add_argument("-d", "--description", help="Attachment description")
 
+    # Download Subcommand (shortcut)
+    parser_download = subparsers.add_parser(
+        "download", help="Download an attachment from a case (shortcut)"
+    )
+    parser_download.add_argument("-c", "--case", required=True, help="Case Number")
+    parser_download.add_argument(
+        "-a", "--attachment", required=True, help="Attachment UUID or filename"
+    )
+    parser_download.add_argument("-o", "--output", help="Destination path or filename")
     # Attachment Subcommand Group
     for att_name in ("attachment", "attachments"):
         parser_att = subparsers.add_parser(
@@ -587,6 +597,8 @@ Authentication:
 
     if args.command == "attach":
         cmd_attach(args, api_client)
+    elif args.command == "download":
+        cmd_download(args, api_client)
     elif args.command in ("attachment", "attachments"):
         cmd_attachment(args, api_client)
     elif args.command == "create":

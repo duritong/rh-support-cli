@@ -12,6 +12,12 @@ def cmd_attach(args, api_client):
     cmd_attachment_upload(args, api_client)
 
 
+def cmd_download(args, api_client):
+    from rh_support_lib.commands.attachments import cmd_attachment_download
+
+    cmd_attachment_download(args, api_client)
+
+
 def cmd_comment(args, api_client):
 
     # 1. Process templates if specified

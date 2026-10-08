@@ -257,7 +257,9 @@ rh-support-cli close -c 12345678 -t close_case
     ```
 *   **Download Attachment**:
     ```bash
-    rh-support-cli attachment -c 12345678 download -a <ATTACHMENT_UUID> [-o /path/to/destination.tar.xz]
+    rh-support-cli attachment -c 12345678 download -a <ATTACHMENT_UUID_OR_FILENAME> [-o /path/to/destination.tar.xz]
+    # Shortcut:
+    rh-support-cli download -c 12345678 -a <ATTACHMENT_UUID_OR_FILENAME> [-o /path/to/destination.tar.xz]
     ```
 *   **Delete Attachment**:
     ```bash
@@ -415,6 +417,7 @@ Toggle focus between the case list and details pane using **`Tab`** or **`Shift+
 | **`Home` / `End`** | Jump to the very top or bottom of the viewport |
 | **`c`** | Open/Focus the inline Comment Pane at the bottom of the case view |
 | **`a`** | Specify and upload local file attachments (Attach Modal) |
+| **`d`** | Select and download a case attachment locally (Download Modal) |
 | **`t`** | Select and apply a local template (Template Modal) |
 | **`b`** | Select and apply an active filter bookmark dynamically (Bookmark Modal) |
 | **`v` / `l`** | Toggle split layout between vertical (side-by-side) and horizontal (mailbox style) |

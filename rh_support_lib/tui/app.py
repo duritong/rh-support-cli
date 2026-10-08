@@ -304,6 +304,63 @@ class AttachModal(ModalScreen[str]):
         self.dismiss("")
 
 
+class DownloadModal(ModalScreen[tuple[str, str] | None]):
+    """Modal screen for selecting an attachment and destination to download."""
+
+    def __init__(self, attachments: list[Attachment]):
+        super().__init__()
+        self.attachments = attachments
+
+    def compose(self) -> ComposeResult:
+        options = []
+        for a in self.attachments:
+            size_str = (
+                f"{a.size_kb:.1f} KB"
+                if a.size_kb < 1024
+                else f"{a.size_kb / 1024.0:.1f} MB"
+            )
+            options.append((f"{a.file_name} ({size_str})", a.uuid))
+
+        default_val = options[0][1] if options else Select.BLANK
+        yield Grid(
+            Label("Download Attachment", id="modal-title"),
+            Label("Select Attachment:"),
+            Select(
+                options,
+                value=default_val,
+                id="download-select",
+                prompt="Choose an attachment",
+            ),
+            Label("Destination Path / Directory:"),
+            Input(
+                value=".",
+                placeholder="./filename or destination dir",
+                id="download-path-input",
+            ),
+            Horizontal(
+                Button("Download", variant="success", id="download-btn"),
+                Button("Cancel", variant="error", id="cancel-btn"),
+                id="modal-buttons",
+            ),
+            id="template-modal-grid",
+        )
+
+    @on(Button.Pressed, "#download-btn")
+    def do_download(self) -> None:
+        sel = self.query_one("#download-select", Select)
+        inp = self.query_one("#download-path-input", Input)
+        att_uuid = str(sel.value) if sel.value and sel.value != Select.BLANK else ""
+        dest = inp.value.strip() or "."
+        if att_uuid:
+            self.dismiss((att_uuid, dest))
+        else:
+            self.dismiss(None)
+
+    @on(Button.Pressed, "#cancel-btn")
+    def cancel_download(self) -> None:
+        self.dismiss(None)
+
+
 class FocusableContainer(VerticalScroll):
     """A scrollable container that can receive keyboard focus and handles keyboard scrolling."""
 
@@ -345,8 +402,8 @@ class SupportApp(App):
         ("r", "refresh", "Refresh"),
         ("c", "add_comment", "Add Comment"),
         ("a", "add_attachment", "Attach File"),
+        ("d", "download_attachment", "Download"),
         ("t", "apply_template", "Apply Template"),
-        ("b", "select_bookmark", "Select Bookmark"),
         ("w", "toggle_follow", "Follow"),
         ("m", "mark_read", "Mark Read"),
         ("v", "toggle_layout", "Split (H/V)"),
@@ -578,6 +635,7 @@ class SupportApp(App):
         self.cases: list[Case] = []
         self.selected_case_id: str | None = None
         self.current_details: CaseDetails | None = None
+        self.current_attachments: list[Attachment] = []
         self.case_service = CaseService(self.api_client)
         self.attachment_service = AttachmentService(self.api_client)
 
@@ -789,6 +847,10 @@ class SupportApp(App):
         else:
             self.run_worker(self.fetch_cases, thread=True)
 
+    @on(Button.Pressed, ".tui-download-btn, #tui-download-btn")
+    def on_download_click(self) -> None:
+        self.action_download_attachment()
+
     @on(Button.Pressed, "#tui-comment-post-btn")
     def on_comment_post_click(self) -> None:
         text_area = self.query_one("#tui-comment-textarea", TextArea)
@@ -848,6 +910,7 @@ class SupportApp(App):
         self, details: CaseDetails, attachments: list[Attachment]
     ) -> None:
         self.current_details = details
+        self.current_attachments = attachments
         detail_container = self.query_one("#case-detail-container")
         detail_container.query("*").remove()
         case = details.case
@@ -897,6 +960,9 @@ class SupportApp(App):
             Horizontal(
                 Button("💬 Comment (C)", classes="tui-comment-btn", variant="success"),
                 Button("📎 Attach (A)", classes="tui-attach-btn", variant="primary"),
+                Button(
+                    "📥 Download (D)", classes="tui-download-btn", variant="primary"
+                ),
                 Button(
                     "📋 Template (T)", classes="tui-template-btn", variant="primary"
                 ),
@@ -1463,6 +1529,58 @@ class SupportApp(App):
             self.fetch_case_details(self.selected_case_id)
         except Exception as e:  # noqa: BLE001
             self.call_from_thread(self.show_error, f"Error: {e}")
+
+    def action_download_attachment(self) -> None:
+        if not self.selected_case_id:
+            self.show_error("Please select a case first.")
+            return
+
+        if not getattr(self, "current_attachments", None):
+            self.notify(
+                "No attachments found on this case.",
+                title="Download Attachment",
+                severity="warning",
+            )
+            return
+
+        def handle_download(result: tuple[str, str] | None) -> None:
+            if not result:
+                return
+            att_uuid, dest_path = result
+            self.run_worker(
+                lambda: self.execute_download(
+                    self.selected_case_id, att_uuid, dest_path
+                ),
+                thread=True,
+            )
+
+        self.push_screen(DownloadModal(self.current_attachments), handle_download)
+
+    def execute_download(self, case_id: str, att_uuid: str, dest_path: str) -> None:
+        def show_downloading():
+            with contextlib.suppress(Exception):
+                self.notify(
+                    f"Downloading attachment '{att_uuid}'...",
+                    title="Download Starting",
+                    severity="information",
+                )
+
+        self.call_from_thread(show_downloading)
+        try:
+            saved_path = self.attachment_service.download_attachment(
+                case_id, att_uuid, target_path=dest_path
+            )
+
+            def show_success():
+                self.notify(
+                    f"Downloaded attachment to: {saved_path}",
+                    title="Download Complete",
+                    severity="information",
+                )
+
+            self.call_from_thread(show_success)
+        except Exception as e:  # noqa: BLE001
+            self.call_from_thread(self.show_error, f"Error downloading attachment: {e}")
 
     def action_select_bookmark(self) -> None:
         def handle_bookmark(bookmark_name: str) -> None:

@@ -157,8 +157,23 @@ Uploads a file to an existing support case.
 rh-support-cli attach -c 12345678 -f /tmp/sosreport.tar.xz
 ```
 
-### 6. Comment & Update Status (`comment`)
+### 6. Download an Attachment (`download`)
 
+Downloads an attachment file from a support case.
+
+**Options:**
+- `-c`, `--case`: The Case Number (required)
+- `-a`, `--attachment`: Attachment UUID or filename (required)
+- `-o`, `--output`: Destination path or filename (default: original filename in current directory)
+
+**Examples:**
+
+*Download an attachment by filename or UUID:*
+```bash
+rh-support-cli download -c 12345678 -a sosreport.tar.xz -o /tmp/sosreport.tar.xz
+```
+
+### 7. Comment & Update Status (`comment`)
 Adds a comment to a case and optionally updates its status.
 
 **Options:**
@@ -178,7 +193,7 @@ rh-support-cli comment -c 12345678 -f response.txt
 rh-support-cli comment -c 12345678 -s closed
 ```
 
-### 7. Close a Case (`close`)
+### 8. Close a Case (`close`)
 
 Closes an existing support case with a comment. Works identically to `comment`, but automatically sets the status to `closed`.
 
@@ -201,7 +216,7 @@ rh-support-cli close -c 12345678
 rh-support-cli close -c 12345678 -f resolution.txt
 ```
 
-### 8. Apply Template (`apply`)
+### 9. Apply Template (`apply`)
 
 Applies a local YAML template over an existing support case. It compares the template fields with the case's current values, and performs the minimal required API requests to bring the case to the target state.
 
@@ -223,7 +238,7 @@ rh-support-cli apply -c 12345678 -t prod-standard --dry-run
 rh-support-cli apply -c 12345678 -t project-team --template-var team_lead=alice
 ```
 
-### 9. List Local Templates (`list-templates` / `list-template`)
+### 10. List Local Templates (`list-templates` / `list-template`)
 
 Lists all local templates stored in `~/.config/rh-support-cli/templates/` along with details like their description, fields they configure, and parent templates they include. **Note:** This command runs completely offline and bypasses authentication.
 
@@ -232,7 +247,7 @@ Lists all local templates stored in `~/.config/rh-support-cli/templates/` along 
 rh-support-cli list-templates
 ```
 
-### 10. Following & Tracking Cases Locally (`follow` / `unfollow` / `following`)
+### 11. Following & Tracking Cases Locally (`follow` / `unfollow` / `following`)
 
 Maintain a local tracking register in `~/.local/state/rh-support-cli/state.yaml` (or via `$XDG_STATE_HOME`) to monitor support tickets across CLI and TUI sessions:
 
@@ -249,7 +264,7 @@ rh-support-cli list --following
 rh-support-cli unfollow 12345678
 ```
 
-### 11. Synchronize Tracked Cases & Background Service (`sync`)
+### 12. Synchronize Tracked Cases & Background Service (`sync`)
 
 Poll the Red Hat GraphQL API across all followed and owned cases in parallel to detect remote updates:
 
@@ -266,7 +281,7 @@ systemctl --user daemon-reload
 systemctl --user enable --now rh-support-sync.timer
 ```
 
-### 12. Querying Unread Case Updates (`updates`)
+### 13. Querying Unread Case Updates (`updates`)
 
 Quickly inspect remote changes and new comments across tracked cases:
 
@@ -281,7 +296,7 @@ rh-support-cli updates --full
 rh-support-cli updates --mark-read
 ```
 
-### 13. Interactive Terminal User Interface (`tui`)
+### 14. Interactive Terminal User Interface (`tui`)
 
 Launches a beautiful, interactive Terminal User Interface (TUI) to browse and manage your Red Hat support cases directly inside your terminal session.
 
@@ -302,6 +317,7 @@ Launches a beautiful, interactive Terminal User Interface (TUI) to browse and ma
 - **Quick Modals & Action Buttons**:
   - Press **`c`** (or click `Comment (C)`) to open the inline **Comment Pane** at the bottom of your case view, allowing you to scroll through and read the case description and comment history while drafting. Includes status dropdown integration (displaying and pre-selecting the auto-detected target status, e.g. `"Waiting on Red Hat"` if the case is `"Waiting on Customer"`), "dirty-state" draft auto-saving under `~/.config/rh-support-cli/drafts/`, and global **`ctrl+x`** keybinding to close/cancel commenting from anywhere.
   - Press **`a`** (or click `Attach (A)`) to easily specify and upload local file attachments in the background.
+  - Press **`d`** (or click `Download (D)`) to select and download case attachments locally via modal.
   - Press **`v`** (or **`l`**) to toggle between vertical (side-by-side) and horizontal (mailbox) split layouts.
   - Press **`w`** to toggle follow/unfollow for the active case.
   - Press **`m`** to explicitly mark the active case as read.
