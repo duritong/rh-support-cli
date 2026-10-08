@@ -3782,7 +3782,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         resolved = StateService._resolve_state_path(state_file="/explicit/state.yaml")
         self.assertEqual(resolved, "/explicit/state.yaml")
 
-        # 4. Backward-compatible fallback to config dir if legacy state file exists
+        # 4. Automatic migration from legacy config dir if legacy state file exists
         temp_dir = tempfile.mkdtemp()
         try:
             legacy_dir = os.path.join(temp_dir, "config", "rh-support-cli")
@@ -3790,13 +3790,24 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             legacy_file = os.path.join(legacy_dir, "state.yaml")
             with open(legacy_file, "w") as f:
                 f.write("version: 1\n")
+            target_state_dir = os.path.join(temp_dir, "state")
             with patch.dict(
                 os.environ,
-                {"XDG_CONFIG_HOME": os.path.join(temp_dir, "config")},
+                {
+                    "XDG_CONFIG_HOME": os.path.join(temp_dir, "config"),
+                    "XDG_STATE_HOME": target_state_dir,
+                },
                 clear=True,
             ):
+                expected_migrated = os.path.join(
+                    target_state_dir, "rh-support-cli", "state.yaml"
+                )
                 resolved = StateService._resolve_state_path()
-                self.assertEqual(resolved, legacy_file)
+                self.assertEqual(resolved, expected_migrated)
+                self.assertTrue(os.path.exists(expected_migrated))
+                with open(expected_migrated) as f:
+                    self.assertEqual(f.read(), "version: 1\n")
+                self.assertFalse(os.path.exists(legacy_file))
         finally:
             shutil.rmtree(temp_dir)
 

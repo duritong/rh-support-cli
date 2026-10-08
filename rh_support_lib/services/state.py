@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import contextlib
 import os
+import shutil
 import tempfile
 from datetime import datetime, timezone
 from typing import Any
@@ -53,28 +55,32 @@ class StateService:
 
         # XDG State Specification: $XDG_STATE_HOME/rh-support-cli/state.yaml (default: ~/.local/state/rh-support-cli/state.yaml)
         xdg_state = os.environ.get("XDG_STATE_HOME")
-        if xdg_state:
-            return os.path.join(
-                os.path.expanduser(xdg_state), "rh-support-cli", "state.yaml"
-            )
-
-        default_state_path = os.path.expanduser(
-            "~/.local/state/rh-support-cli/state.yaml"
+        target_state_path = (
+            os.path.join(os.path.expanduser(xdg_state), "rh-support-cli", "state.yaml")
+            if xdg_state
+            else os.path.expanduser("~/.local/state/rh-support-cli/state.yaml")
         )
 
-        # Backward compatibility: check if legacy state file exists under config directory
+        # Backward compatibility: migrate legacy state file from config directory if present
         xdg_config = os.environ.get("XDG_CONFIG_HOME")
         legacy_config_path = (
             os.path.join(os.path.expanduser(xdg_config), "rh-support-cli", "state.yaml")
             if xdg_config
             else os.path.expanduser("~/.config/rh-support-cli/state.yaml")
         )
-        if not os.path.exists(default_state_path) and os.path.exists(
-            legacy_config_path
-        ):
+        if not os.path.exists(target_state_path) and os.path.exists(legacy_config_path):
+            with contextlib.suppress(Exception):
+                os.makedirs(
+                    os.path.dirname(os.path.abspath(target_state_path)), exist_ok=True
+                )
+                shutil.copy2(legacy_config_path, target_state_path)
+                with contextlib.suppress(Exception):
+                    os.remove(legacy_config_path)
+            if os.path.exists(target_state_path):
+                return target_state_path
             return legacy_config_path
 
-        return default_state_path
+        return target_state_path
 
     def load_state(self) -> dict[str, Any]:
         """Loads state data from the YAML state file."""

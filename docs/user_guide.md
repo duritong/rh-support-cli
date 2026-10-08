@@ -351,7 +351,7 @@ Both the CLI and TUI provide clear visual cues for tracked cases:
     ```
 
 ### Local State & Cache Management (`state.yaml`)
-Operational state (such as followed cases, sync checkpoints, pinned tickets, and local tags) is managed in `~/.local/state/rh-support-cli/state.yaml` (or via `RH_SUPPORT_STATE` / `XDG_STATE_HOME`, with automatic fallback to legacy `XDG_CONFIG_HOME`). It uses safe atomic file operations and scopes metadata per SSO identity.
+Operational state (such as followed cases, sync checkpoints, pinned tickets, and local tags) is managed in `~/.local/state/rh-support-cli/state.yaml` (or via `RH_SUPPORT_STATE` / `XDG_STATE_HOME`). If an existing legacy state file is found under `~/.config/rh-support-cli/state.yaml`, it is automatically migrated to the XDG state directory upon initialization. It uses safe atomic file operations and scopes metadata per SSO identity.
 
 ### Listing local templates
 List all configured local templates, including their private descriptions and target fields. This command runs **completely offline**:
