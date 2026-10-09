@@ -141,7 +141,9 @@ def cmd_updates(args, api_client, config=None):
             if full_output:
                 # Fetch live case details to render full unread comments
                 try:
-                    details = case_service.get_case_details(c_num, first_comments=50)
+                    details = case_service.get_case_details(
+                        c_num, first_comments=50, all_comments=False
+                    )
                     if details and details.comments:
                         last_read_date = cp.last_read_comment_date or ""
                         last_read_id = cp.last_read_comment_id or ""

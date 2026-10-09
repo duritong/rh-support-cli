@@ -78,7 +78,7 @@ GQL_GET_CASE_AND_COMMENTS = """
 query GetCaseAndComments($caseNumber: String, $first: Int, $after: String) {
   redhat_support_uiapi {
     query {
-      RedHatSupportCase(where: { CaseNumber__c: { eq: $caseNumber } }) {
+      RedHatSupportCase(where: { CaseNumber__c: { eq: $caseNumber } }, first: 1) {
         edges {
           node {
             Id
@@ -210,7 +210,7 @@ GQL_CHECK_CASE_LAST_MODIFIED = """
 query CheckCaseLastModified($caseNumber: String) {
   redhat_support_uiapi {
     query {
-      RedHatSupportCase(where: { CaseNumber__c: { eq: $caseNumber } }) {
+      RedHatSupportCase(where: { CaseNumber__c: { eq: $caseNumber } }, first: 1) {
         edges {
           node {
             Id
@@ -848,33 +848,64 @@ class CaseService:
                 if max_comments
                 else first_comments
             )
-            next_vars = {
-                "caseNumber": str(case_number),
+            c_filter = {"Case__c": {"eq": str(case_obj.id or node.get("Id", ""))}}
+            c_vars = {
+                "filter": c_filter,
+                "orderBy": {"CreatedDate": {"order": "ASC"}},
                 "first": batch_size,
                 "after": end_cursor,
             }
-            next_data = self.api_client.execute_graphql(
-                GQL_GET_CASE_AND_COMMENTS, next_vars, url=self.graphql_url
-            )
-            next_uiapi = next_data.get("redhat_support_uiapi") or {}
-            next_query = next_uiapi.get("query") or {}
-            next_cases = next_query.get("RedHatSupportCase") or {}
-            next_edges = next_cases.get("edges") or []
-            if not next_edges:
-                break
-            next_node = next_edges[0].get("node") or {}
-            next_comments_container = next_node.get("CaseComments__r") or {}
-            next_comment_edges = next_comments_container.get("edges") or []
-            if not next_comment_edges:
-                break
-            for c_edge in next_comment_edges:
-                c_node = c_edge.get("node") or {}
-                comments.append(self._normalize_comment_node(c_node))
+            use_fallback = False
+            try:
+                next_data = self.api_client.execute_graphql(
+                    GQL_GET_CASE_COMMENTS, c_vars, url=self.graphql_url
+                )
+                next_uiapi = next_data.get("redhat_support_uiapi") or {}
+                next_query = next_uiapi.get("query") or {}
+                next_comments_container = (
+                    next_query.get("RedHatSupportCaseComment__c") or {}
+                )
+                next_comment_edges = next_comments_container.get("edges") or []
+                if not next_comment_edges:
+                    use_fallback = True
+                else:
+                    for c_edge in next_comment_edges:
+                        c_node = c_edge.get("node") or {}
+                        comments.append(self._normalize_comment_node(c_node))
 
-            next_page_info = next_comments_container.get("pageInfo") or {}
-            has_next = next_page_info.get("hasNextPage", False)
-            end_cursor = next_page_info.get("endCursor")
+                    next_page_info = next_comments_container.get("pageInfo") or {}
+                    has_next = next_page_info.get("hasNextPage", False)
+                    end_cursor = next_page_info.get("endCursor")
+            except Exception:  # noqa: BLE001
+                use_fallback = True
 
+            if use_fallback:
+                next_vars = {
+                    "caseNumber": str(case_number),
+                    "first": batch_size,
+                    "after": end_cursor,
+                }
+                next_data = self.api_client.execute_graphql(
+                    GQL_GET_CASE_AND_COMMENTS, next_vars, url=self.graphql_url
+                )
+                next_uiapi = next_data.get("redhat_support_uiapi") or {}
+                next_query = next_uiapi.get("query") or {}
+                next_cases = next_query.get("RedHatSupportCase") or {}
+                next_edges = next_cases.get("edges") or []
+                if not next_edges:
+                    break
+                next_node = next_edges[0].get("node") or {}
+                next_comments_container = next_node.get("CaseComments__r") or {}
+                next_comment_edges = next_comments_container.get("edges") or []
+                if not next_comment_edges:
+                    break
+                for c_edge in next_comment_edges:
+                    c_node = c_edge.get("node") or {}
+                    comments.append(self._normalize_comment_node(c_node))
+
+                next_page_info = next_comments_container.get("pageInfo") or {}
+                has_next = next_page_info.get("hasNextPage", False)
+                end_cursor = next_page_info.get("endCursor")
         return CaseDetails(
             case=case_obj,
             description=description or "",
@@ -885,10 +916,21 @@ class CaseService:
 
     def get_case_internal_id(self, case_number: str) -> str:
         """Resolves Salesforce internal record Id from a customer case number."""
-        details = self.get_case_details(case_number, first_comments=1)
+        c_num = str(case_number).strip()
+        cached = self.cache_service.get_case_record(c_num)
+        if cached:
+            cid = cached.get("case", {}).get("id")
+            if cid:
+                return cid
+
+        probe = self.check_case_last_modified(c_num)
+        if probe and probe[0]:
+            return probe[0]
+
+        details = self.get_case_details(c_num, first_comments=1, all_comments=False)
         if details and details.case.id:
             return details.case.id
-        return f"500{case_number}"
+        return f"500{c_num}"
 
     def add_comment(
         self,
@@ -1472,7 +1514,9 @@ class CaseService:
 
         def fetch_one(c_num: str) -> Case | None:
             with contextlib.suppress(Exception):
-                details = self.get_case_details(c_num, first_comments=1)
+                details = self.get_case_details(
+                    c_num, first_comments=1, all_comments=False
+                )
                 if details and details.case:
                     c = details.case
                     tc = followed_map.get(c_num)
