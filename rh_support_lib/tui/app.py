@@ -4,6 +4,7 @@ import contextlib
 import os
 import pathlib
 import re
+import threading
 import time
 from typing import ClassVar
 
@@ -669,14 +670,20 @@ class SupportApp(App):
             "vertical" if initial_layout in ("vertical", "vsplit") else "horizontal"
         )
 
+    def _safe_call(self, fn, *args, **kwargs) -> None:
+        """Invokes a UI callback directly if on main thread, or via call_from_thread if in worker."""
+        if threading.current_thread() is threading.main_thread():
+            fn(*args, **kwargs)
+        else:
+            self.call_from_thread(fn, *args, **kwargs)
+
     @contextlib.contextmanager
     def track_job(self, description: str):
-        """Thread-safe context manager tracking an active background job and displaying visual feedback."""
-        self.call_from_thread(self._start_job, description)
+        self._safe_call(self._start_job, description)
         try:
             yield
         finally:
-            self.call_from_thread(self._finish_job, description)
+            self._safe_call(self._finish_job, description)
 
     def _start_job(self, description: str) -> None:
         if description not in self.active_jobs:
@@ -736,12 +743,13 @@ class SupportApp(App):
         with self.track_job("Fetching cases..."):
 
             def show_loading():
-                container = self.query_one("#case-detail-container")
-                container.query("*").remove()
-                container.mount(Static("Loading cases..."))
+                with contextlib.suppress(Exception):
+                    container = self.query_one("#case-detail-container")
+                    container.query("*").remove()
+                    container.mount(Static("Loading cases..."))
 
-            self.call_from_thread(show_loading)
-
+            if not self.selected_case_id:
+                self._safe_call(show_loading)
             try:
                 params = build_filter_params(
                     self.config, self.active_bookmark, self.no_default_bookmark
@@ -755,9 +763,9 @@ class SupportApp(App):
                     if force:
                         list_kwargs["use_cache"] = False
                     self.cases = self.case_service.list_cases(**list_kwargs)
-                self.call_from_thread(self.populate_cases_table)
+                self._safe_call(self.populate_cases_table)
             except Exception as e:  # noqa: BLE001
-                self.call_from_thread(self.show_error, f"Network Error: {e}")
+                self._safe_call(self.show_error, f"Network Error: {e}")
 
     def populate_cases_table(self) -> None:
         table = self.query_one("#case-table", DataTable)
@@ -1070,7 +1078,7 @@ class SupportApp(App):
                     container.mount(Static(f"Fetching details for Case #{case_id}..."))
 
             if not is_already_rendered:
-                self.call_from_thread(show_loading)
+                self._safe_call(show_loading)
 
             try:
                 details = self.case_service.get_case_details(
@@ -1078,7 +1086,7 @@ class SupportApp(App):
                     use_cache=not force,
                 )
                 if not details or not details.case:
-                    self.call_from_thread(self.show_error, f"Case {case_id} not found.")
+                    self._safe_call(self.show_error, f"Case {case_id} not found.")
                     return
 
                 try:
@@ -1086,9 +1094,9 @@ class SupportApp(App):
                 except Exception:  # noqa: BLE001
                     attachments = []
 
-                self.call_from_thread(self.render_case_details, details, attachments)
+                self._safe_call(self.render_case_details, details, attachments)
             except Exception as e:  # noqa: BLE001
-                self.call_from_thread(self.show_error, f"Failed to fetch details: {e}")
+                self._safe_call(self.show_error, f"Failed to fetch details: {e}")
 
     def render_case_details(
         self, details: CaseDetails, attachments: list[Attachment]
@@ -1530,12 +1538,15 @@ class SupportApp(App):
         with self.track_job(f"Posting comment on #{self.selected_case_id}..."):
 
             def show_posting():
-                container = self.query_one("#case-detail-container")
-                container.query("*").remove()
-                container.mount(Static("Posting comment..."))
+                self.screen.remove_class("commenting")
+                with contextlib.suppress(Exception):
+                    self.query_one("#tui-comment-textarea", TextArea).text = ""
+                with contextlib.suppress(Exception):
+                    container = self.query_one("#case-detail-container")
+                    container.query("*").remove()
+                    container.mount(Static("Posting comment..."))
 
-            self.call_from_thread(show_posting)
-            self.screen.remove_class("commenting")
+            self._safe_call(show_posting)
             try:
                 self.case_service.add_comment(
                     self.selected_case_id,
@@ -1544,14 +1555,11 @@ class SupportApp(App):
                     status=target_status if target_status else None,
                 )
 
-                # Clear drafting text area
-                self.query_one("#tui-comment-textarea", TextArea).text = ""
-
-                self.fetch_case_details(self.selected_case_id)
-                self.run_worker(self.fetch_cases, thread=True)
+                self.fetch_case_details(self.selected_case_id, force=True)
+                self.fetch_cases(force=True)
 
             except Exception as e:  # noqa: BLE001
-                self.call_from_thread(self.show_error, str(e))
+                self._safe_call(self.show_error, str(e))
 
     def action_exit_commenting(self) -> None:
         """Hides the comment pane, checking for unsaved changes if needed."""
@@ -1662,7 +1670,7 @@ class SupportApp(App):
                 self.attachment_service.upload_attachment(
                     self.selected_case_id, file_path
                 )
-                self.fetch_case_details(self.selected_case_id)
+                self.fetch_case_details(self.selected_case_id, force=True)
             except Exception as e:  # noqa: BLE001
                 self.call_from_thread(
                     self.show_error, f"Error uploading attachment: {e}"
@@ -1715,7 +1723,7 @@ class SupportApp(App):
                         )
                         return
 
-                self.fetch_case_details(self.selected_case_id)
+                self.fetch_case_details(self.selected_case_id, force=True)
             except Exception as e:  # noqa: BLE001
                 self.call_from_thread(self.show_error, f"Error: {e}")
 

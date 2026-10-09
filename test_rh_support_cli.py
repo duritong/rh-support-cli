@@ -4470,6 +4470,51 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             MockRedHatHandler.details_query_count, initial_details_count + 1
         )
 
+    def test_tui_post_comment_refreshes_details_without_wiping_container(self):
+        """Test that submitting a comment in the TUI refreshes details without stalling on 'Loading cases...'."""
+        import asyncio
+        from unittest.mock import MagicMock, patch
+
+        from rh_support_lib.api import LegacyAPIClient
+        from rh_support_lib.tui.app import SupportApp
+
+        async def run_post_comment_test():
+            client = LegacyAPIClient("mock_access_token_123")
+            with patch.dict(
+                os.environ,
+                {
+                    "XDG_CACHE_HOME": self.test_cache_dir,
+                    "RH_GRAPHQL_URL": f"{self.base_url}/graphql",
+                    "RH_ATTACHMENT_API_URL": self.base_url,
+                },
+            ):
+                app = SupportApp(client, config={"tui": {"poll_interval": 0}})
+                async with app.run_test() as pilot:
+                    await app.workers.wait_for_complete()
+                    await pilot.pause()
+
+                    # Select case 12345
+                    event = MagicMock()
+                    event.row_key.value = "12345"
+                    app.on_row_selected(event)
+                    await app.workers.wait_for_complete()
+                    await pilot.pause()
+
+                    # Post comment
+                    app.execute_comment_submission(
+                        "New comment from test", "Waiting on Customer"
+                    )
+                    await app.workers.wait_for_complete()
+                    await pilot.pause()
+
+                    # Verify that detail container was NOT wiped and buttons are rendered
+                    container = app.query_one("#case-detail-container")
+                    self.assertTrue(len(container.query(".tui-comment-btn")) > 0)
+                    self.assertIsNotNone(app.current_details)
+                    self.assertEqual(app.selected_case_id, "12345")
+
+        asyncio.run(run_post_comment_test())
+
 
 if __name__ == "__main__":
     unittest.main()
