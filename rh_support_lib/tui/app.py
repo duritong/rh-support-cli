@@ -16,6 +16,7 @@ from textual import on
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Grid, Horizontal, Vertical, VerticalScroll
+from textual.content import Content
 from textual.screen import ModalScreen
 from textual.widgets import (
     Button,
@@ -636,6 +637,7 @@ class SupportApp(App):
         self.selected_case_id: str | None = None
         self.current_details: CaseDetails | None = None
         self.current_attachments: list[Attachment] = []
+        self.active_jobs: list[str] = []
         self.case_service = CaseService(self.api_client)
         self.attachment_service = AttachmentService(self.api_client)
         cache_cfg = (config.get("cache") or {}) if config else {}
@@ -667,6 +669,42 @@ class SupportApp(App):
             "vertical" if initial_layout in ("vertical", "vsplit") else "horizontal"
         )
 
+    @contextlib.contextmanager
+    def track_job(self, description: str):
+        """Thread-safe context manager tracking an active background job and displaying visual feedback."""
+        self.call_from_thread(self._start_job, description)
+        try:
+            yield
+        finally:
+            self.call_from_thread(self._finish_job, description)
+
+    def _start_job(self, description: str) -> None:
+        if description not in self.active_jobs:
+            self.active_jobs.append(description)
+        self._sync_header_status()
+
+    def _finish_job(self, description: str) -> None:
+        if description in self.active_jobs:
+            self.active_jobs.remove(description)
+        self._sync_header_status()
+
+    def _sync_header_status(self) -> None:
+        if self.active_jobs:
+            jobs_str = " | ".join(self.active_jobs)
+            self.sub_title = f"⟳ {jobs_str}"
+        else:
+            self.sub_title = ""
+
+    def format_title(self, title: str, sub_title: str) -> Content:
+        title_content = Content(title)
+        if sub_title:
+            return Content.assemble(
+                title_content,
+                (" — ", "dim"),
+                Content(sub_title).stylize("bold yellow"),
+            )
+        return title_content
+
     def compose(self) -> ComposeResult:
         yield Header()
         yield Container(
@@ -695,28 +733,29 @@ class SupportApp(App):
 
     def fetch_cases(self) -> None:
         """Fetches the list of cases in the background."""
+        with self.track_job("Fetching cases..."):
 
-        def show_loading():
-            container = self.query_one("#case-detail-container")
-            container.query("*").remove()
-            container.mount(Static("Loading cases..."))
+            def show_loading():
+                container = self.query_one("#case-detail-container")
+                container.query("*").remove()
+                container.mount(Static("Loading cases..."))
 
-        self.call_from_thread(show_loading)
+            self.call_from_thread(show_loading)
 
-        try:
-            params = build_filter_params(
-                self.config, self.active_bookmark, self.no_default_bookmark
-            )
-            if params.get("following"):
-                self.cases = self.case_service.list_followed_cases(
-                    account=params.get("account")
+            try:
+                params = build_filter_params(
+                    self.config, self.active_bookmark, self.no_default_bookmark
                 )
-            else:
-                list_kwargs = {k: v for k, v in params.items() if k != "following"}
-                self.cases = self.case_service.list_cases(**list_kwargs)
-            self.call_from_thread(self.populate_cases_table)
-        except Exception as e:  # noqa: BLE001
-            self.call_from_thread(self.show_error, f"Network Error: {e}")
+                if params.get("following"):
+                    self.cases = self.case_service.list_followed_cases(
+                        account=params.get("account")
+                    )
+                else:
+                    list_kwargs = {k: v for k, v in params.items() if k != "following"}
+                    self.cases = self.case_service.list_cases(**list_kwargs)
+                self.call_from_thread(self.populate_cases_table)
+            except Exception as e:  # noqa: BLE001
+                self.call_from_thread(self.show_error, f"Network Error: {e}")
 
     def populate_cases_table(self) -> None:
         table = self.query_one("#case-table", DataTable)
@@ -771,7 +810,10 @@ class SupportApp(App):
 
     def poll_cases_background(self) -> None:
         """Polls for updated cases and unread badges, and refreshes current details if modified."""
-        with contextlib.suppress(Exception):
+        with (
+            self.track_job("Syncing updates..."),
+            contextlib.suppress(Exception),
+        ):
             params = build_filter_params(
                 self.config, self.active_bookmark, self.no_default_bookmark
             )
@@ -1007,52 +1049,54 @@ class SupportApp(App):
 
     def fetch_case_details(self, case_id: str, force: bool = False) -> None:
         """Fetches the details and comments for the selected case."""
-        is_already_rendered = (
-            self.selected_case_id == case_id
-            and self.current_details is not None
-            and (
-                str(self.current_details.case.case_number) == str(case_id)
-                or str(self.current_details.case.id) == str(case_id)
+        with self.track_job(f"Loading #{case_id}..."):
+            is_already_rendered = (
+                self.selected_case_id == case_id
+                and self.current_details is not None
+                and (
+                    str(self.current_details.case.case_number) == str(case_id)
+                    or str(self.current_details.case.id) == str(case_id)
+                )
             )
-        )
 
-        def show_loading():
-            with contextlib.suppress(Exception):
-                container = self.query_one("#case-detail-container")
-                container.query("*").remove()
-                container.mount(Static(f"Fetching details for Case #{case_id}..."))
+            def show_loading():
+                with contextlib.suppress(Exception):
+                    container = self.query_one("#case-detail-container")
+                    container.query("*").remove()
+                    container.mount(Static(f"Fetching details for Case #{case_id}..."))
 
-        if not is_already_rendered:
-            self.call_from_thread(show_loading)
-
-        try:
-            matching = next(
-                (
-                    c
-                    for c in self.cases
-                    if str(c.case_number) == str(case_id) or str(c.id) == str(case_id)
-                ),
-                None,
-            )
-            known_lmd = matching.last_modified_date if matching else None
-
-            details = self.case_service.get_case_details(
-                case_id,
-                use_cache=not force,
-                known_last_modified=known_lmd,
-            )
-            if not details or not details.case:
-                self.call_from_thread(self.show_error, f"Case {case_id} not found.")
-                return
+            if not is_already_rendered:
+                self.call_from_thread(show_loading)
 
             try:
-                attachments = self.attachment_service.list_attachments(case_id)
-            except Exception:  # noqa: BLE001
-                attachments = []
+                matching = next(
+                    (
+                        c
+                        for c in self.cases
+                        if str(c.case_number) == str(case_id)
+                        or str(c.id) == str(case_id)
+                    ),
+                    None,
+                )
+                known_lmd = matching.last_modified_date if matching else None
 
-            self.call_from_thread(self.render_case_details, details, attachments)
-        except Exception as e:  # noqa: BLE001
-            self.call_from_thread(self.show_error, f"Failed to fetch details: {e}")
+                details = self.case_service.get_case_details(
+                    case_id,
+                    use_cache=not force,
+                    known_last_modified=known_lmd,
+                )
+                if not details or not details.case:
+                    self.call_from_thread(self.show_error, f"Case {case_id} not found.")
+                    return
+
+                try:
+                    attachments = self.attachment_service.list_attachments(case_id)
+                except Exception:  # noqa: BLE001
+                    attachments = []
+
+                self.call_from_thread(self.render_case_details, details, attachments)
+            except Exception as e:  # noqa: BLE001
+                self.call_from_thread(self.show_error, f"Failed to fetch details: {e}")
 
     def render_case_details(
         self, details: CaseDetails, attachments: list[Attachment]
@@ -1491,29 +1535,31 @@ class SupportApp(App):
             select.value = target_status
 
     def execute_comment_submission(self, comment_body: str, target_status: str) -> None:
-        def show_posting():
-            container = self.query_one("#case-detail-container")
-            container.query("*").remove()
-            container.mount(Static("Posting comment..."))
+        with self.track_job(f"Posting comment on #{self.selected_case_id}..."):
 
-        self.call_from_thread(show_posting)
-        self.screen.remove_class("commenting")
-        try:
-            self.case_service.add_comment(
-                self.selected_case_id,
-                comment_body,
-                is_public=True,
-                status=target_status if target_status else None,
-            )
+            def show_posting():
+                container = self.query_one("#case-detail-container")
+                container.query("*").remove()
+                container.mount(Static("Posting comment..."))
 
-            # Clear drafting text area
-            self.query_one("#tui-comment-textarea", TextArea).text = ""
+            self.call_from_thread(show_posting)
+            self.screen.remove_class("commenting")
+            try:
+                self.case_service.add_comment(
+                    self.selected_case_id,
+                    comment_body,
+                    is_public=True,
+                    status=target_status if target_status else None,
+                )
 
-            self.fetch_case_details(self.selected_case_id)
-            self.run_worker(self.fetch_cases, thread=True)
+                # Clear drafting text area
+                self.query_one("#tui-comment-textarea", TextArea).text = ""
 
-        except Exception as e:  # noqa: BLE001
-            self.call_from_thread(self.show_error, str(e))
+                self.fetch_case_details(self.selected_case_id)
+                self.run_worker(self.fetch_cases, thread=True)
+
+            except Exception as e:  # noqa: BLE001
+                self.call_from_thread(self.show_error, str(e))
 
     def action_exit_commenting(self) -> None:
         """Hides the comment pane, checking for unsaved changes if needed."""
@@ -1609,20 +1655,26 @@ class SupportApp(App):
         self.push_screen(AttachModal(), handle_file)
 
     def execute_attachment_upload(self, file_path: str) -> None:
-        def show_uploading():
-            container = self.query_one("#case-detail-container")
-            container.query("*").remove()
-            container.mount(
-                Static(f"Uploading attachment '{os.path.basename(file_path)}'...")
-            )
+        with self.track_job(f"Uploading '{os.path.basename(file_path)}'..."):
 
-        self.call_from_thread(show_uploading)
+            def show_uploading():
+                container = self.query_one("#case-detail-container")
+                container.query("*").remove()
+                container.mount(
+                    Static(f"Uploading attachment '{os.path.basename(file_path)}'...")
+                )
 
-        try:
-            self.attachment_service.upload_attachment(self.selected_case_id, file_path)
-            self.fetch_case_details(self.selected_case_id)
-        except Exception as e:  # noqa: BLE001
-            self.call_from_thread(self.show_error, f"Error uploading attachment: {e}")
+            self.call_from_thread(show_uploading)
+
+            try:
+                self.attachment_service.upload_attachment(
+                    self.selected_case_id, file_path
+                )
+                self.fetch_case_details(self.selected_case_id)
+            except Exception as e:  # noqa: BLE001
+                self.call_from_thread(
+                    self.show_error, f"Error uploading attachment: {e}"
+                )
 
     def action_apply_template(self) -> None:
         if not self.selected_case_id:
@@ -1641,42 +1693,39 @@ class SupportApp(App):
         )
 
     def execute_template(self, template_name: str) -> None:
-        def show_applying():
-            container = self.query_one("#case-detail-container")
-            container.query("*").remove()
-            container.mount(Static("Applying template..."))
+        with self.track_job(f"Applying template '{template_name}'..."):
 
-        self.call_from_thread(show_applying)
+            def show_applying():
+                container = self.query_one("#case-detail-container")
+                container.query("*").remove()
+                container.mount(Static("Applying template..."))
 
-        try:
-            # We construct a mock args class to invoke apply_template logic
-            from types import SimpleNamespace
+            self.call_from_thread(show_applying)
 
-            from rh_support_lib.commands.apply_template import cmd_apply
-
-            # We create a dummy args class
-            args = SimpleNamespace(
-                case=self.selected_case_id,
-                template=[template_name],
-                template_var=[],
-                dry_run=False,
-                simple_output=True,
-            )
-            # cmd_apply does a sys.exit on completion or errors.
-            # To prevent TUI from crashing/exiting, we can wrap it or execute its logic safely
-            # Let's catch SystemExit and handle refreshing case details afterwards!
             try:
-                cmd_apply(args, self.api_client, self.config)
-            except SystemExit as ex:
-                if ex.code != 0:
-                    self.call_from_thread(
-                        self.show_error, "Template application failed."
-                    )
-                    return
+                from types import SimpleNamespace
 
-            self.fetch_case_details(self.selected_case_id)
-        except Exception as e:  # noqa: BLE001
-            self.call_from_thread(self.show_error, f"Error: {e}")
+                from rh_support_lib.commands.apply_template import cmd_apply
+
+                args = SimpleNamespace(
+                    case=self.selected_case_id,
+                    template=[template_name],
+                    template_var=[],
+                    dry_run=False,
+                    simple_output=True,
+                )
+                try:
+                    cmd_apply(args, self.api_client, self.config)
+                except SystemExit as ex:
+                    if ex.code != 0:
+                        self.call_from_thread(
+                            self.show_error, "Template application failed."
+                        )
+                        return
+
+                self.fetch_case_details(self.selected_case_id)
+            except Exception as e:  # noqa: BLE001
+                self.call_from_thread(self.show_error, f"Error: {e}")
 
     def action_download_attachment(self) -> None:
         if not self.selected_case_id:
@@ -1705,30 +1754,34 @@ class SupportApp(App):
         self.push_screen(DownloadModal(self.current_attachments), handle_download)
 
     def execute_download(self, case_id: str, att_uuid: str, dest_path: str) -> None:
-        def show_downloading():
-            with contextlib.suppress(Exception):
-                self.notify(
-                    f"Downloading attachment '{att_uuid}'...",
-                    title="Download Starting",
-                    severity="information",
+        with self.track_job(f"Downloading '{att_uuid}'..."):
+
+            def show_downloading():
+                with contextlib.suppress(Exception):
+                    self.notify(
+                        f"Downloading attachment '{att_uuid}'...",
+                        title="Download Starting",
+                        severity="information",
+                    )
+
+            self.call_from_thread(show_downloading)
+            try:
+                saved_path = self.attachment_service.download_attachment(
+                    case_id, att_uuid, target_path=dest_path
                 )
 
-        self.call_from_thread(show_downloading)
-        try:
-            saved_path = self.attachment_service.download_attachment(
-                case_id, att_uuid, target_path=dest_path
-            )
+                def show_success():
+                    self.notify(
+                        f"Downloaded attachment to: {saved_path}",
+                        title="Download Complete",
+                        severity="information",
+                    )
 
-            def show_success():
-                self.notify(
-                    f"Downloaded attachment to: {saved_path}",
-                    title="Download Complete",
-                    severity="information",
+                self.call_from_thread(show_success)
+            except Exception as e:  # noqa: BLE001
+                self.call_from_thread(
+                    self.show_error, f"Error downloading attachment: {e}"
                 )
-
-            self.call_from_thread(show_success)
-        except Exception as e:  # noqa: BLE001
-            self.call_from_thread(self.show_error, f"Error downloading attachment: {e}")
 
     def action_select_bookmark(self) -> None:
         def handle_bookmark(bookmark_name: str) -> None:

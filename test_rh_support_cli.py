@@ -4389,6 +4389,45 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
         asyncio.run(run_headless_swr())
 
+    def test_tui_background_activity_indicator(self):
+        """Test that active background jobs update the TUI header subtitle with visual feedback."""
+        import asyncio
+
+        from rh_support_lib.api import LegacyAPIClient
+        from rh_support_lib.tui.app import SupportApp
+
+        async def run_indicator_test():
+            client = LegacyAPIClient("mock_access_token_123")
+            app = SupportApp(client, config={"tui": {"poll_interval": 0}})
+            async with app.run_test() as pilot:
+                # On mount, fetch_cases is actively running and reflected in the header subtitle
+                self.assertIn("Fetching cases...", app.sub_title)
+
+                # Wait for initial load worker to finish
+                await app.workers.wait_for_complete()
+                await pilot.pause()
+                self.assertEqual(app.sub_title, "")
+                app._start_job("Syncing updates...")
+                self.assertEqual(app.sub_title, "⟳ Syncing updates...")
+                formatted = app.format_title(app.title, app.sub_title)
+                self.assertIn("Syncing updates...", str(formatted))
+
+                # Start concurrent job 2
+                app._start_job("Uploading file.log...")
+                self.assertEqual(
+                    app.sub_title, "⟳ Syncing updates... | Uploading file.log..."
+                )
+
+                # Finish job 1
+                app._finish_job("Syncing updates...")
+                self.assertEqual(app.sub_title, "⟳ Uploading file.log...")
+
+                # Finish job 2
+                app._finish_job("Uploading file.log...")
+                self.assertEqual(app.sub_title, "")
+
+        asyncio.run(run_indicator_test())
+
 
 if __name__ == "__main__":
     unittest.main()

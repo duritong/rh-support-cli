@@ -65,8 +65,10 @@ To prevent standard widget-mounting or type-mismatch exceptions inside Textual, 
 2.  A new flat list of static elements (Header, Details Table, Markdown Description, and scrollable Comment Panels) is compiled.
 3.  The complete, compiled child list is passed to a new `Vertical(*widgets)` layout constructor and mounted directly onto `#case-detail-container`.
 
-### Multi-Threaded Non-Blocking Background Workers
+### Multi-Threaded Non-Blocking Background Workers & Visual Job Tracking
 All slow network operations (fetching cases, getting details, posting comments, executing templates, or periodic live polling) run on background threaded workers (`self.run_worker(lambda: fn(), thread=True)`). This prevents synchronous REST/GraphQL queries from blocking the main Textual event loop, maintaining a fluid, lag-free UI and preserving table cursor positions during periodic background polling.
+
+To provide immediate visual feedback without interrupting user actions, workers are wrapped with the thread-safe `track_job(description)` context manager in `SupportApp`. This dynamically updates `self.sub_title` and `format_title`, rendering `Red Hat Support CLI — ⟳ <active_jobs>` in bold yellow on the Textual `Header` bar while operations are actively in flight.
 ---
 
 ## 3. The End-to-End Mock Testing Suite (`test_rh_support_cli.py`)

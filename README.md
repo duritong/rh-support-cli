@@ -323,7 +323,7 @@ Launches a beautiful, interactive Terminal User Interface (TUI) to browse and ma
 **Features:**
 - **Dual Layout Topologies (Horizontal Mailbox Default & Vertical)**: Features a mailbox-style layout by default (full-width case list on top and details below, maximizing wide terminals and multiplexers). Toggle dynamically to vertical side-by-side split at any time using **`v`** or **`l`**, or set via `--layout <horizontal|mailbox|vertical>`.
 - **Compact Zero-Margin Panes**: Panes sit flush with zero margin gap between borders, maximizing visible columns and rows for tables, logs, and comments.
-- **Asynchronous Background Processing**: Keeps the UI highly responsive by loading cases and updates asynchronously.
+- **Asynchronous Background Processing & Live Visual Indicators**: Keeps the UI highly responsive by executing all network operations (fetching cases, detail lookups, live polling, uploads, downloads, and templates) in non-blocking threaded workers, displaying a live `⟳ <job_status>` indicator in the header bar while in flight.
 - **Stale-While-Revalidate (SWR) Instant Render**: Cached case details render immediately (0 ms) on selection with zero UI lag or blank loading screens, while non-blocking background workers validate freshness.
 - **Periodic Live Background Polling**: Periodically polls for remote updates in the background (default: 60s), updating unread badges and active case comments without disrupting keyboard focus or table cursor position.
 - **Vim / Arrow Navigation**: Navigate intuitively with standard keyboard binds.
