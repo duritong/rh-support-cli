@@ -731,7 +731,7 @@ class SupportApp(App):
             self.set_interval(self.poll_interval, self.trigger_background_poll)
         self.run_worker(self.fetch_cases, thread=True)
 
-    def fetch_cases(self) -> None:
+    def fetch_cases(self, force: bool = False) -> None:
         """Fetches the list of cases in the background."""
         with self.track_job("Fetching cases..."):
 
@@ -752,6 +752,8 @@ class SupportApp(App):
                     )
                 else:
                     list_kwargs = {k: v for k, v in params.items() if k != "following"}
+                    if force:
+                        list_kwargs["use_cache"] = False
                     self.cases = self.case_service.list_cases(**list_kwargs)
                 self.call_from_thread(self.populate_cases_table)
             except Exception as e:  # noqa: BLE001
@@ -978,7 +980,9 @@ class SupportApp(App):
 
         # SWR: If details exist in local disk cache, render immediately without waiting
         self.selected_case_id = next_case_id
-        cached_rec = self.case_service.cache_service.get_case_details(next_case_id)
+        cached_rec = self.case_service.cache_service.get_case_details(
+            next_case_id, ttl=0
+        )
         if cached_rec:
             cached_details, cached_atts, _ = cached_rec
             self.render_case_details(cached_details, cached_atts)
@@ -1012,7 +1016,7 @@ class SupportApp(App):
                 thread=True,
             )
         else:
-            self.run_worker(self.fetch_cases, thread=True)
+            self.run_worker(lambda: self.fetch_cases(force=True), thread=True)
 
     @on(Button.Pressed, ".tui-download-btn, #tui-download-btn")
     def on_download_click(self) -> None:
@@ -1069,21 +1073,9 @@ class SupportApp(App):
                 self.call_from_thread(show_loading)
 
             try:
-                matching = next(
-                    (
-                        c
-                        for c in self.cases
-                        if str(c.case_number) == str(case_id)
-                        or str(c.id) == str(case_id)
-                    ),
-                    None,
-                )
-                known_lmd = matching.last_modified_date if matching else None
-
                 details = self.case_service.get_case_details(
                     case_id,
                     use_cache=not force,
-                    known_last_modified=known_lmd,
                 )
                 if not details or not details.case:
                     self.call_from_thread(self.show_error, f"Case {case_id} not found.")
@@ -1441,11 +1433,11 @@ class SupportApp(App):
                 current = current.parent
 
         if is_left:
-            self.run_worker(self.fetch_cases, thread=True)
+            self.run_worker(lambda: self.fetch_cases(force=True), thread=True)
         else:
             if self.selected_case_id:
                 self.run_worker(
-                    lambda: self.fetch_case_details(self.selected_case_id),
+                    lambda: self.fetch_case_details(self.selected_case_id, force=True),
                     thread=True,
                 )
 

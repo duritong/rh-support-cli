@@ -348,6 +348,29 @@ class StatefulMockHandler(http.server.BaseHTTPRequestHandler):
                                             "Status": {
                                                 "value": matched_case.get("status", "")
                                             },
+                                            "CaseComments__r": {
+                                                "edges": (
+                                                    [
+                                                        {
+                                                            "node": {
+                                                                "Id": matched_case.get(
+                                                                    "comments", []
+                                                                )[-1].get("id", ""),
+                                                                "CreatedDate": {
+                                                                    "value": matched_case.get(
+                                                                        "comments", []
+                                                                    )[-1].get(
+                                                                        "createdDate",
+                                                                        "",
+                                                                    )
+                                                                },
+                                                            }
+                                                        }
+                                                    ]
+                                                    if matched_case.get("comments")
+                                                    else []
+                                                )
+                                            },
                                         }
                                     }
                                 ]

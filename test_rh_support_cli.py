@@ -26,6 +26,8 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
     details_query_count = 0
     probe_query_count = 0
     list_query_count = 0
+    latest_mock_comment_id = "comment_2"
+    latest_mock_comment_date = "2023-01-03T10:00:00Z"
     mock_storage: ClassVar[dict] = {}
 
     def log_message(self, format, *args):
@@ -399,6 +401,18 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                                                             },
                                                             "Status": {
                                                                 "value": "Waiting on Red Hat"
+                                                            },
+                                                            "CaseComments__r": {
+                                                                "edges": [
+                                                                    {
+                                                                        "node": {
+                                                                            "Id": MockRedHatHandler.latest_mock_comment_id,
+                                                                            "CreatedDate": {
+                                                                                "value": MockRedHatHandler.latest_mock_comment_date
+                                                                            },
+                                                                        }
+                                                                    }
+                                                                ]
                                                             },
                                                         }
                                                     }
@@ -974,6 +988,8 @@ class TestRhSupportCli(unittest.TestCase):
         MockRedHatHandler.details_query_count = 0
         MockRedHatHandler.probe_query_count = 0
         MockRedHatHandler.list_query_count = 0
+        MockRedHatHandler.latest_mock_comment_id = "comment_2"
+        MockRedHatHandler.latest_mock_comment_date = "2023-01-03T10:00:00Z"
         self.env = os.environ.copy()
         self.env["RH_API_URL"] = self.base_url
         self.env["RH_SSO_URL"] = self.sso_url
@@ -4326,7 +4342,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         import asyncio
 
         from rh_support_lib.api import LegacyAPIClient
-        from rh_support_lib.models import Case, CaseDetails
+        from rh_support_lib.models import Case, CaseComment, CaseDetails
         from rh_support_lib.services.cache import CacheService
         from rh_support_lib.tui.app import SupportApp
 
@@ -4352,7 +4368,15 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         details = CaseDetails(
             case=dummy_case,
             description="Cached instant description",
-            comments=[],
+            comments=[
+                CaseComment(
+                    id="comment_2",
+                    created_date="2023-01-03T10:00:00Z",
+                    body="c2",
+                    created_by="Tester",
+                    is_public=True,
+                )
+            ],
             attachments=[],
             notified_users=[],
         )
@@ -4427,6 +4451,24 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 self.assertEqual(app.sub_title, "")
 
         asyncio.run(run_indicator_test())
+
+    def test_case_details_cache_revalidates_on_new_remote_comment(self):
+        """Test that a new comment on the remote server triggers revalidation and updates cached case."""
+        # 1. Warm cache
+        res1 = self.run_cli(["show", "-c", "12345"])
+        self.assertEqual(res1.returncode, 0)
+        initial_details_count = MockRedHatHandler.details_query_count
+
+        # 2. Server receives new comment_3
+        MockRedHatHandler.latest_mock_comment_id = "comment_3"
+        MockRedHatHandler.latest_mock_comment_date = "2026-10-09T10:00:00Z"
+
+        # 3. Running show -c 12345 automatically detects the new comment and re-fetches!
+        res2 = self.run_cli(["show", "-c", "12345"])
+        self.assertEqual(res2.returncode, 0)
+        self.assertEqual(
+            MockRedHatHandler.details_query_count, initial_details_count + 1
+        )
 
 
 if __name__ == "__main__":

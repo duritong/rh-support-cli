@@ -44,12 +44,14 @@ class CacheService:
         self.list_ttl = (
             int(cache_cfg.get("list_ttl", 60)) if isinstance(cache_cfg, dict) else 60
         )
+        self.case_ttl = (
+            int(cache_cfg.get("case_ttl", 60)) if isinstance(cache_cfg, dict) else 60
+        )
         self.catalog_ttl = (
             int(cache_cfg.get("catalog_ttl", 86400))
             if isinstance(cache_cfg, dict)
             else 86400
         )
-
         # Resolve directory
         self.root_dir = self._resolve_cache_dir(cache_dir)
         self.cases_dir = os.path.join(self.root_dir, "cases")
@@ -124,13 +126,17 @@ class CacheService:
         return data if isinstance(data, dict) else None
 
     def get_case_details(
-        self, case_number: str
+        self, case_number: str, ttl: int | None = None
     ) -> tuple[CaseDetails, list[Attachment], str] | None:
         """Loads and reconstructs CaseDetails, Attachments, and last_modified_date from cache."""
         record = self.get_case_record(case_number)
         if not record:
             return None
 
+        max_age = ttl if ttl is not None else self.case_ttl
+        cached_at = float(record.get("cached_at", 0))
+        if max_age > 0 and (time.time() - cached_at) > max_age:
+            return None
         try:
             case_dict = record.get("case") or {}
             case_obj = Case(
@@ -220,9 +226,14 @@ class CacheService:
             or (details.case.last_modified_date if details.case else "")
             or ""
         )
+        latest_c_id = details.comments[-1].id if details.comments else ""
+        latest_c_date = details.comments[-1].created_date if details.comments else ""
         record = {
             "cached_at": time.time(),
             "last_modified_date": lmd,
+            "status": details.case.status if details.case else "",
+            "latest_comment_id": latest_c_id,
+            "latest_comment_date": latest_c_date,
             "case": asdict(details.case) if details.case else {},
             "description": details.description,
             "comments": [asdict(c) for c in details.comments],

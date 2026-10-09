@@ -216,6 +216,14 @@ query CheckCaseLastModified($caseNumber: String) {
             Id
             LastModifiedDate { value }
             Status { value }
+            CaseComments__r(first: 1, orderBy: { CreatedDate: { order: DESC } }) {
+              edges {
+                node {
+                  Id
+                  CreatedDate { value }
+                }
+              }
+            }
           }
         }
       }
@@ -378,8 +386,10 @@ class CaseService:
         self.state_service = state_service or StateService()
         self.cache_service = cache_service or CacheService(no_cache=no_cache)
 
-    def check_case_last_modified(self, case_number: str) -> tuple[str, str, str] | None:
-        """Lightweight probe query returning (internal_id, last_modified_date, status) or None."""
+    def check_case_last_modified(
+        self, case_number: str
+    ) -> tuple[str, str, str, str, str] | None:
+        """Lightweight probe query returning (internal_id, last_modified_date, status, latest_comment_id, latest_comment_date) or None."""
         variables = {"caseNumber": str(case_number).strip()}
         try:
             data = self.api_client.execute_graphql(
@@ -403,7 +413,22 @@ class CaseService:
                 if isinstance(node.get("Status"), dict)
                 else ""
             )
-            return c_id, lmd, status
+            comment_edges = (
+                node.get("CaseComments__r", {}).get("edges", [])
+                if isinstance(node.get("CaseComments__r"), dict)
+                else []
+            )
+            latest_c_id = ""
+            latest_c_date = ""
+            if comment_edges:
+                c_node = comment_edges[0].get("node") or {}
+                latest_c_id = c_node.get("Id", "")
+                latest_c_date = (
+                    c_node.get("CreatedDate", {}).get("value", "")
+                    if isinstance(c_node.get("CreatedDate"), dict)
+                    else ""
+                )
+            return c_id, lmd, status, latest_c_id, latest_c_date
         except Exception:  # noqa: BLE001
             return None
 
@@ -739,19 +764,24 @@ class CaseService:
     ) -> CaseDetails | None:
         c_num = str(case_number).strip()
         if use_cache and self.cache_service.enabled:
+            record = self.cache_service.get_case_record(c_num)
             cached = self.cache_service.get_case_details(c_num)
-            if cached:
+            if cached and record:
                 cached_details, _cached_atts, cached_lmd = cached
-                if (
-                    known_last_modified
-                    and cached_lmd
-                    and known_last_modified == cached_lmd
-                ):
-                    return cached_details
-                probe = self.check_case_last_modified(c_num)
-                if probe and probe[1] and cached_lmd and probe[1] == cached_lmd:
-                    return cached_details
+                cached_status = record.get("status", "")
+                cached_cid = record.get("latest_comment_id", "")
+                cached_cdate = record.get("latest_comment_date", "")
 
+                probe = self.check_case_last_modified(c_num)
+                if probe:
+                    _pid, p_lmd, p_status, p_cid, p_cdate = probe
+                    lmd_match = (not p_lmd) or (p_lmd == cached_lmd)
+                    status_match = (not p_status) or (p_status == cached_status)
+                    cid_match = (not p_cid) or (p_cid == cached_cid)
+                    cdate_match = (not p_cdate) or (p_cdate == cached_cdate)
+
+                    if lmd_match and status_match and cid_match and cdate_match:
+                        return cached_details
         details = self._get_case_details_graphql(
             case_number=c_num,
             first_comments=first_comments,
