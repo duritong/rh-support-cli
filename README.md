@@ -58,9 +58,9 @@ rh-support-cli [global options] <subcommand> [options]
 **Global Options:**
 - `-j`, `--json`: Output structured results in JSON format (silences banner logs for clean pipe processing).
 - `--format`: Output format: `text` (default), `json`, or `yaml`.
+- `--no-cache`: Bypass reading from and updating local XDG disk cache.
 - `--simple-output`: Disable colored output and visual indicators.
 - `--token-file`: Path to file containing the offline token.
-
 ### 1. List Cases (`list`)
 
 Lists support cases with options to filter by account, status, severity, and owner.
@@ -324,6 +324,8 @@ Launches a beautiful, interactive Terminal User Interface (TUI) to browse and ma
 - **Dual Layout Topologies (Horizontal Mailbox Default & Vertical)**: Features a mailbox-style layout by default (full-width case list on top and details below, maximizing wide terminals and multiplexers). Toggle dynamically to vertical side-by-side split at any time using **`v`** or **`l`**, or set via `--layout <horizontal|mailbox|vertical>`.
 - **Compact Zero-Margin Panes**: Panes sit flush with zero margin gap between borders, maximizing visible columns and rows for tables, logs, and comments.
 - **Asynchronous Background Processing**: Keeps the UI highly responsive by loading cases and updates asynchronously.
+- **Stale-While-Revalidate (SWR) Instant Render**: Cached case details render immediately (0 ms) on selection with zero UI lag or blank loading screens, while non-blocking background workers validate freshness.
+- **Periodic Live Background Polling**: Periodically polls for remote updates in the background (default: 60s), updating unread badges and active case comments without disrupting keyboard focus or table cursor position.
 - **Vim / Arrow Navigation**: Navigate intuitively with standard keyboard binds.
 - **Directional Pane Switching**: Switch focus between top and bottom panes using **`Ctrl+Up`** / **`Ctrl+Down`** in horizontal split mode, and between left and right panes using **`Ctrl+Left`** / **`Ctrl+Right`** in vertical mode.
 - **Single-Pane Focus / Zoom**:

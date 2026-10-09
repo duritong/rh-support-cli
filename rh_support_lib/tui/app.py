@@ -638,7 +638,16 @@ class SupportApp(App):
         self.current_attachments: list[Attachment] = []
         self.case_service = CaseService(self.api_client)
         self.attachment_service = AttachmentService(self.api_client)
-
+        cache_cfg = (config.get("cache") or {}) if config else {}
+        tui_cfg = (config.get("tui") or {}) if config else {}
+        try:
+            self.poll_interval = int(
+                tui_cfg.get("poll_interval")
+                if "poll_interval" in tui_cfg
+                else cache_cfg.get("tui_poll_interval", 60)
+            )
+        except (ValueError, TypeError):
+            self.poll_interval = 60
         # Resolve initial layout: explicit CLI arg > config > state.yaml > default ('vertical')
         user = ""
         with contextlib.suppress(Exception):
@@ -680,6 +689,8 @@ class SupportApp(App):
         table.cursor_type = "row"
         if self.layout == "vertical":
             self.screen.add_class("layout-vertical")
+        if self.poll_interval > 0:
+            self.set_interval(self.poll_interval, self.trigger_background_poll)
         self.run_worker(self.fetch_cases, thread=True)
 
     def fetch_cases(self) -> None:
@@ -754,6 +765,114 @@ class SupportApp(App):
             container.query("*").remove()
             container.mount(Static("Select a case from the list."))
 
+    def trigger_background_poll(self) -> None:
+        """Periodic background poll for live case updates without disturbing active UI focus."""
+        self.run_worker(self.poll_cases_background, thread=True)
+
+    def poll_cases_background(self) -> None:
+        """Polls for updated cases and unread badges, and refreshes current details if modified."""
+        with contextlib.suppress(Exception):
+            params = build_filter_params(
+                self.config, self.active_bookmark, self.no_default_bookmark
+            )
+            if params.get("following"):
+                fresh_cases = self.case_service.list_followed_cases(
+                    account=params.get("account")
+                )
+            else:
+                list_kwargs = {k: v for k, v in params.items() if k != "following"}
+                list_kwargs["use_cache"] = False
+                fresh_cases = self.case_service.list_cases(**list_kwargs)
+
+            if not fresh_cases:
+                return
+
+            self.cases = fresh_cases
+            self.call_from_thread(self.update_table_rows_preserve_cursor)
+
+            if self.selected_case_id:
+                matching = next(
+                    (
+                        c
+                        for c in fresh_cases
+                        if str(c.case_number) == str(self.selected_case_id)
+                        or str(c.id) == str(self.selected_case_id)
+                    ),
+                    None,
+                )
+                known_lmd = matching.last_modified_date if matching else None
+                cached = self.case_service.cache_service.get_case_details(
+                    self.selected_case_id
+                )
+                cached_lmd = cached[2] if cached else None
+
+                if known_lmd and cached_lmd and known_lmd != cached_lmd:
+                    details = self.case_service.get_case_details(
+                        self.selected_case_id, use_cache=False
+                    )
+                    try:
+                        atts = self.attachment_service.list_attachments(
+                            self.selected_case_id
+                        )
+                    except Exception:  # noqa: BLE001
+                        atts = []
+                    if details:
+                        self.call_from_thread(self.render_case_details, details, atts)
+
+    def update_table_rows_preserve_cursor(self) -> None:
+        """Refreshes the DataTable with self.cases while preserving cursor row position."""
+        table = self.query_one("#case-table", DataTable)
+        current_row_key = None
+        with contextlib.suppress(Exception):
+            cell_key = table.coordinate_to_cell_key(table.cursor_coordinate)
+            if cell_key:
+                current_row_key = str(cell_key.row_key.value)
+        table.clear()
+        for idx, c in enumerate(self.cases):
+            num = c.case_number or c.id
+            title = c.summary or ""
+            sev = c.severity or ""
+            status = c.status or ""
+
+            sev_style = ""
+            if "Urgent" in sev or "1" in sev:
+                sev_style = "bold red"
+            elif "High" in sev or "2" in sev:
+                sev_style = "red"
+            elif "Normal" in sev or "3" in sev:
+                sev_style = "yellow"
+            elif "Low" in sev or "4" in sev:
+                sev_style = "green"
+            status_style = ""
+            if "Red Hat" in status or "red hat" in status.lower():
+                status_style = "bold orange3"
+            elif "customer" in status.lower():
+                status_style = "bold green"
+            elif "closed" in status.lower():
+                status_style = "dim"
+
+            num_text = Text(num, style=status_style)
+            if getattr(c, "is_followed", False):
+                num_text.append(" ★", style="bold yellow")
+            if getattr(c, "has_unread", False):
+                cnt = getattr(c, "unread_count", 0)
+                num_text.append(f" ●{cnt}" if cnt else " ●", style="bold cyan")
+
+            table.add_row(
+                num_text,
+                title,
+                Text(sev, style=sev_style),
+                Text(status, style=status_style),
+                key=num,
+            )
+
+        if current_row_key:
+            with contextlib.suppress(Exception):
+                for row_idx, r_key in enumerate(table.rows):
+                    if str(r_key.value) == current_row_key:
+                        table.move_cursor(row=row_idx)
+                        break
+
     def update_case_table_row(self, case_num: str) -> None:
         with contextlib.suppress(Exception):
             table = self.query_one("#case-table", DataTable)
@@ -815,8 +934,14 @@ class SupportApp(App):
                 self.screen.remove_class("commenting")
                 text_area.text = ""
 
-        # Proceed to fetch case details
+        # SWR: If details exist in local disk cache, render immediately without waiting
         self.selected_case_id = next_case_id
+        cached_rec = self.case_service.cache_service.get_case_details(next_case_id)
+        if cached_rec:
+            cached_details, cached_atts, _ = cached_rec
+            self.render_case_details(cached_details, cached_atts)
+
+        # Proceed to validate/fetch fresh case details in background
         self.run_worker(
             lambda: self.fetch_case_details(self.selected_case_id), thread=True
         )
@@ -841,7 +966,7 @@ class SupportApp(App):
     def on_refresh_click(self) -> None:
         if self.selected_case_id:
             self.run_worker(
-                lambda: self.fetch_case_details(self.selected_case_id),
+                lambda: self.fetch_case_details(self.selected_case_id, force=True),
                 thread=True,
             )
         else:
@@ -880,8 +1005,16 @@ class SupportApp(App):
     def on_comment_cancel_click(self) -> None:
         self.action_exit_commenting()
 
-    def fetch_case_details(self, case_id: str) -> None:
+    def fetch_case_details(self, case_id: str, force: bool = False) -> None:
         """Fetches the details and comments for the selected case."""
+        is_already_rendered = (
+            self.selected_case_id == case_id
+            and self.current_details is not None
+            and (
+                str(self.current_details.case.case_number) == str(case_id)
+                or str(self.current_details.case.id) == str(case_id)
+            )
+        )
 
         def show_loading():
             with contextlib.suppress(Exception):
@@ -889,10 +1022,25 @@ class SupportApp(App):
                 container.query("*").remove()
                 container.mount(Static(f"Fetching details for Case #{case_id}..."))
 
-        self.call_from_thread(show_loading)
+        if not is_already_rendered:
+            self.call_from_thread(show_loading)
 
         try:
-            details = self.case_service.get_case_details(case_id)
+            matching = next(
+                (
+                    c
+                    for c in self.cases
+                    if str(c.case_number) == str(case_id) or str(c.id) == str(case_id)
+                ),
+                None,
+            )
+            known_lmd = matching.last_modified_date if matching else None
+
+            details = self.case_service.get_case_details(
+                case_id,
+                use_cache=not force,
+                known_last_modified=known_lmd,
+            )
             if not details or not details.case:
                 self.call_from_thread(self.show_error, f"Case {case_id} not found.")
                 return

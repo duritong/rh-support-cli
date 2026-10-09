@@ -23,6 +23,9 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
     last_update_payload = None
     last_notifiedusers_payload = None
     last_deleted_notifieduser = None
+    details_query_count = 0
+    probe_query_count = 0
+    list_query_count = 0
     mock_storage: ClassVar[dict] = {}
 
     def log_message(self, format, *args):
@@ -351,8 +354,67 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps(resp_data).encode())
                 return
 
+            # 5.5 CheckCaseLastModified
+            if "CheckCaseLastModified" in query:
+                MockRedHatHandler.probe_query_count += 1
+                case_num = str(variables.get("caseNumber", "12345"))
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                if not case_num.isdigit() or case_num in (
+                    "99999",
+                    "nonexistent",
+                    "not_found",
+                ):
+                    self.wfile.write(
+                        json.dumps(
+                            {
+                                "data": {
+                                    "redhat_support_uiapi": {
+                                        "query": {"RedHatSupportCase": {"edges": []}}
+                                    }
+                                }
+                            }
+                        ).encode()
+                    )
+                else:
+                    self.wfile.write(
+                        json.dumps(
+                            {
+                                "data": {
+                                    "redhat_support_uiapi": {
+                                        "query": {
+                                            "RedHatSupportCase": {
+                                                "edges": [
+                                                    {
+                                                        "node": {
+                                                            "Id": f"500{case_num}",
+                                                            "LastModifiedDate": {
+                                                                "value": (
+                                                                    "2023-01-02T10:00:00Z"
+                                                                    if case_num
+                                                                    == "12345"
+                                                                    else "2026-08-20T10:00:00Z"
+                                                                )
+                                                            },
+                                                            "Status": {
+                                                                "value": "Waiting on Red Hat"
+                                                            },
+                                                        }
+                                                    }
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        ).encode()
+                    )
+                return
+
             # 6. GetCaseAndComments
             if "GetCaseAndComments" in query or "CaseComments__r" in query:
+                MockRedHatHandler.details_query_count += 1
                 case_num = str(variables.get("caseNumber", "12345"))
                 if not case_num.isdigit() or case_num in (
                     "99999",
@@ -511,6 +573,7 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                 or "GetSupportCases" in query
                 or "RedHatSupportCase" in query
             ):
+                MockRedHatHandler.list_query_count += 1
                 where_clause = variables.get("where") or {}
                 filters_received = [f"AUTH={source}"]
                 if "RedHatSupportAccount" in where_clause:
@@ -908,6 +971,9 @@ class TestRhSupportCli(unittest.TestCase):
 
     def setUp(self):
         # Set up environment variables for the CLI to use the mock server
+        MockRedHatHandler.details_query_count = 0
+        MockRedHatHandler.probe_query_count = 0
+        MockRedHatHandler.list_query_count = 0
         self.env = os.environ.copy()
         self.env["RH_API_URL"] = self.base_url
         self.env["RH_SSO_URL"] = self.sso_url
@@ -1975,7 +2041,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         # We can't easily check headers in subprocess output unless we debug log.
         # Let's use debug log.
 
-        result = self.run_cli(["--debug", "list"])
+        result = self.run_cli(["--no-cache", "--debug", "list"])
         self.assertIn("Authorization': 'Bearer <HIDDEN>", result.stderr)
         # Wait, debug output hides the token.
 
@@ -4130,6 +4196,198 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         self.assertGreater(len(data), 0)
         self.assertIn("uuid", data[0])
         self.assertIn("file_name", data[0])
+
+    def test_cache_service_atomic_writes_and_keys(self):
+        """Test CacheService atomic writes, TTL expiration, and deterministic key hashing."""
+        from rh_support_lib.models import Case
+        from rh_support_lib.services.cache import CacheService
+
+        cache = CacheService(cache_dir=self.test_cache_dir)
+        self.assertTrue(cache.enabled)
+
+        # 1. Deterministic list cache key hashing
+        key1 = cache.compute_list_cache_key(
+            status=["Waiting on Red Hat", "Closed"], severity=["1", "2"]
+        )
+        # Permuted order should produce identical hash key
+        key2 = cache.compute_list_cache_key(
+            status=["Closed", "Waiting on Red Hat"], severity=["2", "1"]
+        )
+        self.assertEqual(key1, key2)
+
+        # Different filter produces different key
+        key3 = cache.compute_list_cache_key(status=["Closed"])
+        self.assertNotEqual(key1, key3)
+
+        # 2. Atomic list caching and TTL
+        dummy_case = Case(
+            case_number="99901",
+            summary="Test Case",
+            status="Waiting on Red Hat",
+            severity="1 (Urgent)",
+            product="RHEL",
+            version="9.0",
+            account_number="123",
+            created_date="2026-01-01",
+            last_modified_date="2026-01-02",
+            created_by="User",
+            last_modified_by="User",
+            owner="Owner",
+            contact_name="Contact",
+            contact_sso="sso",
+            case_type="Standard",
+            id="50099901",
+        )
+        cache.set_case_list(key1, [dummy_case])
+        cached_list = cache.get_case_list(key1, ttl=60)
+        self.assertIsNotNone(cached_list)
+        self.assertEqual(len(cached_list), 1)
+        self.assertEqual(cached_list[0].case_number, "99901")
+
+        # Expired TTL returns None
+        self.assertIsNone(cache.get_case_list(key1, ttl=0))
+
+    def test_case_details_cache_hit_and_lightweight_probe(self):
+        """Test that repeated 'show' commands use the lightweight probe and serve from local cache."""
+        initial_details_count = MockRedHatHandler.details_query_count
+        initial_probe_count = MockRedHatHandler.probe_query_count
+
+        # First call: cache miss, executes full details query
+        res1 = self.run_cli(["show", "-c", "12345"])
+        self.assertEqual(res1.returncode, 0)
+        self.assertIn("12345", res1.stdout)
+        self.assertEqual(
+            MockRedHatHandler.details_query_count, initial_details_count + 1
+        )
+
+        # Verify cache file exists
+        cached_file = os.path.join(
+            self.test_cache_dir, "rh-support-cli", "cases", "12345.json"
+        )
+        self.assertTrue(os.path.isfile(cached_file))
+
+        # Second call: cache hit! Details query count does NOT increase, lightweight probe query count does
+        res2 = self.run_cli(["show", "-c", "12345"])
+        self.assertEqual(res2.returncode, 0)
+        self.assertIn("12345", res2.stdout)
+        self.assertEqual(
+            MockRedHatHandler.details_query_count, initial_details_count + 1
+        )
+        self.assertEqual(MockRedHatHandler.probe_query_count, initial_probe_count + 1)
+
+        # Third call with --no-cache: bypasses cache and increments details query count
+        res3 = self.run_cli(["show", "-c", "12345", "--no-cache"])
+        self.assertEqual(res3.returncode, 0)
+        self.assertEqual(
+            MockRedHatHandler.details_query_count, initial_details_count + 2
+        )
+
+    def test_case_list_cache_hit_and_no_cache(self):
+        """Test that repeated 'list' commands hit local cache within TTL and --no-cache bypasses it."""
+        initial_list_count = MockRedHatHandler.list_query_count
+
+        # First call: cache miss
+        res1 = self.run_cli(["list"])
+        self.assertEqual(res1.returncode, 0)
+        self.assertEqual(MockRedHatHandler.list_query_count, initial_list_count + 1)
+
+        # Second call: hits cache (list_query_count remains identical)
+        res2 = self.run_cli(["list"])
+        self.assertEqual(res2.returncode, 0)
+        self.assertEqual(MockRedHatHandler.list_query_count, initial_list_count + 1)
+
+        # Third call with --no-cache: fetches from server
+        res3 = self.run_cli(["list", "--no-cache"])
+        self.assertEqual(res3.returncode, 0)
+        self.assertEqual(MockRedHatHandler.list_query_count, initial_list_count + 2)
+
+    def test_case_cache_invalidation_on_comment(self):
+        """Test that commenting on a case invalidates its cached details."""
+        # 1. Warm cache
+        res_show1 = self.run_cli(["show", "-c", "12345"])
+        self.assertEqual(res_show1.returncode, 0)
+        cached_file = os.path.join(
+            self.test_cache_dir, "rh-support-cli", "cases", "12345.json"
+        )
+        self.assertTrue(os.path.isfile(cached_file))
+
+        # 2. Add comment
+        comment_file = os.path.join(self.test_cache_dir, "c.txt")
+        with open(comment_file, "w") as f:
+            f.write("New test comment text")
+        res_comm = self.run_cli(["comment", "-c", "12345", "-f", comment_file])
+        self.assertEqual(res_comm.returncode, 0)
+
+        # Cache file should be removed upon mutation!
+        self.assertFalse(os.path.isfile(cached_file))
+
+    def test_tui_swr_cache_instant_render(self):
+        """Test that TUI immediately renders details from cache without loading placeholder."""
+        import asyncio
+
+        from rh_support_lib.api import LegacyAPIClient
+        from rh_support_lib.models import Case, CaseDetails
+        from rh_support_lib.services.cache import CacheService
+        from rh_support_lib.tui.app import SupportApp
+
+        cache = CacheService(cache_dir=self.test_cache_dir)
+        dummy_case = Case(
+            case_number="12345",
+            summary="SWR Instant Case",
+            status="Waiting on Red Hat",
+            severity="1 (Urgent)",
+            product="RHEL",
+            version="9.0",
+            account_number="123",
+            created_date="2026-01-01",
+            last_modified_date="2023-01-02T10:00:00Z",
+            created_by="Tester",
+            last_modified_by="Tester",
+            owner="Owner",
+            contact_name="Tester",
+            contact_sso="tester",
+            case_type="Standard",
+            id="50012345",
+        )
+        details = CaseDetails(
+            case=dummy_case,
+            description="Cached instant description",
+            comments=[],
+            attachments=[],
+            notified_users=[],
+        )
+        cache.set_case_details(
+            "12345", details, last_modified_date="2023-01-02T10:00:00Z"
+        )
+
+        async def run_headless_swr():
+            from unittest.mock import patch
+
+            client = LegacyAPIClient("mock_access_token_123")
+            with patch.dict(
+                os.environ,
+                {
+                    "XDG_CACHE_HOME": self.test_cache_dir,
+                    "RH_GRAPHQL_URL": f"{self.base_url}/graphql",
+                    "RH_ATTACHMENT_API_URL": self.base_url,
+                },
+            ):
+                app = SupportApp(client, config={"tui": {"poll_interval": 0}})
+                async with app.run_test() as pilot:
+                    await pilot.pause()
+                    # Trigger row selection for cached case 12345
+                    from unittest.mock import MagicMock
+
+                    event = MagicMock()
+                    event.row_key.value = "12345"
+                    app.on_row_selected(event)
+                    # current_details should be populated IMMEDIATELY from cache!
+                    self.assertIsNotNone(app.current_details)
+                    self.assertEqual(
+                        app.current_details.description, "Cached instant description"
+                    )
+
+        asyncio.run(run_headless_swr())
 
 
 if __name__ == "__main__":

@@ -17,6 +17,7 @@ from rh_support_lib.models import (
     CaseDetails,
     ProductItem,
 )
+from rh_support_lib.services.cache import CacheService
 from rh_support_lib.services.state import StateService
 from rh_support_lib.utils import clean_comment_body
 
@@ -205,6 +206,24 @@ query GetCaseComments($filter: RedHatSupportCaseComment__c_Filter!, $orderBy: Re
 }
 """
 
+GQL_CHECK_CASE_LAST_MODIFIED = """
+query CheckCaseLastModified($caseNumber: String) {
+  redhat_support_uiapi {
+    query {
+      RedHatSupportCase(where: { CaseNumber__c: { eq: $caseNumber } }) {
+        edges {
+          node {
+            Id
+            LastModifiedDate { value }
+            Status { value }
+          }
+        }
+      }
+    }
+  }
+}
+"""
+
 GQL_GET_ACTIVE_PRODUCTS = """
 query GetActiveProducts($first: Int, $after: String) {
   redhat_support_uiapi {
@@ -349,12 +368,44 @@ class CaseService:
         rest_url: str | None = None,
         graphql_url: str | None = None,
         state_service: StateService | None = None,
+        cache_service: CacheService | None = None,
+        no_cache: bool = False,
     ):
         self.api_client = api_client
         self.graphql_url = (
             graphql_url or os.environ.get("RH_GRAPHQL_URL") or GRAPHQL_URL
         )
         self.state_service = state_service or StateService()
+        self.cache_service = cache_service or CacheService(no_cache=no_cache)
+
+    def check_case_last_modified(self, case_number: str) -> tuple[str, str, str] | None:
+        """Lightweight probe query returning (internal_id, last_modified_date, status) or None."""
+        variables = {"caseNumber": str(case_number).strip()}
+        try:
+            data = self.api_client.execute_graphql(
+                GQL_CHECK_CASE_LAST_MODIFIED, variables, url=self.graphql_url
+            )
+            uiapi = data.get("redhat_support_uiapi") or {}
+            query_data = uiapi.get("query") or {}
+            case_container = query_data.get("RedHatSupportCase") or {}
+            edges = case_container.get("edges") or []
+            if not edges:
+                return None
+            node = edges[0].get("node") or {}
+            c_id = node.get("Id", "")
+            lmd = (
+                node.get("LastModifiedDate", {}).get("value", "")
+                if isinstance(node.get("LastModifiedDate"), dict)
+                else ""
+            )
+            status = (
+                node.get("Status", {}).get("value", "")
+                if isinstance(node.get("Status"), dict)
+                else ""
+            )
+            return c_id, lmd, status
+        except Exception:  # noqa: BLE001
+            return None
 
     # --- NORMALIZATION HELPERS ---
 
@@ -537,8 +588,22 @@ class CaseService:
         after: str | None = None,
         all_pages: bool = False,
         limit: int | None = None,
+        use_cache: bool = True,
     ) -> list[Case]:
-        return self._list_cases_graphql(
+        cache_key = self.cache_service.compute_list_cache_key(
+            account=account,
+            status=status,
+            severity=severity,
+            owner=owner,
+            limit=limit,
+            all_pages=all_pages,
+        )
+        if use_cache and not after and self.cache_service.enabled:
+            cached_list = self.cache_service.get_case_list(cache_key)
+            if cached_list is not None:
+                return cached_list
+
+        cases = self._list_cases_graphql(
             account=account,
             status=status,
             severity=severity,
@@ -548,6 +613,9 @@ class CaseService:
             all_pages=all_pages,
             limit=limit,
         )
+        if use_cache and not after and self.cache_service.enabled and cases:
+            self.cache_service.set_case_list(cache_key, cases)
+        return cases
 
     def _list_cases_graphql(
         self,
@@ -666,13 +734,34 @@ class CaseService:
         first_comments: int = 200,
         all_comments: bool = True,
         max_comments: int | None = None,
+        use_cache: bool = True,
+        known_last_modified: str | None = None,
     ) -> CaseDetails | None:
-        return self._get_case_details_graphql(
-            case_number=case_number,
+        c_num = str(case_number).strip()
+        if use_cache and self.cache_service.enabled:
+            cached = self.cache_service.get_case_details(c_num)
+            if cached:
+                cached_details, _cached_atts, cached_lmd = cached
+                if (
+                    known_last_modified
+                    and cached_lmd
+                    and known_last_modified == cached_lmd
+                ):
+                    return cached_details
+                probe = self.check_case_last_modified(c_num)
+                if probe and probe[1] and cached_lmd and probe[1] == cached_lmd:
+                    return cached_details
+
+        details = self._get_case_details_graphql(
+            case_number=c_num,
             first_comments=first_comments,
             all_comments=all_comments,
             max_comments=max_comments,
         )
+        if details and use_cache and self.cache_service.enabled:
+            lmd = details.case.last_modified_date if details.case else ""
+            self.cache_service.set_case_details(c_num, details, last_modified_date=lmd)
+        return details
 
     def _get_case_details_graphql(
         self,
@@ -827,6 +916,7 @@ class CaseService:
                 case_number, status=mapped_status, case_internal_id=record_id
             )
 
+        self.cache_service.invalidate_case(case_number)
         return CaseComment(
             id=str(comment_id),
             body=body,
@@ -890,17 +980,27 @@ class CaseService:
         data = self.api_client.execute_graphql(
             GQL_UPDATE_CASE, variables, url=self.graphql_url
         )
-        return (
+        res = (
             data.get("redhat_support_uiapi", {})
             .get("CaseUpdate", {})
             .get("RedHatSupportRecord", {})
         )
+        self.cache_service.invalidate_case(case_number)
+        return res
 
     def get_active_products(
-        self, first: int = 200, all_pages: bool = True
+        self, first: int = 200, all_pages: bool = True, use_cache: bool = True
     ) -> list[ProductItem]:
         """Fetches active products from the product catalog."""
-        return self._get_active_products_graphql(first=first, all_pages=all_pages)
+        if use_cache and all_pages and self.cache_service.enabled:
+            cached_prods = self.cache_service.get_products()
+            if cached_prods is not None:
+                return cached_prods
+
+        products = self._get_active_products_graphql(first=first, all_pages=all_pages)
+        if use_cache and all_pages and self.cache_service.enabled and products:
+            self.cache_service.set_products(products)
+        return products
 
     def _get_active_products_graphql(
         self, first: int = 200, all_pages: bool = True
@@ -1112,6 +1212,7 @@ class CaseService:
             if isinstance(record.get("CaseNumber__c"), dict)
             else record.get("caseNumber", "")
         )
+        self.cache_service.invalidate_case_lists()
         return str(case_num)
 
     def get_current_user(self) -> str:

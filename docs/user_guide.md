@@ -61,6 +61,13 @@ default_bookmark: ocp-team
 # Optionally: Set your background debug file for logging full redacted HTTP sessions to analyze API responses
 debug_file: ~/.config/rh-support-cli/debug_log.txt
 
+# Local XDG Disk Cache & Background Polling Options
+cache:
+  enabled: true                 # Set to false to disable all disk caching globally
+  list_ttl: 60                  # Seconds before a case list query re-fetches from API (default: 60s)
+  catalog_ttl: 86400            # Seconds before product catalog re-fetches (default: 24h)
+  tui_poll_interval: 60         # Seconds between non-blocking background polls in TUI (default: 60s, 0 to disable)
+
 # Group custom filter bookmarks
 bookmarks:
   ocp-team:
@@ -68,6 +75,14 @@ bookmarks:
     severity: ["High", "Urgent"]
     product: "OpenShift Container Platform"
 ```
+
+### Global Cache Control (`--no-cache` & `RH_NO_CACHE`)
+To completely bypass reading from or writing to the local XDG disk cache for any command, pass `--no-cache`:
+```bash
+rh-support-cli list --no-cache
+rh-support-cli show -c 12345678 --no-cache
+```
+You can also set the environment variable `export RH_NO_CACHE=1`.
 
 ---
 
@@ -421,7 +436,7 @@ rh-support-cli tui
 *   `-l <layout>` / `--layout <layout>`: Select TUI split layout (`horizontal` / `mailbox` for default mailbox style or `vertical` for side-by-side).
 *   `-b <bookmark_name>` / `--bookmark <bookmark_name>`: Launch the TUI using a specific bookmark of filters on startup instead of the default bookmark.
 *   `--no-default-bookmark`: Launch the TUI completely unfiltered, loading all cases on startup.
-
+*   `--no-cache`: Launch the TUI bypassing disk cache reads.
 ### Core Features & Layout Modes
 *   **Horizontal Split (Mailbox Style - Default)**: Full-width case list positioned across the top (like an email inbox), with expansive case details and comment thread below. Ideal for terminal multiplexers (`tmux`/`screen`) and widescreen monitors.
 *   **Vertical Split (Side-by-Side)**: Case table on the left, full rich case details, descriptions (fully rendered Markdown), and complete scrollable comments thread on the right.
@@ -455,6 +470,11 @@ Toggle focus between the case list and details pane using **`Tab`** or **`Shift+
 ### TUI Unread Auto-Navigation & Dwell Mark-Read
 *   **Auto-Scroll to Unread**: When selecting a case with unread comments, the details pane automatically scrolls to the yellow dotted checkpoint divider (`┈┈┈┈ 📍 Last read checkpoint ... ┈┈┈┈`).
 *   **Dwell Auto-Mark Read**: Dwelling on an active case for 2.5 seconds automatically advances the read checkpoint in `state.yaml` and clears the unread badge (`●`) from the case table.
+
+### Stale-While-Revalidate (SWR) Instant Case Rendering & Background Polling
+*   **Instant Rendering (SWR)**: When selecting a case row in the TUI, if the case has previously been fetched, its complete metadata, description, and comment thread are rendered **immediately (0 ms)** from the local XDG disk cache. No `Loading...` blank screen or UI stutter.
+*   **Zero-Cost In-Memory Freshness**: When navigating cases, the TUI compares the selected case's remote `LastModifiedDate` against the cached timestamp. If unchanged, zero network requests are made.
+*   **Periodic Background Polling**: While the TUI is running, a background worker polls for remote ticket changes every `poll_interval` seconds (default: 60s, configurable in `config.yaml` or disabled with `0`). It refreshes unread badges (`●`) in the case table and seamlessly updates the active details pane if new comments or status transitions occur, without interrupting keyboard navigation or losing cursor position.
 ## 7. Stateful Offline Mock Support Mode (Offline & Demos)
 
 To facilitate zero-setup demonstrations, offline testing, and development without real credentials or network connectivity, the tool includes an advanced, built-in **Stateful Offline Mock Support Mode**.

@@ -124,6 +124,11 @@ Authentication:
         action="store_true",
         help="Use Red Hat GraphQL & v3 Attachment APIs (default)",
     )
+    parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Bypass and do not update local disk cache",
+    )
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     parser.add_argument(
         "--debug-file",
@@ -595,6 +600,9 @@ Authentication:
             default=None,
             help="Output format: 'text', 'json', or 'yaml'",
         )
+        p.add_argument(
+            "--no-cache", action="store_true", help="Bypass local disk cache"
+        )
     for att_p in set(att_sub.choices.values()):
         att_p.add_argument(
             "-j", "--json", action="store_true", help="Output in JSON format"
@@ -604,6 +612,9 @@ Authentication:
             choices=["text", "json", "yaml"],
             default=None,
             help="Output format: 'text', 'json', or 'yaml'",
+        )
+        att_p.add_argument(
+            "--no-cache", action="store_true", help="Bypass local disk cache"
         )
 
     if argcomplete:
@@ -629,6 +640,18 @@ Authentication:
         args.json = False
 
     config = load_config(args.config_file)
+    cache_cfg = config.get("cache") or {}
+    no_cache = (
+        getattr(args, "no_cache", False)
+        or "--no-cache" in sys.argv
+        or cache_cfg.get("enabled") is False
+        or os.environ.get("RH_NO_CACHE") in ("1", "true", "True")
+    )
+    if no_cache:
+        os.environ["RH_NO_CACHE"] = "1"
+        args.no_cache = True
+    else:
+        args.no_cache = False
 
     if args.command == "link":
         cmd_link(args)

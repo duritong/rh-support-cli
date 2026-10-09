@@ -31,6 +31,7 @@ The project is structured as a Python CLI wrapper around the Red Hat Support Cas
     │   └── watchers.py     # follow, unfollow, following subcommands (local state)
     ├── services/           # Decoupled domain service layer
     │   ├── attachments.py  # AttachmentService (v3 presigned upload, download, delete, status)
+    │   ├── cache.py        # CacheService (Atomic XDG disk cache, TTL management, key hashing)
     │   ├── cases.py        # CaseService (GraphQL queries, mutations, case lookups)
     │   └── state.py        # StateService (Generic operational state, atomic YAML persistence)
     ├── synthetic_corpus/   # Local stateful mock portal and synthetic generator
@@ -48,6 +49,7 @@ The project is structured as a Python CLI wrapper around the Red Hat Support Cas
 *   **Presigned Direct Transfer Attachments**: Under the new CRM mode, large files up to 5 TB bypass intermediate API gateways via `AttachmentService`, using single PUT ($\le 5\text{ GB}$) or multipart parallel chunks (> $5\text{ GB}$) with automatic completion verification.
 *   **Relay Cursor-Based Pagination**: GraphQL operations use standardized Relay cursor connections (`edges { node, cursor }`, `pageInfo { hasNextPage, endCursor }`). `CaseService` features transparent auto-exhaustion for comment threads (`get_case_details`), configurable batch looping for case listings (`list_cases(all_pages=..., limit=...)`), and catalog iteration for products (`get_active_products`).
 *   **Structured Machine-Readable Serialization**: All domain models and query commands provide native serialization through `format_structured_output` (`--json`, `--format yaml`), stripping all interactive logging and ANSI escape sequences to enable robust scripting and pipe automation.
+*   **Thread-Safe Local Caching & SWR Layer**: Encapsulated in `CacheService` (`rh_support_lib/services/cache.py`), managing thread-safe atomic file writes (`os.replace`) under `$XDG_CACHE_HOME/rh-support-cli/`. Case details are validated conditionally via lightweight GraphQL probes (`CheckCaseLastModified`, ~250 bytes), while case lists employ deterministic filter-sorted SHA256 key hashing with configurable TTLs (default 60s). The TUI implements Stale-While-Revalidate (SWR), rendering cached records immediately upon row selection before running background verification.
 *   **No-Auth Execution Paths**: Commands that only inspect local resources (like `list-templates` and `completion`) are routed before OIDC token fetching in `main.py`, providing fast, completely offline execution.
 The interactive dashboard is implemented using the **`Textual`** reactive framework. 
 
@@ -64,8 +66,7 @@ To prevent standard widget-mounting or type-mismatch exceptions inside Textual, 
 3.  The complete, compiled child list is passed to a new `Vertical(*widgets)` layout constructor and mounted directly onto `#case-detail-container`.
 
 ### Multi-Threaded Non-Blocking Background Workers
-All slow network operations (fetching cases, getting details, posting comments, or executing templates) run on background threaded workers (`self.run_worker(lambda: fn(), thread=True)`). This prevents synchronous REST queries from blocking the main Textual event loop, maintaining a fluid, lag-free UI.
-
+All slow network operations (fetching cases, getting details, posting comments, executing templates, or periodic live polling) run on background threaded workers (`self.run_worker(lambda: fn(), thread=True)`). This prevents synchronous REST/GraphQL queries from blocking the main Textual event loop, maintaining a fluid, lag-free UI and preserving table cursor positions during periodic background polling.
 ---
 
 ## 3. The End-to-End Mock Testing Suite (`test_rh_support_cli.py`)

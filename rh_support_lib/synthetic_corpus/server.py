@@ -310,6 +310,53 @@ class StatefulMockHandler(http.server.BaseHTTPRequestHandler):
                 }
             return {"errors": [{"message": f"Case record {case_ref} not found"}]}
 
+        # CheckCaseLastModified (Query probe)
+        if "CheckCaseLastModified" in query:
+            case_num = variables.get("caseNumber") or ""
+            cases = self._load_all_cases(corpus_path)
+            matched_case = None
+            for c in cases:
+                if str(c.get("caseNumber")) == str(case_num):
+                    matched_case = c
+                    break
+            if not matched_case:
+                return {
+                    "data": {
+                        "redhat_support_uiapi": {
+                            "query": {"RedHatSupportCase": {"edges": []}}
+                        }
+                    }
+                }
+            return {
+                "data": {
+                    "redhat_support_uiapi": {
+                        "query": {
+                            "RedHatSupportCase": {
+                                "edges": [
+                                    {
+                                        "node": {
+                                            "Id": matched_case.get(
+                                                "id",
+                                                f"500{matched_case.get('caseNumber')}",
+                                            ),
+                                            "LastModifiedDate": {
+                                                "value": matched_case.get(
+                                                    "lastModifiedDate",
+                                                    "2026-08-20T10:00:00Z",
+                                                )
+                                            },
+                                            "Status": {
+                                                "value": matched_case.get("status", "")
+                                            },
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+
         # 6. GetCaseAndComments (Query Single Case)
         if "GetCaseAndComments" in query or (
             "CaseNumber__c" in query and "CaseComments__r" in query
