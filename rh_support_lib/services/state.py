@@ -4,6 +4,7 @@ import contextlib
 import os
 import shutil
 import tempfile
+import threading
 from datetime import datetime, timezone
 from typing import Any
 
@@ -29,6 +30,7 @@ class StateService:
         config_file: str | None = None,
     ):
         self.state_file = self._resolve_state_path(state_file, config_file)
+        self._lock = threading.RLock()
 
     @staticmethod
     def _resolve_state_path(
@@ -84,37 +86,39 @@ class StateService:
 
     def load_state(self) -> dict[str, Any]:
         """Loads state data from the YAML state file."""
-        if not os.path.isfile(self.state_file):
-            return {"version": 1, "users": {}}
-        try:
-            with open(self.state_file, "r") as f:
-                data = yaml.safe_load(f) or {}
-                if not isinstance(data, dict):
-                    data = {"version": 1, "users": {}}
-                data.setdefault("version", 1)
-                data.setdefault("users", {})
-                return data
-        except (OSError, yaml.YAMLError):
-            return {"version": 1, "users": {}}
+        with self._lock:
+            if not os.path.isfile(self.state_file):
+                return {"version": 1, "users": {}}
+            try:
+                with open(self.state_file, "r") as f:
+                    data = yaml.safe_load(f) or {}
+                    if not isinstance(data, dict):
+                        data = {"version": 1, "users": {}}
+                    data.setdefault("version", 1)
+                    data.setdefault("users", {})
+                    return data
+            except (OSError, yaml.YAMLError):
+                return {"version": 1, "users": {}}
 
     def save_state(self, data: dict[str, Any]) -> None:
         """Atomically saves state data to state.yaml."""
-        dir_name = os.path.dirname(os.path.abspath(self.state_file))
-        os.makedirs(dir_name, exist_ok=True)
+        with self._lock:
+            dir_name = os.path.dirname(os.path.abspath(self.state_file))
+            os.makedirs(dir_name, exist_ok=True)
 
-        data.setdefault("version", 1)
-        data.setdefault("users", {})
+            data.setdefault("version", 1)
+            data.setdefault("users", {})
 
-        # Write to temp file in same directory and atomic rename
-        fd, temp_path = tempfile.mkstemp(dir=dir_name, prefix="state_", suffix=".tmp")
-        try:
-            with open(fd, "w") as f:
-                yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
-            os.replace(temp_path, self.state_file)
-        except Exception:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-            raise
+            # Write to temp file in same directory and atomic rename
+            fd, temp_path = tempfile.mkstemp(dir=dir_name, prefix="state_", suffix=".tmp")
+            try:
+                with open(fd, "w") as f:
+                    yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
+                os.replace(temp_path, self.state_file)
+            except Exception:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+                raise
 
     def _get_user_state(self, data: dict[str, Any], user: str) -> dict[str, Any]:
         users = data.setdefault("users", {})
@@ -243,6 +247,12 @@ class StateService:
             ):
                 final_rel = "both"
 
+        existing_cp = (
+            existing.get("read_checkpoint", {}) if isinstance(existing, dict) else {}
+        )
+        existing_lk = (
+            existing.get("latest_known", {}) if isinstance(existing, dict) else {}
+        )
         entry = {
             "relationship": final_rel,
             "followed_at": (
@@ -262,13 +272,18 @@ class StateService:
             "source": source
             or (existing.get("source", "cli") if isinstance(existing, dict) else "cli"),
             "read_checkpoint": {
-                "status": status,
-                "severity": severity,
-                "last_read_comment_id": last_comment_id,
-                "last_read_comment_date": last_comment_date,
-                "marked_read_at": now_str,
+                "status": status or existing_cp.get("status", ""),
+                "severity": severity or existing_cp.get("severity", ""),
+                "last_read_comment_id": (
+                    last_comment_id or existing_cp.get("last_read_comment_id", "")
+                ),
+                "last_read_comment_date": (
+                    last_comment_date or existing_cp.get("last_read_comment_date", "")
+                ),
+                "marked_read_at": existing_cp.get("marked_read_at") or now_str,
             },
-            "latest_known": {
+            "latest_known": existing_lk
+            or {
                 "status": status,
                 "severity": severity,
                 "last_modified_date": last_modified_date or now_str,
@@ -379,6 +394,71 @@ class StateService:
         self.add_followed_case(case_number, user)
         return True
 
+    def batch_update_latest_known(
+        self,
+        user: str,
+        case_updates: list[dict[str, Any]],
+    ) -> None:
+        """Atomically updates latest_known for multiple cases in a single thread-safe write."""
+        if not case_updates:
+            return
+        with self._lock:
+            data = self.load_state()
+            user_state = self._get_user_state(data, user)
+            tracked_dict = user_state.setdefault("tracked_cases", {})
+            now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+            for up in case_updates:
+                c_num = str(up["case_number"]).strip()
+                tc = tracked_dict.get(c_num)
+                if not tc or not isinstance(tc, dict):
+                    tc = {
+                        "relationship": "followed",
+                        "followed_at": now_str,
+                        "summary": up.get("summary", ""),
+                        "account_number": str(up.get("account_number", "")),
+                        "source": "sync",
+                        "read_checkpoint": {
+                            "status": up.get("status", ""),
+                            "severity": up.get("severity", ""),
+                            "last_read_comment_id": up.get("latest_comment_id", ""),
+                            "last_read_comment_date": up.get("latest_comment_date", ""),
+                            "marked_read_at": now_str,
+                        },
+                        "latest_known": {},
+                    }
+                    tracked_dict[c_num] = tc
+
+                cp = tc.setdefault("read_checkpoint", {})
+                cp_status = cp.get("status", "")
+                status = up.get("status", "")
+                if not cp_status and status:
+                    # Initialize previously empty checkpoint status so subsequent changes are tracked
+                    cp["status"] = status
+                    cp_status = status
+
+                status_changed = up.get("status_changed")
+                if status_changed is None:
+                    status_changed = bool(cp_status and status and cp_status != status)
+
+                tc["latest_known"] = {
+                    "status": status,
+                    "severity": up.get("severity", ""),
+                    "last_modified_date": up.get("last_modified_date", ""),
+                    "latest_comment_id": up.get("latest_comment_id", ""),
+                    "latest_comment_date": up.get("latest_comment_date", ""),
+                    "latest_comment_author": up.get("latest_comment_author", ""),
+                    "latest_comment_snippet": up.get("latest_comment_snippet", ""),
+                    "unread_comment_count": int(up.get("new_comment_count", 0)),
+                    "status_changed": bool(status_changed),
+                }
+                if up.get("summary"):
+                    tc["summary"] = up["summary"]
+                if up.get("account_number"):
+                    tc["account_number"] = str(up["account_number"])
+
+            self.save_state(data)
+
     def update_latest_known(
         self,
         user: str,
@@ -391,50 +471,28 @@ class StateService:
         latest_comment_author: str = "",
         latest_comment_snippet: str = "",
         new_comment_count: int = 0,
+        status_changed: bool | None = None,
+        summary: str = "",
     ) -> None:
         """Updates the latest known remote state for a case, computing unread indicators."""
-        data = self.load_state()
-        user_state = self._get_user_state(data, user)
-        tracked_dict = user_state.setdefault("tracked_cases", {})
-        c_num = str(case_number).strip()
-
-        tc = tracked_dict.get(c_num)
-        if not tc or not isinstance(tc, dict):
-            # Initialize tracked entry
-            now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-            tc = {
-                "relationship": "followed",
-                "followed_at": now_str,
-                "summary": "",
-                "account_number": "",
-                "source": "sync",
-                "read_checkpoint": {
+        self.batch_update_latest_known(
+            user=user,
+            case_updates=[
+                {
+                    "case_number": case_number,
                     "status": status,
                     "severity": severity,
-                    "last_read_comment_id": latest_comment_id,
-                    "last_read_comment_date": latest_comment_date,
-                    "marked_read_at": now_str,
-                },
-                "latest_known": {},
-            }
-            tracked_dict[c_num] = tc
-
-        cp = tc.setdefault("read_checkpoint", {})
-        cp_status = cp.get("status", "")
-        status_changed = bool(cp_status and status and cp_status != status)
-
-        tc["latest_known"] = {
-            "status": status,
-            "severity": severity,
-            "last_modified_date": last_modified_date,
-            "latest_comment_id": latest_comment_id,
-            "latest_comment_date": latest_comment_date,
-            "latest_comment_author": latest_comment_author,
-            "latest_comment_snippet": latest_comment_snippet,
-            "unread_comment_count": new_comment_count,
-            "status_changed": status_changed,
-        }
-        self.save_state(data)
+                    "last_modified_date": last_modified_date,
+                    "latest_comment_id": latest_comment_id,
+                    "latest_comment_date": latest_comment_date,
+                    "latest_comment_author": latest_comment_author,
+                    "latest_comment_snippet": latest_comment_snippet,
+                    "new_comment_count": new_comment_count,
+                    "status_changed": status_changed,
+                    "summary": summary,
+                }
+            ],
+        )
 
     def mark_case_read(
         self,

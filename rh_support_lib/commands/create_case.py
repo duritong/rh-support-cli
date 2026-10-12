@@ -193,6 +193,7 @@ def cmd_create(args, api_client, config):
         and not k.startswith("_")
     }
     try:
+        fmt = getattr(args, "format", "markdown") or "markdown"
         case_number = case_service.create_case(
             summary=summary,
             description=description,
@@ -202,6 +203,7 @@ def cmd_create(args, api_client, config):
             case_type=case_type or "Standard",
             account_number=defaults.get("accountNumber"),
             extra_fields=extra_fields,
+            body_format=fmt,
         )
         print(f"Success: Case #{case_number} created.")
         if temp_desc_path and os.path.exists(temp_desc_path):

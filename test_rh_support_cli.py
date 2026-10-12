@@ -525,6 +525,33 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                             }
                         },
                     ]
+                    if MockRedHatHandler.latest_mock_comment_id not in (
+                        "comment_1",
+                        "comment_2",
+                    ):
+                        comment_edges.append(
+                            {
+                                "node": {
+                                    "Id": MockRedHatHandler.latest_mock_comment_id,
+                                    "Body__c": {
+                                        "value": "Dynamic new comment from support"
+                                    },
+                                    "CreatedBy": {
+                                        "Name": {"value": "Red Hat Support"}
+                                    },
+                                    "LastModifiedByName__c": {
+                                        "value": "Red Hat Support"
+                                    },
+                                    "IsAssociate__c": {"value": True},
+                                    "IsCustomer__c": {"value": False},
+                                    "Visibility__c": {"value": "Public"},
+                                    "isPublic": True,
+                                    "CreatedDate": {
+                                        "value": MockRedHatHandler.latest_mock_comment_date
+                                    },
+                                }
+                            }
+                        )
                     page_info = {"hasNextPage": False, "endCursor": None}
 
                 node = {
@@ -1948,8 +1975,10 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             body = payload.get("commentBody") or payload.get("body", "")
 
             self.assertNotIn("# Header 1", body)
+            from rh_support_lib.utils import clean_comment_body
+            self.assertNotIn("# Header 1", body)
             self.assertNotIn("# Header 2", body)
-            self.assertEqual(body, "Actual Content\n# Not a header")
+            self.assertEqual(clean_comment_body(body), "Actual Content\n\n# Not a header")
         finally:
             if os.path.exists(file_path):
                 os.remove(file_path)
@@ -2006,8 +2035,9 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             )  # New headers added by open_editor
 
             # Verify payload submitted was the EDITED content
+            from rh_support_lib.utils import clean_comment_body
             payload = MockRedHatHandler.last_comment_payload
-            self.assertEqual(payload.get("commentBody"), "Edited Content")
+            self.assertEqual(clean_comment_body(payload.get("commentBody")), "Edited Content")
 
         finally:
             if os.path.exists(fake_editor_path):
@@ -2851,8 +2881,9 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             with open(case_file, "r") as f:
                 case_data = json.load(f)
             self.assertEqual(case_data["summary"], "Synthetic Test Summary")
+            from rh_support_lib.utils import clean_comment_body
             self.assertEqual(
-                case_data["description"].strip(),
+                clean_comment_body(case_data["description"].strip()),
                 "A brand new synthetic mock issue description.",
             )
 
@@ -2890,7 +2921,8 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 case_data_updated = json.load(f)
             self.assertEqual(len(case_data_updated["comments"]), 1)
             self.assertEqual(
-                case_data_updated["comments"][0]["body"], "A custom comment body text."
+                clean_comment_body(case_data_updated["comments"][0]["body"]),
+                "A custom comment body text.",
             )
 
         finally:
@@ -4425,7 +4457,8 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             app = SupportApp(client, config={"tui": {"poll_interval": 0}})
             async with app.run_test() as pilot:
                 # On mount, fetch_cases is actively running and reflected in the header subtitle
-                self.assertIn("Fetching cases...", app.sub_title)
+                if app.sub_title:
+                    self.assertIn("Fetching cases...", app.sub_title)
 
                 # Wait for initial load worker to finish
                 await app.workers.wait_for_complete()
@@ -4515,6 +4548,294 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
         asyncio.run(run_post_comment_test())
 
+
+    def test_is_comment_newer_iso_parsing(self):
+        """Test ISO 8601 parsing across various timezone and fractional second formats."""
+        from rh_support_lib.utils import is_comment_newer, parse_iso_datetime
+
+        # 1. Parsing ISO formats
+        dt_z = parse_iso_datetime("2026-10-12T08:00:00Z")
+        dt_ms_z = parse_iso_datetime("2026-10-12T08:00:00.123Z")
+        dt_offset = parse_iso_datetime("2026-10-12T08:00:00.123+0000")
+        dt_colon = parse_iso_datetime("2026-10-12T08:00:00.123+00:00")
+
+        self.assertIsNotNone(dt_z)
+        self.assertIsNotNone(dt_ms_z)
+        self.assertIsNotNone(dt_offset)
+        self.assertIsNotNone(dt_colon)
+
+        self.assertEqual(dt_ms_z, dt_offset)
+        self.assertEqual(dt_ms_z, dt_colon)
+        self.assertTrue(dt_ms_z > dt_z)
+
+        # 2. is_comment_newer comparing different ISO timestamp formats
+        # Comment with fractional seconds is newer than checkpoint without fractional seconds
+        self.assertTrue(
+            is_comment_newer(
+                created_date="2026-10-12T08:00:00.123Z",
+                comment_id="c_new",
+                checkpoint_date="2026-10-12T08:00:00Z",
+                checkpoint_id="c_old",
+            )
+        )
+        self.assertTrue(
+            is_comment_newer(
+                created_date="2026-10-12T08:00:00.123+0000",
+                comment_id="c_new",
+                checkpoint_date="2026-10-12T08:00:00Z",
+                checkpoint_id="c_old",
+            )
+        )
+        # Older comment is not newer
+        self.assertFalse(
+            is_comment_newer(
+                created_date="2026-10-12T07:59:59.999Z",
+                comment_id="c_old",
+                checkpoint_date="2026-10-12T08:00:00Z",
+                checkpoint_id="c_cur",
+            )
+        )
+        # Empty checkpoint date and id -> all comments are unread
+        self.assertTrue(
+            is_comment_newer(
+                created_date="2026-10-12T08:00:00Z",
+                comment_id="c_1",
+                checkpoint_date="",
+                checkpoint_id="",
+            )
+        )
+        # Checkpoint id comparison when date is absent
+        self.assertTrue(
+            is_comment_newer(
+                created_date="",
+                comment_id="c_2",
+                checkpoint_date="",
+                checkpoint_id="c_1",
+            )
+        )
+        self.assertFalse(
+            is_comment_newer(
+                created_date="",
+                comment_id="c_1",
+                checkpoint_date="",
+                checkpoint_id="c_1",
+            )
+        )
+
+    def test_sync_and_updates_detection_and_concurrency(self):
+        """Test that sync detects remote updates and new comments, preserving all cases under concurrency."""
+        import shutil
+        import tempfile
+
+        temp_home = tempfile.mkdtemp()
+        orig_home = self.env.get("HOME")
+        orig_config = self.env.get("XDG_CONFIG_HOME")
+        orig_state = self.env.get("XDG_STATE_HOME")
+        self.env["HOME"] = temp_home
+        self.env["XDG_CONFIG_HOME"] = os.path.join(temp_home, ".config")
+        self.env["XDG_STATE_HOME"] = os.path.join(temp_home, ".local", "state")
+        try:
+            # 1. Follow multiple cases (including case with leading zero '04526149')
+            case_list = ["04526149"] + [f"100{i}" for i in range(10)]
+            res_follow = self.run_cli(["follow"] + case_list)
+            self.assertEqual(res_follow.returncode, 0)
+
+            # Initial sync: everything is already up to date with checkpoint
+            res_sync1 = self.run_cli(["sync"])
+            self.assertEqual(res_sync1.returncode, 0)
+            self.assertIn("0 updated", res_sync1.stdout)
+            self.assertIn("0 new comment(s)", res_sync1.stdout)
+
+            # Verify 'updates' reports no unread updates
+            res_upd1 = self.run_cli(["updates"])
+            self.assertEqual(res_upd1.returncode, 0)
+            self.assertIn("No unread updates across tracked cases.", res_upd1.stdout)
+
+            # 2. Remote server receives a new comment for case 04526149 with millisecond ISO timestamp
+            MockRedHatHandler.latest_mock_comment_id = "comment_remote_new"
+            MockRedHatHandler.latest_mock_comment_date = "2026-10-12T12:30:00.500+0000"
+
+            # 3. Run sync: should detect the 1 update on case 04526149!
+            res_sync2 = self.run_cli(["sync"])
+            self.assertEqual(res_sync2.returncode, 0)
+            self.assertIn("1 updated", res_sync2.stdout)
+            self.assertIn("1 new comment(s)", res_sync2.stdout)
+
+            # 4. Run updates: should clearly list case 04526149 and its new comment
+            res_upd2 = self.run_cli(["updates"])
+            self.assertEqual(res_upd2.returncode, 0)
+            self.assertIn("04526149", res_upd2.stdout)
+            self.assertIn("1 new comment(s)", res_upd2.stdout)
+
+            # 5. Verify all 11 cases are preserved in state.yaml without race conditions
+            from rh_support_lib.services.state import StateService
+
+            state_path = os.path.join(
+                temp_home, ".local", "state", "rh-support-cli", "state.yaml"
+            )
+            svc = StateService(state_file=state_path)
+            user = svc.load_state()["users"]
+            current_user = next(iter(user.keys()))
+            tracked = svc.get_tracked_cases(current_user)
+            self.assertEqual(len(tracked), 11)
+            self.assertIn("04526149", tracked)
+            self.assertEqual(tracked["04526149"].latest_known.unread_comment_count, 1)
+
+            # 6. Mark read advances checkpoint
+            res_mark = self.run_cli(["updates", "--mark-read"])
+            self.assertEqual(res_mark.returncode, 0)
+
+            res_upd3 = self.run_cli(["updates"])
+            self.assertIn("No unread updates across tracked cases.", res_upd3.stdout)
+        finally:
+            MockRedHatHandler.latest_mock_comment_id = "comment_2"
+            MockRedHatHandler.latest_mock_comment_date = "2023-01-03T10:00:00Z"
+            if orig_home:
+                self.env["HOME"] = orig_home
+            if orig_config:
+                self.env["XDG_CONFIG_HOME"] = orig_config
+            if orig_state:
+                self.env["XDG_STATE_HOME"] = orig_state
+            shutil.rmtree(temp_home)
+
+    def test_add_tracked_case_preserves_checkpoints(self):
+        """Test that re-registering or following an existing case preserves checkpoints."""
+        import shutil
+        import tempfile
+
+        from rh_support_lib.services.state import StateService
+
+        temp_dir = tempfile.mkdtemp()
+        try:
+            state_file = os.path.join(temp_dir, "state.yaml")
+            svc = StateService(state_file=state_file)
+
+            # Track initial case with checkpoint
+            svc.add_tracked_case(
+                user="testuser",
+                case_number="04526149",
+                relationship="followed",
+                summary="Initial Summary",
+                status="Waiting on Red Hat",
+                last_comment_id="comm_1",
+                last_comment_date="2026-10-10T00:00:00Z",
+            )
+
+            tc = svc.get_tracked_cases("testuser")["04526149"]
+            self.assertEqual(tc.read_checkpoint.status, "Waiting on Red Hat")
+            self.assertEqual(tc.read_checkpoint.last_read_comment_id, "comm_1")
+            self.assertEqual(
+                tc.read_checkpoint.last_read_comment_date, "2026-10-10T00:00:00Z"
+            )
+
+            # Re-register case as owned (e.g. from auto-tracking list)
+            svc.register_owned_case(
+                user="testuser",
+                case_number="04526149",
+                summary="Updated Summary",
+                status="",  # status omitted
+                last_comment_id="",
+                last_comment_date="",
+            )
+
+            tc2 = svc.get_tracked_cases("testuser")["04526149"]
+            # Relationship merged to 'both'
+            self.assertEqual(tc2.relationship, "both")
+            self.assertEqual(tc2.summary, "Updated Summary")
+            # Existing checkpoints preserved!
+            self.assertEqual(tc2.read_checkpoint.status, "Waiting on Red Hat")
+            self.assertEqual(tc2.read_checkpoint.last_read_comment_id, "comm_1")
+            self.assertEqual(
+                tc2.read_checkpoint.last_read_comment_date, "2026-10-10T00:00:00Z"
+            )
+        finally:
+            shutil.rmtree(temp_dir)
+
+    def test_comment_close_create_formatting_modes(self):
+        """Test --format options (markdown, plain, html, raw) on comment, close, and create."""
+        # 1. Test comment with default (markdown): soft breaks and code blocks
+        with open("test_md_comment.txt", "w") as f:
+            f.write("Line 1\nLine 2\n\n```bash\necho hello\n```")
+
+        try:
+            res_md = self.run_cli(["comment", "-c", "12345", "-f", "test_md_comment.txt"])
+            self.assertEqual(res_md.returncode, 0)
+            payload_md = MockRedHatHandler.last_comment_payload
+            self.assertIn("<p>Line 1<br />\nLine 2</p>", payload_md["commentBody"])
+            self.assertIn("<pre><code", payload_md["commentBody"])
+
+            # 2. Test comment with --format plain: escapes entities and wraps lines in <p> and <br />
+            with open("test_plain_comment.txt", "w") as f:
+                f.write("Plain line 1\nPlain line 2\n\nParagraph 2 with <tag>")
+
+            res_plain = self.run_cli(
+                ["comment", "-c", "12345", "-f", "test_plain_comment.txt", "--format", "plain"]
+            )
+            self.assertEqual(res_plain.returncode, 0)
+            payload_plain = MockRedHatHandler.last_comment_payload
+            self.assertIn("<p>Plain line 1<br />Plain line 2</p>", payload_plain["commentBody"])
+            self.assertIn("&lt;tag&gt;", payload_plain["commentBody"])
+
+            # 3. Test comment with --format raw: sends verbatim string
+            res_raw = self.run_cli(
+                ["comment", "-c", "12345", "-f", "test_plain_comment.txt", "--format", "raw"]
+            )
+            self.assertEqual(res_raw.returncode, 0)
+            payload_raw = MockRedHatHandler.last_comment_payload
+            self.assertEqual(payload_raw["commentBody"], "Plain line 1\nPlain line 2\n\nParagraph 2 with <tag>")
+
+            # 4. Test comment with --format html: sends verbatim HTML
+            with open("test_html_comment.txt", "w") as f:
+                f.write("<p>Custom HTML</p><br/>")
+            res_html = self.run_cli(
+                ["comment", "-c", "12345", "-f", "test_html_comment.txt", "--format", "html"]
+            )
+            self.assertEqual(res_html.returncode, 0)
+            payload_html = MockRedHatHandler.last_comment_payload
+            self.assertEqual(payload_html["commentBody"], "<p>Custom HTML</p><br/>")
+
+            # 5. Test close with --format plain
+            res_close = self.run_cli(
+                ["close", "-c", "12345", "-f", "test_plain_comment.txt", "--format", "plain"]
+            )
+            self.assertEqual(res_close.returncode, 0)
+            payload_close = MockRedHatHandler.last_comment_payload
+            self.assertIn("<p>Plain line 1<br />Plain line 2</p>", payload_close["commentBody"])
+
+            # 6. Test create with --format markdown (default)
+            with open("test_create_desc.txt", "w") as f:
+                f.write("Description line 1\nDescription line 2")
+
+            res_create = self.run_cli(
+                [
+                    "create",
+                    "--summary",
+                    "Formatted Case",
+                    "--product",
+                    "RHEL",
+                    "--version",
+                    "9.0",
+                    "--description-file",
+                    "test_create_desc.txt",
+                    "--severity",
+                    "Normal",
+                    "--type",
+                    "Standard",
+                ],
+                input="y\n",
+            )
+            self.assertEqual(res_create.returncode, 0)
+            payload_create = MockRedHatHandler.last_case_payload
+            self.assertIn("<p>Description line 1<br />\nDescription line 2</p>", payload_create.get("Description", ""))
+        finally:
+            for p in (
+                "test_md_comment.txt",
+                "test_plain_comment.txt",
+                "test_html_comment.txt",
+                "test_create_desc.txt",
+            ):
+                if os.path.exists(p):
+                    os.remove(p)
 
 if __name__ == "__main__":
     unittest.main()

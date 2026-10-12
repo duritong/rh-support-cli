@@ -3,6 +3,7 @@ import pydoc
 import sys
 
 from rh_support_lib.services.cases import CaseService
+from rh_support_lib.utils import is_comment_newer
 
 
 def cmd_show(args, api_client):
@@ -80,18 +81,21 @@ def cmd_show(args, api_client):
         old_status = tc.read_checkpoint.status
         if old_status and status and old_status != status:
             status_changed = True
-        last_read_date = tc.read_checkpoint.last_read_comment_date or ""
+        last_read_date = (
+            tc.read_checkpoint.last_read_comment_date
+            or tc.read_checkpoint.marked_read_at
+            or ""
+        )
         last_read_id = tc.read_checkpoint.last_read_comment_id or ""
 
     unread_indices = set()
-    if last_read_date or last_read_id:
+    if tc and tc.read_checkpoint:
         for idx, c in enumerate(comments):
-            if (
-                last_read_date
-                and c.created_date > last_read_date
-                or not last_read_date
-                and last_read_id
-                and c.id != last_read_id
+            if is_comment_newer(
+                created_date=c.created_date,
+                comment_id=c.id,
+                checkpoint_date=last_read_date,
+                checkpoint_id=last_read_id,
             ):
                 unread_indices.add(idx)
     if args.simple_output:

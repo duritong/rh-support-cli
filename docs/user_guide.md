@@ -259,6 +259,40 @@ rh-support-cli close -c 12345678 -f resolution.txt
 rh-support-cli close -c 12345678 -t close_case
 ```
 
+### Case Comment & Description Formatting (Portal Rich Text)
+
+Under Red Hat's customer portal architecture ([Article 7146730](https://access.redhat.com/articles/7146730)), case comments and descriptions are stored as **Rich Text (HTML)** rather than native Markdown or raw text.
+
+Because the portal web interface renders comments directly via HTML without preserving whitespace, raw newlines (`\n`) collapse into spaces on the web portal if posted as unformatted text.
+
+To solve this, `rh-support-cli` formats your comments and descriptions using `--format`:
+
+* **`markdown` (Default)**: Automatically parses GitHub-Flavored Markdown into semantic HTML with soft line breaks enabled:
+  * Single newlines (`\n`) become `<br />` breaks on the portal.
+  * Consecutive newlines (`\n\n`) become `<p>...</p>` paragraph blocks.
+  * Triple-backtick code fences (`` ``` ``) become monospace `<pre><code>...</code></pre>` blocks.
+  * Inline code (`` `code` ``) becomes `<code>...</code>`.
+  * Bold, italic, bulleted lists, and links are translated into standard HTML tags.
+  * When retrieved back in the CLI/TUI (`show`, `updates`, TUI), comments are translated back into clean terminal Markdown.
+* **`plain`**: HTML-escapes all entities and translates `\n\n` into `<p>...</p>` and `\n` into `<br />`. Does not parse Markdown syntax. Recommended for raw diagnostic dumps or system logs where characters like `*`, `_`, or `#` should not be styled.
+* **`html`**: Sends verbatim HTML directly to the portal (e.g. if pre-rendered by external tooling).
+* **`raw`**: Bypasses all formatting and sends the exact unformatted string.
+
+#### Examples
+```bash
+# Post a Markdown comment with line breaks and code blocks (default):
+rh-support-cli comment -c 12345678 -f update.md
+
+# Post raw terminal log output while preserving line breaks:
+rh-support-cli comment -c 12345678 -f dmesg.log --format plain
+
+# Close a case with raw plain-text output:
+rh-support-cli close -c 12345678 -f resolution.txt --format raw
+
+# Create a new case with plain paragraph breaks:
+rh-support-cli create --summary "Kernel Panic" --description-file ./panic.log --format plain
+```
+
 ### Attachment Management (`attachment` / `attachments`)
 *   **List Attachments**:
     ```bash

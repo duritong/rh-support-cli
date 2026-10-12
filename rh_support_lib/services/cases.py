@@ -19,7 +19,11 @@ from rh_support_lib.models import (
 )
 from rh_support_lib.services.cache import CacheService
 from rh_support_lib.services.state import StateService
-from rh_support_lib.utils import clean_comment_body
+from rh_support_lib.utils import (
+    clean_comment_body,
+    format_body_for_portal,
+    is_comment_newer,
+)
 
 # --- GRAPHQL QUERIES & MUTATIONS ---
 
@@ -880,32 +884,35 @@ class CaseService:
                 use_fallback = True
 
             if use_fallback:
-                next_vars = {
-                    "caseNumber": str(case_number),
-                    "first": batch_size,
-                    "after": end_cursor,
-                }
-                next_data = self.api_client.execute_graphql(
-                    GQL_GET_CASE_AND_COMMENTS, next_vars, url=self.graphql_url
-                )
-                next_uiapi = next_data.get("redhat_support_uiapi") or {}
-                next_query = next_uiapi.get("query") or {}
-                next_cases = next_query.get("RedHatSupportCase") or {}
-                next_edges = next_cases.get("edges") or []
-                if not next_edges:
-                    break
-                next_node = next_edges[0].get("node") or {}
-                next_comments_container = next_node.get("CaseComments__r") or {}
-                next_comment_edges = next_comments_container.get("edges") or []
-                if not next_comment_edges:
-                    break
-                for c_edge in next_comment_edges:
-                    c_node = c_edge.get("node") or {}
-                    comments.append(self._normalize_comment_node(c_node))
+                try:
+                    next_vars = {
+                        "caseNumber": str(case_number),
+                        "first": batch_size,
+                        "after": end_cursor,
+                    }
+                    next_data = self.api_client.execute_graphql(
+                        GQL_GET_CASE_AND_COMMENTS, next_vars, url=self.graphql_url
+                    )
+                    next_uiapi = next_data.get("redhat_support_uiapi") or {}
+                    next_query = next_uiapi.get("query") or {}
+                    next_cases = next_query.get("RedHatSupportCase") or {}
+                    next_edges = next_cases.get("edges") or []
+                    if not next_edges:
+                        break
+                    next_node = next_edges[0].get("node") or {}
+                    next_comments_container = next_node.get("CaseComments__r") or {}
+                    next_comment_edges = next_comments_container.get("edges") or []
+                    if not next_comment_edges:
+                        break
+                    for c_edge in next_comment_edges:
+                        c_node = c_edge.get("node") or {}
+                        comments.append(self._normalize_comment_node(c_node))
 
-                next_page_info = next_comments_container.get("pageInfo") or {}
-                has_next = next_page_info.get("hasNextPage", False)
-                end_cursor = next_page_info.get("endCursor")
+                    next_page_info = next_comments_container.get("pageInfo") or {}
+                    has_next = next_page_info.get("hasNextPage", False)
+                    end_cursor = next_page_info.get("endCursor")
+                except Exception:  # noqa: BLE001
+                    break
         return CaseDetails(
             case=case_obj,
             description=description or "",
@@ -939,6 +946,7 @@ class CaseService:
         is_public: bool = True,
         status: str | None = None,
         case_internal_id: str | None = None,
+        body_format: str = "markdown",
     ) -> CaseComment:
         """Adds a comment to an existing support case and optionally updates case status."""
         return self._add_comment_graphql(
@@ -947,6 +955,7 @@ class CaseService:
             is_public=is_public,
             status=status,
             case_internal_id=case_internal_id,
+            body_format=body_format,
         )
 
     def _add_comment_graphql(
@@ -956,15 +965,16 @@ class CaseService:
         is_public: bool = True,
         status: str | None = None,
         case_internal_id: str | None = None,
+        body_format: str = "markdown",
     ) -> CaseComment:
         record_id = case_internal_id or self.get_case_internal_id(case_number)
+        formatted_body = format_body_for_portal(body, fmt=body_format)
 
         comment_input = {
             "Case__c": str(record_id),
-            "Body__c": body,
+            "Body__c": formatted_body,
             "Visibility__c": "Public" if is_public else "Private",
         }
-
         variables = {"input": {"RedHatSupportCaseComment__c": comment_input}}
         data = self.api_client.execute_graphql(
             GQL_CREATE_CASE_COMMENT, variables, url=self.graphql_url
@@ -1215,6 +1225,7 @@ class CaseService:
         account_number: str | None = None,
         sso_user: str | None = None,
         extra_fields: dict[str, Any] | None = None,
+        body_format: str = "markdown",
     ) -> str:
         """Creates a new Red Hat support case using the GraphQL API."""
         return self._create_case_graphql(
@@ -1227,6 +1238,7 @@ class CaseService:
             account_number=account_number,
             sso_user=sso_user,
             extra_fields=extra_fields,
+            body_format=body_format,
         )
 
     def _create_case_graphql(
@@ -1240,6 +1252,7 @@ class CaseService:
         account_number: str | None = None,
         sso_user: str | None = None,
         extra_fields: dict[str, Any] | None = None,
+        body_format: str = "markdown",
     ) -> str:
         mapped_severity = SEVERITY_MAP.get(severity.lower(), severity)
         lookups = self.resolve_case_lookups(
@@ -1248,10 +1261,11 @@ class CaseService:
             product_name=product_name,
             version_name=version_name,
         )
+        formatted_desc = format_body_for_portal(description, fmt=body_format)
 
         case_input: dict[str, Any] = {
             "Subject": summary,
-            "Description": description,
+            "Description": formatted_desc,
             "Priority": mapped_severity,
             "ProductId": lookups.get("ProductId"),
             "AccountId": lookups.get("AccountId"),
@@ -1327,7 +1341,7 @@ class CaseService:
             last_comm_date = ""
             last_mod = ""
             with contextlib.suppress(Exception):
-                details = self.get_case_details(c_str, first_comments=50)
+                details = self.get_case_details(c_str, first_comments=200)
                 if details:
                     summary = details.case.summary
                     acc = details.case.account_number
@@ -1381,31 +1395,35 @@ class CaseService:
         if not tracked:
             return {"synced_count": 0, "updated_cases": [], "new_comments": 0}
 
-        def sync_one(c_num: str) -> dict[str, Any] | None:
+        def sync_one(c_num: str) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
             tc = tracked[c_num]
             try:
-                details = self.get_case_details(c_num, first_comments=50)
+                details = self.get_case_details(c_num, first_comments=200, use_cache=False)
                 if not details:
-                    return None
+                    return None, None
 
-                status = details.case.status
-                severity = details.case.severity
-                last_mod = details.case.last_modified_date
+                status = details.case.status if details.case else ""
+                severity = details.case.severity if details.case else ""
+                last_mod = details.case.last_modified_date if details.case else ""
 
                 # Check unread comments since checkpoint
-                last_read_date = tc.read_checkpoint.last_read_comment_date or ""
+                last_read_date = (
+                    tc.read_checkpoint.last_read_comment_date
+                    or tc.read_checkpoint.marked_read_at
+                    or ""
+                )
                 last_read_id = tc.read_checkpoint.last_read_comment_id or ""
 
-                new_comments = []
-                for comm in details.comments:
-                    if (
-                        last_read_date
-                        and comm.created_date > last_read_date
-                        or not last_read_date
-                        and last_read_id
-                        and comm.id != last_read_id
-                    ):
-                        new_comments.append(comm)
+                new_comments = [
+                    comm
+                    for comm in details.comments
+                    if is_comment_newer(
+                        created_date=comm.created_date,
+                        comment_id=comm.id,
+                        checkpoint_date=last_read_date,
+                        checkpoint_id=last_read_id,
+                    )
+                ]
 
                 latest_comm_id = details.comments[-1].id if details.comments else ""
                 latest_comm_date = (
@@ -1418,45 +1436,48 @@ class CaseService:
                     details.comments[-1].body[:120].strip() if details.comments else ""
                 )
 
-                status_changed = bool(
-                    tc.read_checkpoint.status
-                    and status
-                    and tc.read_checkpoint.status != status
-                )
+                old_status = tc.read_checkpoint.status or tc.latest_known.status or ""
+                status_changed = bool(old_status and status and old_status != status)
 
-                self.state_service.update_latest_known(
-                    user=user,
-                    case_number=c_num,
-                    status=status,
-                    severity=severity,
-                    last_modified_date=last_mod,
-                    latest_comment_id=latest_comm_id,
-                    latest_comment_date=latest_comm_date,
-                    latest_comment_author=latest_comm_author,
-                    latest_comment_snippet=latest_comm_snippet,
-                    new_comment_count=len(new_comments),
-                )
+                case_update = {
+                    "case_number": c_num,
+                    "summary": details.case.summary if details.case else "",
+                    "account_number": details.case.account_number if details.case else "",
+                    "status": status,
+                    "severity": severity,
+                    "last_modified_date": last_mod,
+                    "latest_comment_id": latest_comm_id,
+                    "latest_comment_date": latest_comm_date,
+                    "latest_comment_author": latest_comm_author,
+                    "latest_comment_snippet": latest_comm_snippet,
+                    "new_comment_count": len(new_comments),
+                    "status_changed": status_changed,
+                }
 
+                updated_info = None
                 if len(new_comments) > 0 or status_changed:
-                    return {
+                    updated_info = {
                         "case_number": c_num,
-                        "summary": details.case.summary,
+                        "summary": details.case.summary if details.case else "",
                         "status": status,
-                        "old_status": tc.read_checkpoint.status,
+                        "old_status": old_status,
                         "status_changed": status_changed,
                         "new_comment_count": len(new_comments),
                         "new_comments": new_comments,
                         "latest_comment_author": latest_comm_author,
                         "latest_comment_snippet": latest_comm_snippet,
                     }
+                return case_update, updated_info
             except Exception:  # noqa: BLE001
-                return None
-            return None
+                return None, None
 
         with ThreadPoolExecutor(max_workers=min(10, max(1, len(tracked)))) as executor:
             results = list(executor.map(sync_one, list(tracked.keys())))
 
-        updated = [r for r in results if r]
+        case_updates = [r[0] for r in results if r and r[0]]
+        self.state_service.batch_update_latest_known(user=user, case_updates=case_updates)
+
+        updated = [r[1] for r in results if r and r[1]]
         total_new_comments = sum(r["new_comment_count"] for r in updated)
         return {
             "synced_count": len(tracked),

@@ -125,6 +125,7 @@ Creates a new support case. If options are omitted, the tool will interactively 
 - `--type`: Case type (Standard, Bug)
 - `--attachment`: Path to a file to attach. Can be used multiple times.
 - `--no-default-template`: Ignore default create template from config.
+- `--format`: Formatting style for description (`markdown` [default], `plain`, `html`, `raw`). Converts to portal rich text (HTML).
 
 **Examples:**
 
@@ -195,6 +196,7 @@ Adds a comment to a case and optionally updates its status.
 - `-c`, `--case`: The Case Number (required)
 - `-f`, `--file`: Path to a file containing the comment text. If omitted, opens `$EDITOR`.
 - `-s`, `--status`: Update case status. Choices: `redhat` (Waiting on Red Hat), `customer` (Waiting on Customer), `closed`. Default: `redhat`.
+- `--format`: Formatting style for comment body (`markdown` [default], `plain`, `html`, `raw`). Default: `markdown`.
 
 **Examples:**
 
@@ -218,6 +220,7 @@ Closes an existing support case with a comment. Works identically to `comment`, 
 - `-t`, `--template`: Name of local template to apply (optional)
 - `--include-previous-comments`: Include the last N comments in the editor header (default: 1)
 - `--edit`: Open editor to edit the content from `--file` before submitting
+- `--format`: Formatting style for closing comment body (`markdown` [default], `plain`, `html`, `raw`). Default: `markdown`.
 
 **Examples:**
 
@@ -229,6 +232,38 @@ rh-support-cli close -c 12345678
 *Close a case with comment from a file:*
 ```bash
 rh-support-cli close -c 12345678 -f resolution.txt
+```
+
+### Rich Text & Markdown Formatting (`--format`)
+
+In Red Hat Customer Portal case comments and descriptions are stored and displayed as **Rich Text (HTML)** rather than native Markdown or plain text. Unformatted plain-text newlines posted to the portal collapse into whitespace, causing comments to render without line breaks.
+
+`rh-support-cli` automatically formats your comments and descriptions to ensure they look properly formatted both in the terminal and on the Customer Portal web UI:
+
+* **`markdown` (Default)**: Converts GitHub-Flavored Markdown to semantic HTML with soft line breaks enabled:
+  * Single newlines (`\n`) become `<br />` line breaks.
+  * Double newlines (`\n\n`) become `<p>...</p>` paragraphs.
+  * Code blocks (`` ``` ``) become monospace `<pre><code>...</code></pre>` blocks.
+  * Inline code (`` `code` ``) becomes `<code>...</code>`.
+  * Lists, links, and bold/italic markup are properly formatted for web view.
+  * When retrieved back via `show`, `updates`, or the TUI, comments are automatically converted back into clean terminal Markdown.
+* **`plain`**: HTML-escapes all entities and wraps text in `<p>` and `<br />` tags to preserve line breaks and paragraphs without parsing Markdown syntax. Ideal for raw logs or diagnostics containing characters like `*`, `#`, or `_`.
+* **`html`**: Sends verbatim HTML directly to the portal.
+* **`raw`**: Sends the verbatim unformatted string without any HTML tag wrapping or conversion.
+
+**Examples:**
+```bash
+# Post a Markdown-formatted comment (default):
+rh-support-cli comment -c 12345678 -f update.md
+
+# Post raw logs preserving line breaks without Markdown parsing:
+rh-support-cli comment -c 12345678 -f /var/log/messages --format plain
+
+# Close a case with raw plain-text output:
+rh-support-cli close -c 12345678 -f resolution.txt --format raw
+
+# Create a case with plain text paragraph formatting:
+rh-support-cli create --summary "Issue" --description-file ./desc.txt --format plain
 ```
 
 ### 10. Apply Template (`apply`)

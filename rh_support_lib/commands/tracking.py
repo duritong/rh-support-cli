@@ -8,7 +8,7 @@ import sys
 
 from rh_support_lib.constants import COLORS
 from rh_support_lib.services.cases import CaseService
-from rh_support_lib.utils import colorize
+from rh_support_lib.utils import colorize, is_comment_newer
 
 
 def cmd_sync(args, api_client, config=None):
@@ -142,21 +142,22 @@ def cmd_updates(args, api_client, config=None):
                 # Fetch live case details to render full unread comments
                 try:
                     details = case_service.get_case_details(
-                        c_num, first_comments=50, all_comments=False
+                        c_num, first_comments=200, all_comments=False
                     )
                     if details and details.comments:
-                        last_read_date = cp.last_read_comment_date or ""
+                        last_read_date = (
+                            cp.last_read_comment_date
+                            or cp.marked_read_at
+                            or ""
+                        )
                         last_read_id = cp.last_read_comment_id or ""
                         for comm in details.comments:
-                            is_new = False
-                            if (
-                                last_read_date
-                                and comm.created_date > last_read_date
-                                or not last_read_date
-                                and last_read_id
-                                and comm.id != last_read_id
-                            ):
-                                is_new = True
+                            is_new = is_comment_newer(
+                                created_date=comm.created_date,
+                                comment_id=comm.id,
+                                checkpoint_date=last_read_date,
+                                checkpoint_id=last_read_id,
+                            )
                             if is_new:
                                 author = colorize(comm.created_by, COLORS.BOLD, simple)
                                 vis = f"({comm.visibility})" if comm.visibility else ""

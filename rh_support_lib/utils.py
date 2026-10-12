@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import html
 import json
 import os
@@ -6,6 +8,7 @@ import shlex
 import subprocess
 import tempfile
 from dataclasses import asdict, is_dataclass
+from datetime import datetime, timezone
 from html.parser import HTMLParser
 from typing import Any
 
@@ -308,3 +311,99 @@ def format_structured_output(data: Any, fmt: str = "json") -> str:
     if fmt == "yaml":
         return yaml.dump(converted, sort_keys=False, default_flow_style=False)
     return json.dumps(converted, indent=2, default=str)
+
+
+def parse_iso_datetime(dt_str: str | None) -> datetime | None:
+    """Parses an ISO 8601 date string with variable formats into a UTC-aware datetime."""
+    if not dt_str:
+        return None
+    s = str(dt_str).strip()
+    if not s:
+        return None
+    # Normalize trailing Z
+    if s.endswith(("Z", "z")):
+        s = s[:-1] + "+00:00"
+    # Handle +0000 / -0500 without colon in offset
+    elif len(s) >= 5 and (s[-5] in ("+", "-")) and s[-3] != ":":
+        s = s[:-2] + ":" + s[-2:]
+    try:
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except (ValueError, TypeError, OSError):
+        return None
+
+
+def is_comment_newer(
+    created_date: str | None,
+    comment_id: str | None,
+    checkpoint_date: str | None,
+    checkpoint_id: str | None,
+) -> bool:
+    """Determines whether a comment is newer than the checkpoint.
+
+    Returns True if:
+    1. The comment's created_date is strictly greater than checkpoint_date (parsed UTC datetimes).
+    2. Or if parsing fails but created_date > checkpoint_date lexicographically.
+    3. Or if no checkpoint_date is present, but checkpoint_id is present and comment_id != checkpoint_id.
+    4. Or if neither checkpoint_date nor checkpoint_id is set (untracked/unread history).
+    """
+    # 1. Compare parsed UTC datetimes if checkpoint_date is provided
+    c_dt = parse_iso_datetime(created_date)
+    cp_dt = parse_iso_datetime(checkpoint_date)
+    if c_dt and cp_dt:
+        return c_dt > cp_dt
+
+    # 2. String comparison fallback if dates are present but cannot be parsed as ISO
+    if created_date and checkpoint_date:
+        return created_date > checkpoint_date
+
+    # 3. ID comparison fallback when no checkpoint date is available
+    if checkpoint_id and comment_id:
+        return comment_id != checkpoint_id
+
+    # 4. If neither checkpoint date nor checkpoint ID is set, all comments are unread
+    return bool(not checkpoint_date and not checkpoint_id)
+
+
+def format_body_for_portal(body: str | None, fmt: str = "markdown") -> str:
+    """Formats comment body or case description for Red Hat Support Portal.
+
+    The portal's Salesforce-based CRM stores and renders Body__c/Description as rich text (HTML).
+    Raw plain-text newlines collapse into whitespace unless formatted with HTML tags.
+
+    Supported formats:
+    - 'markdown' (default): Converts GFM Markdown to HTML with soft breaks enabled (<p>, <br>, <pre><code>).
+    - 'plain': Escapes HTML entities and converts newlines to <p> and <br /> tags without markdown formatting.
+    - 'html': Verbatim HTML passthrough (stripped).
+    - 'raw': Verbatim unformatted string passthrough without any HTML conversion.
+    """
+    if not body:
+        return ""
+    body_str = str(body)
+    fmt_norm = (fmt or "markdown").lower().strip()
+
+    if fmt_norm == "raw":
+        return body_str
+
+    if fmt_norm == "html":
+        return body_str.strip()
+
+    if fmt_norm == "plain":
+        escaped = html.escape(body_str)
+        paragraphs = [
+            p.replace("\n", "<br />").strip()
+            for p in escaped.split("\n\n")
+            if p.strip()
+        ]
+        if not paragraphs:
+            return ""
+        return "".join(f"<p>{p}</p>" for p in paragraphs)
+
+    # Default: markdown
+    from markdown_it import MarkdownIt
+
+    md = MarkdownIt("gfm-like", {"breaks": True, "html": True})
+    rendered = md.render(body_str).strip()
+    return rendered

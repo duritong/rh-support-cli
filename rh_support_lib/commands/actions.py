@@ -128,11 +128,13 @@ def cmd_comment(args, api_client):
     # 1. Post Comment and update status via CaseService
     print(f"Posting comment to Case #{args.case}...")
     try:
+        fmt = getattr(args, "format", "markdown") or "markdown"
         case_service.add_comment(
             args.case,
             comment_body,
             is_public=True,
             status=final_status if final_status else None,
+            body_format=fmt,
         )
         print("Success: Comment added.")
         if final_status:

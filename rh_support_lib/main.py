@@ -339,6 +339,12 @@ Authentication:
     parser_create.add_argument(
         "--template-var", action="append", help="Variable for template (key=value)"
     )
+    parser_create.add_argument(
+        "--format",
+        choices=["markdown", "plain", "html", "raw"],
+        default="markdown",
+        help="Format for case description (default: markdown, converted to portal rich text)",
+    )
 
     # Comment Subcommand
     parser_comment = subparsers.add_parser("comment", help="Post a comment to a case")
@@ -373,6 +379,12 @@ Authentication:
         action="store_true",
         help="Open editor to edit the content from --file before submitting",
     )
+    parser_comment.add_argument(
+        "--format",
+        choices=["markdown", "plain", "html", "raw"],
+        default="markdown",
+        help="Format for comment body (default: markdown, converted to portal rich text)",
+    )
 
     # Close Subcommand
     parser_close = subparsers.add_parser(
@@ -403,6 +415,12 @@ Authentication:
         "--edit",
         action="store_true",
         help="Open editor to edit the content from --file before submitting",
+    )
+    parser_close.add_argument(
+        "--format",
+        choices=["markdown", "plain", "html", "raw"],
+        default="markdown",
+        help="Format for closing comment body (default: markdown, converted to portal rich text)",
     )
 
     # Apply Subcommand
@@ -590,16 +608,18 @@ Authentication:
         default=8080,
         help="Local TCP port to bind the server to (default: 8080)",
     )
+    content_format_parsers = {parser_create, parser_comment, parser_close}
     for p in set(subparsers.choices.values()):
         p.add_argument(
             "-j", "--json", action="store_true", help="Output in JSON format"
         )
-        p.add_argument(
-            "--format",
-            choices=["text", "json", "yaml"],
-            default=None,
-            help="Output format: 'text', 'json', or 'yaml'",
-        )
+        if p not in content_format_parsers:
+            p.add_argument(
+                "--format",
+                choices=["text", "json", "yaml"],
+                default=None,
+                help="Output format: 'text', 'json', or 'yaml'",
+            )
         p.add_argument(
             "--no-cache", action="store_true", help="Bypass local disk cache"
         )
@@ -624,20 +644,21 @@ Authentication:
     if "--simple-output" in sys.argv or getattr(args, "simple_output", False):
         args.simple_output = True
 
-    if (
-        "--json" in sys.argv
-        or "-j" in sys.argv
-        or getattr(args, "json", False)
-        or getattr(args, "format", None) == "json"
-    ):
-        args.format = "json"
-        args.json = True
-    elif getattr(args, "format", None) == "yaml":
-        args.format = "yaml"
-        args.json = False
-    else:
-        args.format = "text"
-        args.json = False
+    if getattr(args, "command", None) not in ("create", "comment", "close"):
+        if (
+            "--json" in sys.argv
+            or "-j" in sys.argv
+            or getattr(args, "json", False)
+            or getattr(args, "format", None) == "json"
+        ):
+            args.format = "json"
+            args.json = True
+        elif getattr(args, "format", None) == "yaml":
+            args.format = "yaml"
+            args.json = False
+        else:
+            args.format = "text"
+            args.json = False
 
     config = load_config(args.config_file)
     cache_cfg = config.get("cache") or {}
