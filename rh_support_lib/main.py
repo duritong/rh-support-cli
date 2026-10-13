@@ -635,6 +635,66 @@ Authentication:
     parser_search.add_argument(
         "--simple-output", action="store_true", help="Disable colored output"
     )
+
+    # Systemd Subcommand
+    parser_systemd = subparsers.add_parser(
+        "systemd", help="Manage systemd user timer for periodic case synchronization"
+    )
+    systemd_sub = parser_systemd.add_subparsers(dest="systemd_action")
+
+    p_sys_install = systemd_sub.add_parser(
+        "install", help="Install systemd timer and service"
+    )
+    p_sys_install.add_argument(
+        "--interval",
+        default="15m",
+        help="Sync interval (e.g. 5m, 15m, 1h, default: 15m)",
+    )
+    p_sys_install.add_argument(
+        "--notify",
+        action="store_true",
+        help="Enable desktop notifications on new comments/updates",
+    )
+    p_sys_install.add_argument(
+        "--enable",
+        "--now",
+        action="store_true",
+        dest="enable",
+        help="Immediately enable and start timer via systemctl",
+    )
+
+    systemd_sub.add_parser(
+        "uninstall", help="Stop, disable, and remove systemd timer and service"
+    )
+    systemd_sub.add_parser("status", help="Show systemd timer and service status")
+
+    # install-systemd Shortcut Subcommand
+    parser_install_sys = subparsers.add_parser(
+        "install-systemd",
+        help="Install systemd user timer for periodic case synchronization",
+    )
+    parser_install_sys.add_argument(
+        "--interval",
+        default="15m",
+        help="Sync interval (e.g. 5m, 15m, 1h, default: 15m)",
+    )
+    parser_install_sys.add_argument(
+        "--notify",
+        action="store_true",
+        help="Enable desktop notifications on new comments/updates",
+    )
+    parser_install_sys.add_argument(
+        "--enable",
+        "--now",
+        action="store_true",
+        dest="enable",
+        help="Immediately enable and start timer via systemctl",
+    )
+
+    subparsers.add_parser(
+        "install-timer",
+        help="Install systemd user timer for periodic case synchronization (alias)",
+    )
     # List Templates Subcommand
     subparsers.add_parser(
         "list-templates", help="List all local templates and their details"
@@ -677,7 +737,14 @@ Authentication:
         default=8080,
         help="Local TCP port to bind the server to (default: 8080)",
     )
-    content_format_parsers = {parser_create, parser_comment, parser_close}
+    content_format_parsers = {
+        parser_create,
+        parser_comment,
+        parser_close,
+        parser_systemd,
+        parser_install_sys,
+        p_sys_install,
+    }
     for p in set(subparsers.choices.values()):
         p.add_argument(
             "-j", "--json", action="store_true", help="Output in JSON format"
@@ -751,6 +818,14 @@ Authentication:
         sys.exit(0)
     elif args.command in ["list-templates", "list-template"]:
         cmd_list_templates(args, config)
+        sys.exit(0)
+    elif args.command in ["systemd", "install-systemd", "install-timer"]:
+        from rh_support_lib.commands.systemd import cmd_install_systemd, cmd_systemd
+
+        if args.command in ("install-systemd", "install-timer"):
+            cmd_install_systemd(args)
+        else:
+            cmd_systemd(args)
         sys.exit(0)
     elif args.command == "mock-portal":
         from rh_support_lib.synthetic_corpus.server import run_mock_server

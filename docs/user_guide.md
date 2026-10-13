@@ -284,7 +284,7 @@ rh-support-cli following
 rh-support-cli unfollow 12345678
 ```
 
-### 5.10 Synchronizing Tracked Cases (`sync`)
+### 5.10 Synchronizing Tracked Cases & Systemd Timer (`sync` / `install-systemd` / `systemd`)
 Polls Red Hat's backend across all followed and owned cases in parallel to detect remote updates:
 
 ```bash
@@ -293,12 +293,24 @@ rh-support-cli sync
 
 # Sync with desktop notifications on new comments or status transitions:
 rh-support-cli sync --notify
-
-# Install systemd user service & timer for background synchronization:
-rh-support-cli sync --install-systemd --interval 15m
-systemctl --user enable --now rh-support-sync.timer
 ```
 
+#### Installing the Background Systemd Timer
+You can automate regular case synchronization using a systemd user timer:
+
+```bash
+# Install and immediately start the timer (default: 15m):
+rh-support-cli install-systemd --enable
+
+# Install with custom interval and desktop notifications:
+rh-support-cli install-systemd --interval 30m --notify --enable
+
+# Inspect timer and service status:
+rh-support-cli systemd status
+
+# Stop and uninstall the timer:
+rh-support-cli systemd uninstall
+```
 ### 5.11 Querying Unread Updates (`updates`)
 Inspects what changed across your tracked cases since your last checkpoint:
 

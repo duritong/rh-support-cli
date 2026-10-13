@@ -3854,6 +3854,66 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 self.env["XDG_STATE_HOME"] = orig_state
             shutil.rmtree(temp_home)
 
+    def test_systemd_install_and_management_commands(self):
+        """Test dedicated install-systemd and systemd install/status/uninstall commands."""
+        import shutil
+        import tempfile
+
+        temp_home = tempfile.mkdtemp()
+        orig_home = self.env.get("HOME")
+        orig_config = self.env.get("XDG_CONFIG_HOME")
+        self.env["HOME"] = temp_home
+        self.env["XDG_CONFIG_HOME"] = os.path.join(temp_home, ".config")
+        service_path = os.path.join(
+            temp_home, ".config", "systemd", "user", "rh-support-sync.service"
+        )
+        timer_path = os.path.join(
+            temp_home, ".config", "systemd", "user", "rh-support-sync.timer"
+        )
+        try:
+            # 1. install-systemd with --interval 30m and --notify
+            res_install = self.run_cli(
+                ["install-systemd", "--interval", "30m", "--notify"]
+            )
+            self.assertEqual(res_install.returncode, 0)
+            self.assertIn("Installed systemd user service:", res_install.stdout)
+            self.assertIn("Installed systemd user timer:", res_install.stdout)
+            self.assertIn("Desktop notifications:", res_install.stdout)
+            self.assertTrue(os.path.exists(service_path))
+            self.assertTrue(os.path.exists(timer_path))
+            with open(service_path) as f:
+                s_content = f.read()
+                self.assertIn("--notify", s_content)
+            with open(timer_path) as f:
+                t_content = f.read()
+                self.assertIn("OnUnitActiveSec=30m", t_content)
+
+            # 2. systemd status
+            res_status = self.run_cli(["systemd", "status"])
+            self.assertEqual(res_status.returncode, 0)
+            self.assertIn("Timer unit:   Installed", res_status.stdout)
+            self.assertIn("Service unit: Installed", res_status.stdout)
+
+            # 3. systemd uninstall
+            res_uninstall = self.run_cli(["systemd", "uninstall"])
+            self.assertEqual(res_uninstall.returncode, 0)
+            self.assertIn("uninstalled", res_uninstall.stdout)
+            self.assertFalse(os.path.exists(service_path))
+            self.assertFalse(os.path.exists(timer_path))
+
+            # 4. systemd install subcommand
+            res_sub_install = self.run_cli(["systemd", "install", "--interval", "5m"])
+            self.assertEqual(res_sub_install.returncode, 0)
+            self.assertTrue(os.path.exists(timer_path))
+            with open(timer_path) as f:
+                self.assertIn("OnUnitActiveSec=5m", f.read())
+        finally:
+            if orig_home:
+                self.env["HOME"] = orig_home
+            if orig_config:
+                self.env["XDG_CONFIG_HOME"] = orig_config
+            shutil.rmtree(temp_home)
+
     def test_updates_and_show_checkpoint(self):
         """Test updates CLI command and show command with visual checkpoint divider and status banner."""
         import shutil

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import contextlib
-import os
 import shutil
 import subprocess
 import sys
 
+from rh_support_lib.commands.systemd import install_systemd_timer
 from rh_support_lib.constants import COLORS
 from rh_support_lib.services.cases import CaseService
 from rh_support_lib.utils import colorize, is_comment_newer
@@ -15,9 +15,14 @@ def cmd_sync(args, api_client, config=None):
     """Syncs tracked cases against remote GraphQL metadata, detecting updates and new comments."""
     # 1. Systemd unit generator
     if getattr(args, "install_systemd", False):
-        install_systemd_timer(interval=getattr(args, "interval", "15m"))
-        return
+        from rh_support_lib.commands.systemd import install_systemd_timer
 
+        install_systemd_timer(
+            interval=getattr(args, "interval", "15m"),
+            notify=getattr(args, "notify", False),
+            enable=getattr(args, "enable", False),
+        )
+        return
     case_service = CaseService(api_client)
     user = getattr(args, "user", None) or case_service.get_current_user()
     acc = getattr(args, "account", None)
@@ -193,47 +198,9 @@ def send_desktop_notification(title: str, message: str) -> None:
             )
 
 
-def install_systemd_timer(interval: str = "15m") -> None:
-    """Generates and installs systemd user service and timer units."""
-    unit_dir = os.path.expanduser("~/.config/systemd/user")
-    os.makedirs(unit_dir, exist_ok=True)
-
-    cli_bin = sys.argv[0]
-    if not os.path.isabs(cli_bin):
-        cli_bin = shutil.which(cli_bin) or os.path.abspath(cli_bin)
-
-    service_content = f"""[Unit]
-Description=Red Hat Support Case Periodic Sync Service
-After=network-online.target
-
-[Service]
-Type=oneshot
-ExecStart={cli_bin} sync
-Environment=PYTHONUNBUFFERED=1
-"""
-
-    timer_content = f"""[Unit]
-Description=Periodic Red Hat Support Case Sync Timer
-
-[Timer]
-OnBootSec=2min
-OnUnitActiveSec={interval}
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-"""
-
-    service_path = os.path.join(unit_dir, "rh-support-sync.service")
-    timer_path = os.path.join(unit_dir, "rh-support-sync.timer")
-
-    with open(service_path, "w") as f:
-        f.write(service_content)
-    with open(timer_path, "w") as f:
-        f.write(timer_content)
-
-    print(f"Installed systemd user service: {service_path}")
-    print(f"Installed systemd user timer:   {timer_path} (interval: {interval})\n")
-    print("To enable and start the timer, run:")
-    print("  systemctl --user daemon-reload")
-    print("  systemctl --user enable --now rh-support-sync.timer")
+__all__ = [
+    "cmd_sync",
+    "cmd_updates",
+    "install_systemd_timer",
+    "send_desktop_notification",
+]

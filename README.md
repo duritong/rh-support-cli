@@ -63,8 +63,10 @@ rh-support-cli comment -c 12345678 -f update.md -s redhat
 
 # 6. Launch the interactive split-pane dashboard:
 rh-support-cli tui
-```
 
+# 7. Install regular background sync timer (runs every 15 min with desktop alerts):
+rh-support-cli install-systemd --enable --notify
+```
 ---
 
 ## Documentation Directory
