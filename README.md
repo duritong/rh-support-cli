@@ -147,19 +147,25 @@ rh-support-cli create \
   --attachment /var/log/dmesg
 ```
 
-### 5. Attach a File (`attach`)
+### 5. Attach a File (`attach` / `attachment upload`)
 
-Uploads a file to an existing support case.
+Uploads a file to an existing support case directly using presigned storage URLs and handles multipart upload for large files (> 5 GB).
+
+**No Manual Splitting Needed**: Files larger than 5 GB (up to **5 TB**, such as large core dumps, `vmcore` archives, or multi-gigabyte log bundles) are **automatically handled via multipart uploads**. You do not need to manually run `split -b`.
 
 **Options:**
 - `-c`, `--case`: The Case Number (required)
 - `-f`, `--file`: Path to the file to attach (required)
+- `-d`, `--description`: Optional description of the attachment
 
-**Example:**
+**Examples:**
 ```bash
+# Attach a standard diagnostic bundle:
 rh-support-cli attach -c 12345678 -f /tmp/sosreport.tar.xz
-```
 
+# Attach a massive 20 GB vmcore archive (automatically uses multipart streaming):
+rh-support-cli attach -c 12345678 -f /var/crash/vmcore.tar.gz -d "Kernel panic memory dump"
+```
 ### 6. List Attachments (`list-attachments` / `attachments`)
 
 Lists all file attachments uploaded to a support case, displaying their UUID, filename, size, uploader, date, and upload status.

@@ -301,12 +301,18 @@ rh-support-cli create --summary "Kernel Panic" --description-file ./panic.log --
     rh-support-cli attachments 12345678
     rh-support-cli attachment -c 12345678 list [--include-deleted]
     ```
-*   **Upload Attachments**:
+*   **Upload Attachments (`attach` / `attachment upload`)**:
     ```bash
-    rh-support-cli attachment -c 12345678 upload -f /path/to/sosreport.tar.xz [-d "Sosreport after OOM"]
-    # Shortcut:
     rh-support-cli attach -c 12345678 -f /path/to/sosreport.tar.xz
+    # or using the attachment command group with an optional description:
+    rh-support-cli attachment -c 12345678 upload -f /path/to/sosreport.tar.xz -d "Sosreport after OOM"
     ```
+
+    #### Automated Multipart Upload for Large Files (> 5 GB up to 5 TB)
+    Under the v3 Attachment Service ([API Guide](https://access.redhat.com/articles/7146201)), files exceeding 5 GB are **automatically split and uploaded using multipart storage transfers**.
+    * **No Manual `split` Required**: You do not need to manually run `split -b 5G` or `split -b 1024M` on large disk dumps or archives. The CLI automatically calculates the required chunks, requests presigned part URLs, and streams each chunk sequentially.
+    * **Live Progress Reporting**: In interactive terminals, a live Rich progress bar reports real-time transfer speed (MB/s), elapsed and remaining time, and overall progress percentage. In `--simple-output` mode, uploads run quietly for logging.
+    * **Clean Abort on Failure**: If an upload is cancelled (`Ctrl+C`) or encounters a network error midway, the CLI automatically calls the server's abort endpoint (`DELETE /v3/cases/attachments/upload/abort`) to clean up the storage session.
 *   **Download Attachment**:
     ```bash
     rh-support-cli attachment -c 12345678 download -a <ATTACHMENT_UUID_OR_FILENAME> [-o /path/to/destination.tar.xz]

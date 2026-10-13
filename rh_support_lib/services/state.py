@@ -110,7 +110,9 @@ class StateService:
             data.setdefault("users", {})
 
             # Write to temp file in same directory and atomic rename
-            fd, temp_path = tempfile.mkstemp(dir=dir_name, prefix="state_", suffix=".tmp")
+            fd, temp_path = tempfile.mkstemp(
+                dir=dir_name, prefix="state_", suffix=".tmp"
+            )
             try:
                 with open(fd, "w") as f:
                     yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)

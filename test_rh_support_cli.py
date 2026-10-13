@@ -536,9 +536,7 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                                     "Body__c": {
                                         "value": "Dynamic new comment from support"
                                     },
-                                    "CreatedBy": {
-                                        "Name": {"value": "Red Hat Support"}
-                                    },
+                                    "CreatedBy": {"Name": {"value": "Red Hat Support"}},
                                     "LastModifiedByName__c": {
                                         "value": "Red Hat Support"
                                     },
@@ -650,7 +648,9 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                         filters_received.append(f"OWN={own}")
                 if "Subject" in where_clause:
                     subj = where_clause["Subject"]
-                    sub_val = subj.get("like", "") if isinstance(subj, dict) else str(subj)
+                    sub_val = (
+                        subj.get("like", "") if isinstance(subj, dict) else str(subj)
+                    )
                     clean_sub = sub_val.replace("%", "")
                     filters_received.append(f"SUBJ={clean_sub}")
                 if "CaseNumber__c" in where_clause:
@@ -763,7 +763,15 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-type", "application/json")
             self.end_headers()
-            if filesize > 5368709120:
+            if filesize > 5368709120 or "totalChunks" in data:
+                total_chunks = max(1, data.get("totalChunks", 2))
+                parts = [
+                    {
+                        "partNumber": i + 1,
+                        "presignedUrl": f"http://{host}/mock-storage/{attach_uuid}?partNumber={i + 1}",
+                    }
+                    for i in range(total_chunks)
+                ]
                 self.wfile.write(
                     json.dumps(
                         {
@@ -771,16 +779,7 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                             "uploadStrategy": "MULTIPART",
                             "uploadId": "upload_id_123",
                             "expirationTime": "2026-12-31T23:59:59.000Z",
-                            "parts": [
-                                {
-                                    "partNumber": 1,
-                                    "presignedUrl": f"http://{host}/mock-storage/{attach_uuid}?partNumber=1",
-                                },
-                                {
-                                    "partNumber": 2,
-                                    "presignedUrl": f"http://{host}/mock-storage/{attach_uuid}?partNumber=2",
-                                },
-                            ],
+                            "parts": parts,
                         }
                     ).encode()
                 )
@@ -1025,7 +1024,8 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_DELETE(self):
-        # Check Authorization header
+        content_length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(content_length) if content_length > 0 else b""
         auth_header = self.headers.get("Authorization")
         if auth_header != "Bearer mock_access_token_123":
             self.send_response(401)
@@ -1041,6 +1041,9 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
 
         # DELETE /v3/cases/attachments/upload/abort
         if "/attachments/upload/abort" in self.path:
+            MockRedHatHandler.last_aborted_upload = (
+                json.loads(body.decode()) if body else {}
+            )
             self.send_response(200)
             self.send_header("Content-type", "application/json")
             self.end_headers()
@@ -2053,9 +2056,12 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
             self.assertNotIn("# Header 1", body)
             from rh_support_lib.utils import clean_comment_body
+
             self.assertNotIn("# Header 1", body)
             self.assertNotIn("# Header 2", body)
-            self.assertEqual(clean_comment_body(body), "Actual Content\n\n# Not a header")
+            self.assertEqual(
+                clean_comment_body(body), "Actual Content\n\n# Not a header"
+            )
         finally:
             if os.path.exists(file_path):
                 os.remove(file_path)
@@ -2113,8 +2119,11 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
             # Verify payload submitted was the EDITED content
             from rh_support_lib.utils import clean_comment_body
+
             payload = MockRedHatHandler.last_comment_payload
-            self.assertEqual(clean_comment_body(payload.get("commentBody")), "Edited Content")
+            self.assertEqual(
+                clean_comment_body(payload.get("commentBody")), "Edited Content"
+            )
 
         finally:
             if os.path.exists(fake_editor_path):
@@ -2959,6 +2968,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 case_data = json.load(f)
             self.assertEqual(case_data["summary"], "Synthetic Test Summary")
             from rh_support_lib.utils import clean_comment_body
+
             self.assertEqual(
                 clean_comment_body(case_data["description"].strip()),
                 "A brand new synthetic mock issue description.",
@@ -4625,7 +4635,6 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
         asyncio.run(run_post_comment_test())
 
-
     def test_is_comment_newer_iso_parsing(self):
         """Test ISO 8601 parsing across various timezone and fractional second formats."""
         from rh_support_lib.utils import is_comment_newer, parse_iso_datetime
@@ -4835,7 +4844,9 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             f.write("Line 1\nLine 2\n\n```bash\necho hello\n```")
 
         try:
-            res_md = self.run_cli(["comment", "-c", "12345", "-f", "test_md_comment.txt"])
+            res_md = self.run_cli(
+                ["comment", "-c", "12345", "-f", "test_md_comment.txt"]
+            )
             self.assertEqual(res_md.returncode, 0)
             payload_md = MockRedHatHandler.last_comment_payload
             self.assertIn("<p>Line 1<br />\nLine 2</p>", payload_md["commentBody"])
@@ -4846,26 +4857,55 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 f.write("Plain line 1\nPlain line 2\n\nParagraph 2 with <tag>")
 
             res_plain = self.run_cli(
-                ["comment", "-c", "12345", "-f", "test_plain_comment.txt", "--format", "plain"]
+                [
+                    "comment",
+                    "-c",
+                    "12345",
+                    "-f",
+                    "test_plain_comment.txt",
+                    "--format",
+                    "plain",
+                ]
             )
             self.assertEqual(res_plain.returncode, 0)
             payload_plain = MockRedHatHandler.last_comment_payload
-            self.assertIn("<p>Plain line 1<br />Plain line 2</p>", payload_plain["commentBody"])
+            self.assertIn(
+                "<p>Plain line 1<br />Plain line 2</p>", payload_plain["commentBody"]
+            )
             self.assertIn("&lt;tag&gt;", payload_plain["commentBody"])
 
             # 3. Test comment with --format raw: sends verbatim string
             res_raw = self.run_cli(
-                ["comment", "-c", "12345", "-f", "test_plain_comment.txt", "--format", "raw"]
+                [
+                    "comment",
+                    "-c",
+                    "12345",
+                    "-f",
+                    "test_plain_comment.txt",
+                    "--format",
+                    "raw",
+                ]
             )
             self.assertEqual(res_raw.returncode, 0)
             payload_raw = MockRedHatHandler.last_comment_payload
-            self.assertEqual(payload_raw["commentBody"], "Plain line 1\nPlain line 2\n\nParagraph 2 with <tag>")
+            self.assertEqual(
+                payload_raw["commentBody"],
+                "Plain line 1\nPlain line 2\n\nParagraph 2 with <tag>",
+            )
 
             # 4. Test comment with --format html: sends verbatim HTML
             with open("test_html_comment.txt", "w") as f:
                 f.write("<p>Custom HTML</p><br/>")
             res_html = self.run_cli(
-                ["comment", "-c", "12345", "-f", "test_html_comment.txt", "--format", "html"]
+                [
+                    "comment",
+                    "-c",
+                    "12345",
+                    "-f",
+                    "test_html_comment.txt",
+                    "--format",
+                    "html",
+                ]
             )
             self.assertEqual(res_html.returncode, 0)
             payload_html = MockRedHatHandler.last_comment_payload
@@ -4873,11 +4913,21 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
             # 5. Test close with --format plain
             res_close = self.run_cli(
-                ["close", "-c", "12345", "-f", "test_plain_comment.txt", "--format", "plain"]
+                [
+                    "close",
+                    "-c",
+                    "12345",
+                    "-f",
+                    "test_plain_comment.txt",
+                    "--format",
+                    "plain",
+                ]
             )
             self.assertEqual(res_close.returncode, 0)
             payload_close = MockRedHatHandler.last_comment_payload
-            self.assertIn("<p>Plain line 1<br />Plain line 2</p>", payload_close["commentBody"])
+            self.assertIn(
+                "<p>Plain line 1<br />Plain line 2</p>", payload_close["commentBody"]
+            )
 
             # 6. Test create with --format markdown (default)
             with open("test_create_desc.txt", "w") as f:
@@ -4903,7 +4953,10 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             )
             self.assertEqual(res_create.returncode, 0)
             payload_create = MockRedHatHandler.last_case_payload
-            self.assertIn("<p>Description line 1<br />\nDescription line 2</p>", payload_create.get("Description", ""))
+            self.assertIn(
+                "<p>Description line 1<br />\nDescription line 2</p>",
+                payload_create.get("Description", ""),
+            )
         finally:
             for p in (
                 "test_md_comment.txt",
@@ -4949,7 +5002,10 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         """Test search with --open flag announces opening browser URL."""
         res = self.run_cli(["search", "boot mount", "--type", "kcs", "--open"])
         self.assertEqual(res.returncode, 0)
-        self.assertIn("Opening https://access.redhat.com/solutions/7008126 in browser...", res.stdout)
+        self.assertIn(
+            "Opening https://access.redhat.com/solutions/7008126 in browser...",
+            res.stdout,
+        )
 
     def test_search_local_cache(self):
         """Test search --local searches cached cases across description and comments without hitting network."""
@@ -4993,13 +5049,19 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
     def test_search_structured_output(self):
         """Test search with --format json and yaml."""
-        res_json = self.run_cli(["search", "boot mount", "--type", "kcs", "--format", "json"])
+        res_json = self.run_cli(
+            ["search", "boot mount", "--type", "kcs", "--format", "json"]
+        )
         self.assertEqual(res_json.returncode, 0)
         data = json.loads(res_json.stdout)
         self.assertTrue(isinstance(data, list))
         self.assertTrue(any(d.get("id") == "7008126" for d in data))
-        self.assertTrue(any("https://access.redhat.com/solutions/7008126" in d.get("url", "") for d in data))
-
+        self.assertTrue(
+            any(
+                "https://access.redhat.com/solutions/7008126" in d.get("url", "")
+                for d in data
+            )
+        )
 
     def test_search_kcs_language_and_doc_id(self):
         """Test KCS search omits docs URL as ID, filters non-English by default, and allows --language."""
@@ -5016,7 +5078,9 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 self.assertNotIn("https://docs.redhat.com", line.split()[0])
 
         # 2. Querying with --language ja returns Japanese result
-        res_ja = self.run_cli(["search", "networking", "--type", "kcs", "--language", "ja"])
+        res_ja = self.run_cli(
+            ["search", "networking", "--type", "kcs", "--language", "ja"]
+        )
         self.assertEqual(res_ja.returncode, 0)
         self.assertIn("RHEL 9 ネットワークの設定", res_ja.stdout)
         self.assertIn("https://docs.redhat.com/ja/documentation/", res_ja.stdout)
@@ -5056,12 +5120,16 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             self.assertIn("PROD=Red Hat OpenShift Container Platform", res_bm.stdout)
 
             # 2. --no-default-bookmark skips bookmark filters
-            res_no_bm = self.run_cli(["search", "cert", "--no-default-bookmark", "--format", "json"])
+            res_no_bm = self.run_cli(
+                ["search", "cert", "--no-default-bookmark", "--format", "json"]
+            )
             self.assertEqual(res_no_bm.returncode, 0)
             self.assertNotIn("PROD=Red Hat OpenShift", res_no_bm.stdout)
 
             # 3. CLI override takes precedence over bookmark
-            res_override = self.run_cli(["search", "cert", "--product", "RHEL", "--format", "json"])
+            res_override = self.run_cli(
+                ["search", "cert", "--product", "RHEL", "--format", "json"]
+            )
             self.assertEqual(res_override.returncode, 0)
             self.assertIn("PROD=RHEL", res_override.stdout)
             self.assertNotIn("PROD=Red Hat OpenShift", res_override.stdout)
@@ -5071,5 +5139,131 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             if orig_config:
                 self.env["XDG_CONFIG_HOME"] = orig_config
             shutil.rmtree(temp_home)
+
+    def test_file_part_stream_slicing_and_length(self):
+        """Test FilePartStream streams exact byte slices in blocks with callbacks."""
+        import tempfile
+
+        from rh_support_lib.services.attachments import FilePartStream
+
+        temp_file = tempfile.NamedTemporaryFile(delete=False)  # noqa: SIM115
+        content = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" * 100  # 3600 bytes
+        temp_file.write(content)
+        temp_file.close()
+
+        try:
+            progress_bytes = []
+
+            def on_progress(n: int) -> None:
+                progress_bytes.append(n)
+
+            with FilePartStream(
+                file_path=temp_file.name,
+                start_offset=100,
+                length=500,
+                block_size=128,
+                on_bytes_read=on_progress,
+            ) as stream:
+                self.assertEqual(len(stream), 500)
+                read_data = stream.read()
+                self.assertEqual(len(read_data), 500)
+                self.assertEqual(read_data, content[100:600])
+                self.assertEqual(sum(progress_bytes), 500)
+                self.assertEqual(stream.read(), b"")
+        finally:
+            os.remove(temp_file.name)
+
+    def test_attachment_multipart_streaming_upload(self):
+        """Test automated multipart upload with low-memory streaming and progress tracking."""
+        import tempfile
+
+        from rh_support_lib.api import LegacyAPIClient
+        from rh_support_lib.services.attachments import AttachmentService
+
+        temp_file = tempfile.NamedTemporaryFile(delete=False)  # noqa: SIM115
+        payload_data = b"MOCK_LARGE_MULTIPART_PAYLOAD_CHUNK_" * 100  # ~3500 bytes
+        temp_file.write(payload_data)
+        temp_file.close()
+
+        client = LegacyAPIClient("mock_access_token_123")
+        service = AttachmentService(client, base_url=self.base_url)
+        orig_threshold = AttachmentService.MULTIPART_THRESHOLD
+        AttachmentService.MULTIPART_THRESHOLD = (
+            1000  # Trigger multipart on small test file
+        )
+
+        try:
+            progress_reports = []
+
+            def on_progress(uploaded: int, total: int) -> None:
+                progress_reports.append((uploaded, total))
+
+            att = service.upload_attachment(
+                case_number="12345",
+                file_path=temp_file.name,
+                description="Automated multipart upload test",
+                progress_callback=on_progress,
+            )
+            self.assertIsNotNone(att)
+            self.assertEqual(att.uuid, "att_test_uuid_123")
+            self.assertEqual(att.file_name, os.path.basename(temp_file.name))
+            self.assertTrue(len(progress_reports) > 0)
+            # Final report reached 100%
+            self.assertEqual(progress_reports[-1][0], len(payload_data))
+            self.assertEqual(progress_reports[-1][1], len(payload_data))
+        finally:
+            AttachmentService.MULTIPART_THRESHOLD = orig_threshold
+            os.remove(temp_file.name)
+
+    def test_attachment_multipart_abort_on_put_failure(self):
+        """Test that multipart upload aborts session cleanly if a chunk PUT fails."""
+        import tempfile
+        from unittest.mock import patch
+
+        import requests
+
+        from rh_support_lib.api import LegacyAPIClient
+        from rh_support_lib.services.attachments import AttachmentService
+
+        temp_file = tempfile.NamedTemporaryFile(delete=False)  # noqa: SIM115
+        temp_file.write(b"MOCK_DATA_" * 200)
+        temp_file.close()
+
+        client = LegacyAPIClient("mock_access_token_123")
+        service = AttachmentService(client, base_url=self.base_url)
+        orig_threshold = AttachmentService.MULTIPART_THRESHOLD
+        AttachmentService.MULTIPART_THRESHOLD = 500
+
+        try:
+            # Simulate PUT failure on part upload
+            with (
+                patch(
+                    "requests.put",
+                    side_effect=requests.RequestException(
+                        "Simulated connection timeout"
+                    ),
+                ),
+                self.assertRaises(requests.RequestException),
+            ):
+                service.upload_attachment(
+                    case_number="12345",
+                    file_path=temp_file.name,
+                )
+
+            # Verify abort endpoint was called
+            self.assertIsNotNone(
+                getattr(MockRedHatHandler, "last_aborted_upload", None)
+            )
+            self.assertEqual(
+                MockRedHatHandler.last_aborted_upload.get("uploadId"), "upload_id_123"
+            )
+            self.assertEqual(
+                MockRedHatHandler.last_aborted_upload.get("caseNumber"), "12345"
+            )
+        finally:
+            AttachmentService.MULTIPART_THRESHOLD = orig_threshold
+            os.remove(temp_file.name)
+
+
 if __name__ == "__main__":
     unittest.main()

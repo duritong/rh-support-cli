@@ -146,9 +146,7 @@ def cmd_updates(args, api_client, config=None):
                     )
                     if details and details.comments:
                         last_read_date = (
-                            cp.last_read_comment_date
-                            or cp.marked_read_at
-                            or ""
+                            cp.last_read_comment_date or cp.marked_read_at or ""
                         )
                         last_read_id = cp.last_read_comment_id or ""
                         for comm in details.comments:

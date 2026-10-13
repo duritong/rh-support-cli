@@ -646,7 +646,13 @@ class CaseService:
             all_pages=all_pages,
             limit=limit,
         )
-        if use_cache and not after and not query and self.cache_service.enabled and cases:
+        if (
+            use_cache
+            and not after
+            and not query
+            and self.cache_service.enabled
+            and cases
+        ):
             self.cache_service.set_case_list(cache_key, cases)
         return cases
 
@@ -812,13 +818,21 @@ class CaseService:
 
             c_status = str(case_data.get("status", "")).lower()
             if status:
-                statuses = [str(s).lower() for s in (status if isinstance(status, list) else [status])]
-                if c_status not in statuses and not any(s in c_status for s in statuses):
+                statuses = [
+                    str(s).lower()
+                    for s in (status if isinstance(status, list) else [status])
+                ]
+                if c_status not in statuses and not any(
+                    s in c_status for s in statuses
+                ):
                     continue
 
             c_sev = str(case_data.get("severity", "")).lower()
             if severity:
-                sevs = [str(s).lower() for s in (severity if isinstance(severity, list) else [severity])]
+                sevs = [
+                    str(s).lower()
+                    for s in (severity if isinstance(severity, list) else [severity])
+                ]
                 if c_sev not in sevs and not any(s in c_sev for s in sevs):
                     continue
 
@@ -846,7 +860,12 @@ class CaseService:
                 case_type=case_data.get("case_type", "Standard"),
                 id=case_data.get("id", ""),
                 is_followed=tc.relationship in ("followed", "both") if tc else False,
-                has_unread=(tc.latest_known.unread_comment_count > 0 or tc.latest_known.status_changed) if tc else False,
+                has_unread=(
+                    tc.latest_known.unread_comment_count > 0
+                    or tc.latest_known.status_changed
+                )
+                if tc
+                else False,
                 unread_count=tc.latest_known.unread_comment_count if tc else 0,
             )
             seen.add(c_num)
@@ -1550,7 +1569,9 @@ class CaseService:
         def sync_one(c_num: str) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
             tc = tracked[c_num]
             try:
-                details = self.get_case_details(c_num, first_comments=200, use_cache=False)
+                details = self.get_case_details(
+                    c_num, first_comments=200, use_cache=False
+                )
                 if not details:
                     return None, None
 
@@ -1594,7 +1615,9 @@ class CaseService:
                 case_update = {
                     "case_number": c_num,
                     "summary": details.case.summary if details.case else "",
-                    "account_number": details.case.account_number if details.case else "",
+                    "account_number": details.case.account_number
+                    if details.case
+                    else "",
                     "status": status,
                     "severity": severity,
                     "last_modified_date": last_mod,
@@ -1627,7 +1650,9 @@ class CaseService:
             results = list(executor.map(sync_one, list(tracked.keys())))
 
         case_updates = [r[0] for r in results if r and r[0]]
-        self.state_service.batch_update_latest_known(user=user, case_updates=case_updates)
+        self.state_service.batch_update_latest_known(
+            user=user, case_updates=case_updates
+        )
 
         updated = [r[1] for r in results if r and r[1]]
         total_new_comments = sum(r["new_comment_count"] for r in updated)

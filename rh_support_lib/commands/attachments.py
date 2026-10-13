@@ -126,7 +126,46 @@ def cmd_attachment_upload(args, api_client):
         fname = os.path.basename(fpath)
         print(f"Attaching '{fname}' to Case #{case_num}...")
         try:
-            service.upload_attachment(case_num, fpath, description=description)
+            simple = getattr(args, "simple_output", False)
+            fsize = os.path.getsize(fpath)
+
+            if not simple and sys.stdout.isatty():
+                from rich.progress import (
+                    BarColumn,
+                    DownloadColumn,
+                    Progress,
+                    SpinnerColumn,
+                    TextColumn,
+                    TimeRemainingColumn,
+                    TransferSpeedColumn,
+                )
+
+                with Progress(
+                    SpinnerColumn(),
+                    TextColumn("[bold blue]{task.fields[filename]}"),
+                    BarColumn(bar_width=None),
+                    "[progress.percentage]{task.percentage:>3.1f}%",
+                    "•",
+                    DownloadColumn(),
+                    "•",
+                    TransferSpeedColumn(),
+                    "•",
+                    TimeRemainingColumn(),
+                    transient=True,
+                ) as progress:
+                    task_id = progress.add_task("upload", total=fsize, filename=fname)
+
+                    def on_progress(uploaded: int, total: int, tid=task_id) -> None:
+                        progress.update(tid, completed=uploaded, total=total)
+
+                    service.upload_attachment(
+                        case_num,
+                        fpath,
+                        description=description,
+                        progress_callback=on_progress,
+                    )
+            else:
+                service.upload_attachment(case_num, fpath, description=description)
             print(f"Success: File '{fname}' attached.")
         except Exception as e:  # noqa: BLE001
             print(f"Network Error while uploading '{fname}': {e}")

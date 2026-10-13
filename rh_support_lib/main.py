@@ -572,7 +572,9 @@ Authentication:
     parser_search = subparsers.add_parser(
         "search", help="Search support cases and Red Hat Knowledgebase (KCS) solutions"
     )
-    parser_search.add_argument("query", help="Search keywords, error message, or case number")
+    parser_search.add_argument(
+        "query", help="Search keywords, error message, or case number"
+    )
     parser_search.add_argument(
         "-t",
         "--type",
@@ -590,7 +592,9 @@ Authentication:
         "--severity", help="Filter cases by severity (e.g. urgent, high, normal, low)"
     )
     parser_search.add_argument("-a", "--account", help="Filter cases by account number")
-    parser_search.add_argument("-u", "--owner", help="Filter cases by owner name or SSO")
+    parser_search.add_argument(
+        "-u", "--owner", help="Filter cases by owner name or SSO"
+    )
     parser_search.add_argument(
         "-l",
         "--limit",

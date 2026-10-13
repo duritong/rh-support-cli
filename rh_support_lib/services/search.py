@@ -82,23 +82,15 @@ class SearchService:
             if not isinstance(doc, dict):
                 continue
             doc_id = str(
-                doc.get("id")
-                or doc.get("documentId")
-                or doc.get("solution_id")
-                or ""
+                doc.get("id") or doc.get("documentId") or doc.get("solution_id") or ""
             ).strip()
             title = str(doc.get("title") or doc.get("summary") or "").strip()
             summary = str(doc.get("summary") or doc.get("abstract") or "").strip()
             doc_kind = str(
-                doc.get("documentKind")
-                or doc.get("document_kind")
-                or "Solution"
+                doc.get("documentKind") or doc.get("document_kind") or "Solution"
             ).strip()
             view_uri = str(
-                doc.get("view_uri")
-                or doc.get("uri")
-                or doc.get("url")
-                or ""
+                doc.get("view_uri") or doc.get("uri") or doc.get("url") or ""
             ).strip()
 
             # If doc_id is a URL or documentation path, migrate to view_uri and clear doc_id
@@ -109,13 +101,27 @@ class SearchService:
 
             # Client-side language filtering to prevent untranslated/foreign results
             if target_lang and target_lang not in ("all", "*"):
-                doc_lang = str(doc.get("language") or doc.get("locale") or "").strip().lower()
+                doc_lang = (
+                    str(doc.get("language") or doc.get("locale") or "").strip().lower()
+                )
                 if doc_lang and not doc_lang.startswith(target_lang):
                     continue
                 view_lower = view_uri.lower()
                 if target_lang == "en" and any(
                     f"/{code}/" in view_lower
-                    for code in ("ja", "zh", "zh_cn", "zh-cn", "ko", "de", "fr", "es", "pt", "it", "ru")
+                    for code in (
+                        "ja",
+                        "zh",
+                        "zh_cn",
+                        "zh-cn",
+                        "ko",
+                        "de",
+                        "fr",
+                        "es",
+                        "pt",
+                        "it",
+                        "ru",
+                    )
                 ):
                     continue
             prod_val = doc.get("product") or doc.get("products") or ""
@@ -125,9 +131,7 @@ class SearchService:
                 prod_str = str(prod_val)
 
             pub_date = str(
-                doc.get("published_date")
-                or doc.get("last_modified_date")
-                or ""
+                doc.get("published_date") or doc.get("last_modified_date") or ""
             ).strip()
 
             results.append(
@@ -155,7 +159,9 @@ class SearchService:
         local_only: bool = False,
     ) -> dict[str, list[Any]]:
         """Searches both support cases and KCS solutions."""
-        cases = self.search_cases(query=query, product=product, limit=limit, local_only=local_only)
+        cases = self.search_cases(
+            query=query, product=product, limit=limit, local_only=local_only
+        )
         kcs = (
             []
             if local_only

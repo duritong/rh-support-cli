@@ -4,6 +4,7 @@ import contextlib
 import os
 import re
 from collections.abc import Callable
+from typing import ClassVar
 
 import requests
 
@@ -11,8 +12,56 @@ from rh_support_lib.constants import ATTACHMENT_API_URL
 from rh_support_lib.models import Attachment
 
 
+class FilePartStream:
+    """Streams a byte slice of a file in small blocks without reading the entire part into memory."""
+
+    def __init__(
+        self,
+        file_path: str,
+        start_offset: int,
+        length: int,
+        block_size: int = 8 * 1024 * 1024,
+        on_bytes_read: Callable[[int], None] | None = None,
+    ):
+        self.file_path = file_path
+        self.start_offset = start_offset
+        self.length = length
+        self.block_size = block_size
+        self.on_bytes_read = on_bytes_read
+        self._bytes_sent = 0
+        self._file = open(file_path, "rb")  # noqa: SIM115
+        self._file.seek(start_offset)
+
+    def __len__(self) -> int:
+        return self.length
+
+    def read(self, size: int = -1) -> bytes:
+        if self._bytes_sent >= self.length:
+            return b""
+        remaining = self.length - self._bytes_sent
+        to_read = remaining if size < 0 else min(size, remaining)
+        data = self._file.read(to_read)
+        if data:
+            self._bytes_sent += len(data)
+            if self.on_bytes_read:
+                self.on_bytes_read(len(data))
+        return data
+
+    def close(self) -> None:
+        if self._file and not self._file.closed:
+            self._file.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.close()
+
+
 class AttachmentService:
     """Service to handle all support case file attachment operations via the v3 Attachment API."""
+
+    MULTIPART_THRESHOLD: ClassVar[int] = 5368709120  # 5 GB
 
     def __init__(
         self,
@@ -149,6 +198,22 @@ class AttachmentService:
         resp.raise_for_status()
         return True
 
+    def abort_upload(
+        self, case_number: str, attachment_id: str, upload_id: str
+    ) -> bool:
+        """Aborts an in-progress multipart upload session."""
+        abort_url = f"{self.base_url}/v3/cases/attachments/upload/abort"
+        payload = {
+            "attachmentId": attachment_id,
+            "caseNumber": str(case_number),
+            "uploadId": upload_id,
+        }
+        try:
+            resp = self.api_client.delete(abort_url, json=payload)
+            return resp.status_code in (200, 204)
+        except Exception:  # noqa: BLE001
+            return False
+
     def upload_attachment(
         self,
         case_number: str,
@@ -173,8 +238,8 @@ class AttachmentService:
             "clientId": client_id,
             "description": description,
         }
-        if file_size > 5368709120:  # > 5 GB
-            chunk_size = 5368709120
+        if file_size > self.MULTIPART_THRESHOLD:  # > 5 GB
+            chunk_size = self.MULTIPART_THRESHOLD
             total_chunks = (file_size + chunk_size - 1) // chunk_size
             payload["totalChunks"] = total_chunks
 
@@ -193,17 +258,31 @@ class AttachmentService:
                     "SINGLE_PUT strategy specified but presignedUrl missing."
                 )
 
-            with open(file_path, "rb") as f:
-                put_headers = {"Content-Type": "application/octet-stream"}
+            uploaded_bytes = 0
+
+            def handle_single_progress(n: int) -> None:
+                nonlocal uploaded_bytes
+                uploaded_bytes += n
+                if progress_callback:
+                    progress_callback(uploaded_bytes, file_size)
+
+            with FilePartStream(
+                file_path=file_path,
+                start_offset=0,
+                length=file_size,
+                on_bytes_read=handle_single_progress,
+            ) as stream:
+                put_headers = {
+                    "Content-Type": "application/octet-stream",
+                    "Content-Length": str(file_size),
+                }
                 put_resp = requests.put(
                     presigned_url,
-                    data=f,
+                    data=stream,
                     headers=put_headers,
                     timeout=(30, 3600),
                 )
                 put_resp.raise_for_status()
-                if progress_callback:
-                    progress_callback(file_size, file_size)
 
         elif strategy == "MULTIPART":
             upload_id = init_data.get("uploadId")
@@ -214,41 +293,67 @@ class AttachmentService:
                 )
 
             parts_result = []
-            chunk_size = file_size // len(parts) if parts else file_size
+            num_parts = len(parts)
+            chunk_size = (
+                self.MULTIPART_THRESHOLD
+                if num_parts > 1 and file_size > self.MULTIPART_THRESHOLD
+                else (file_size + num_parts - 1) // num_parts
+            )
             uploaded_bytes = 0
 
-            with open(file_path, "rb") as f:
-                for part in parts:
-                    part_num = part.get("partNumber", 1)
+            def handle_chunk_progress(n: int) -> None:
+                nonlocal uploaded_bytes
+                uploaded_bytes += n
+                if progress_callback:
+                    progress_callback(uploaded_bytes, file_size)
+
+            try:
+                for idx, part in enumerate(parts):
+                    part_num = part.get("partNumber", idx + 1)
                     part_url = part.get("presignedUrl")
-                    part_data = f.read(chunk_size)
+                    if not part_url:
+                        raise RuntimeError(f"Missing presignedUrl for part {part_num}")
 
-                    put_headers = {"Content-Type": "application/octet-stream"}
-                    put_resp = requests.put(
-                        part_url,
-                        data=part_data,
-                        headers=put_headers,
-                        timeout=(30, 3600),
-                    )
-                    put_resp.raise_for_status()
+                    start_offset = idx * chunk_size
+                    part_length = min(chunk_size, max(0, file_size - start_offset))
+                    if part_length <= 0:
+                        break
 
-                    etag = put_resp.headers.get("ETag", "").strip('"')
-                    parts_result.append({"partNumber": part_num, "eTag": etag})
-                    uploaded_bytes += len(part_data)
-                    if progress_callback:
-                        progress_callback(uploaded_bytes, file_size)
+                    with FilePartStream(
+                        file_path=file_path,
+                        start_offset=start_offset,
+                        length=part_length,
+                        on_bytes_read=handle_chunk_progress,
+                    ) as part_stream:
+                        put_headers = {
+                            "Content-Type": "application/octet-stream",
+                            "Content-Length": str(part_length),
+                        }
+                        put_resp = requests.put(
+                            part_url,
+                            data=part_stream,
+                            headers=put_headers,
+                            timeout=(30, 3600),
+                        )
+                        put_resp.raise_for_status()
 
-            # 3. Complete multipart upload
-            complete_url = f"{self.base_url}/v3/cases/attachments/upload/complete"
-            comp_payload = {
-                "attachmentId": attachment_id,
-                "caseNumber": str(case_number),
-                "uploadId": upload_id,
-                "parts": parts_result,
-            }
-            comp_resp = self.api_client.post(complete_url, json=comp_payload)
-            comp_resp.raise_for_status()
+                        etag = put_resp.headers.get("ETag", "").strip('"')
+                        parts_result.append({"partNumber": part_num, "eTag": etag})
 
+                # 3. Complete multipart upload
+                complete_url = f"{self.base_url}/v3/cases/attachments/upload/complete"
+                comp_payload = {
+                    "attachmentId": attachment_id,
+                    "caseNumber": str(case_number),
+                    "uploadId": upload_id,
+                    "parts": parts_result,
+                }
+                comp_resp = self.api_client.post(complete_url, json=comp_payload)
+                comp_resp.raise_for_status()
+            except (Exception, KeyboardInterrupt):
+                with contextlib.suppress(Exception):
+                    self.abort_upload(case_number, attachment_id, upload_id)
+                raise
         size_kb = round(file_size / 1024.0, 1)
         return Attachment(
             uuid=attachment_id,

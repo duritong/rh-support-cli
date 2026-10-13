@@ -87,7 +87,6 @@ class ProductItem:
     parent_id: str | None = None
 
 
-
 @dataclass
 class KCSSearchResult:
     """Represents a Knowledgebase (KCS) solution or article search result."""
@@ -103,7 +102,9 @@ class KCSSearchResult:
 
     def __post_init__(self) -> None:
         # If id is a URL or documentation path, migrate it to url and omit id to avoid confusion
-        if self.id and (self.id.startswith(("http://", "https://", "/", "www.")) or "/" in self.id):
+        if self.id and (
+            self.id.startswith(("http://", "https://", "/", "www.")) or "/" in self.id
+        ):
             if not self.url and not self.view_uri:
                 self.url = self.id
             self.id = ""
@@ -118,6 +119,7 @@ class KCSSearchResult:
                     else "solutions"
                 )
                 self.url = f"https://access.redhat.com/{path}/{self.id}"
+
 
 @dataclass
 class CaseCheckpoint:

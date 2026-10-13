@@ -45,8 +45,16 @@ def cmd_search(args, api_client, config: dict[str, Any] | None = None) -> None:
 
     # CLI Overrides take precedence over bookmarks
     product = getattr(args, "product", None) or filters.get("product")
-    account = getattr(args, "account", None) or filters.get("account") or filters.get("accountNumber")
-    owner = getattr(args, "owner", None) or filters.get("owner") or filters.get("ownerSSOName")
+    account = (
+        getattr(args, "account", None)
+        or filters.get("account")
+        or filters.get("accountNumber")
+    )
+    owner = (
+        getattr(args, "owner", None)
+        or filters.get("owner")
+        or filters.get("ownerSSOName")
+    )
 
     raw_status = getattr(args, "status", None) or filters.get("status")
     mapped_statuses = None
@@ -125,7 +133,9 @@ def cmd_search(args, api_client, config: dict[str, Any] | None = None) -> None:
             out_data = kcs
         else:
             out_data = {"cases": cases, "kcs": kcs}
-        print(format_structured_output(out_data, fmt="yaml" if fmt == "yaml" else "json"))
+        print(
+            format_structured_output(out_data, fmt="yaml" if fmt == "yaml" else "json")
+        )
         return
 
     # Check empty results
@@ -162,7 +172,9 @@ def cmd_search(args, api_client, config: dict[str, Any] | None = None) -> None:
     # Render Cases Table
     if cases:
         if search_type == "all":
-            console.print("\n[bold cyan]── SUPPORT CASES ──────────────────────────────[/bold cyan]")
+            console.print(
+                "\n[bold cyan]── SUPPORT CASES ──────────────────────────────[/bold cyan]"
+            )
         table_c = Table(
             show_header=True,
             header_style="bold magenta" if not simple else "",
@@ -193,7 +205,9 @@ def cmd_search(args, api_client, config: dict[str, Any] | None = None) -> None:
                     cnt = getattr(c, "unread_count", 0)
                     num_col.append(f" ●{cnt}" if cnt else " ●", style="bold cyan")
 
-            case_url = getattr(c, "url", f"https://access.redhat.com/support/cases/{num}")
+            case_url = getattr(
+                c, "url", f"https://access.redhat.com/support/cases/{num}"
+            )
             url_col = case_url if simple else Text(case_url, style=f"link {case_url}")
 
             table_c.add_row(
@@ -209,7 +223,9 @@ def cmd_search(args, api_client, config: dict[str, Any] | None = None) -> None:
     # Render KCS Table
     if kcs:
         if search_type == "all":
-            console.print("\n[bold cyan]── KNOWLEDGEBASE (KCS) SOLUTIONS ──────────────[/bold cyan]")
+            console.print(
+                "\n[bold cyan]── KNOWLEDGEBASE (KCS) SOLUTIONS ──────────────[/bold cyan]"
+            )
         table_k = Table(
             show_header=True,
             header_style="bold green" if not simple else "",
