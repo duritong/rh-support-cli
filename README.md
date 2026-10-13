@@ -1,590 +1,99 @@
-# Red Hat Support Case CLI
+# Red Hat Support Case CLI (`rh-support-cli`)
 
-A command-line interface tool to interact with the Red Hat Support Case API. This tool allows you to create new cases, attach files, and post comments/updates to existing cases directly from your terminal.
+A modern, developer-centric command-line interface and interactive Terminal User Interface (TUI) to manage, troubleshoot, and coordinate Red Hat support tickets directly from your shell.
 
-## Installation
+---
 
-You can install the tool and its dependencies using `pip`. This will install the `rh-support-cli` command to your system (e.g., `/usr/local/bin`) and the library files to your Python site-packages.
+## Overview & Core Capabilities
+
+The `rh-support-cli` tool bridges the gap between local system operations and the official Red Hat Customer Portal, enabling platform engineers, SREs, and system administrators to manage support cases with zero friction:
+
+* **Case Management**: Create, view, list, comment on, and close support tickets directly from the terminal.
+* **Unified Search**: Search across your account's support cases and the Red Hat Knowledgebase (KCS) technical solutions and articles, with clickable browser links.
+* **Large File Attachments**: Upload diagnostic bundles and log archives up to 5 TB with **automated multipart streaming** (<50 MB RAM usage) and live progress bars. No manual file splitting needed.
+* **Local Case Tracking & Background Sync**: Follow tickets locally, track read checkpoints, and receive desktop notifications on new comments or status transitions via background timers.
+* **Rich Text / Markdown Formatting**: Author comments and descriptions in natural Markdown; the CLI automatically formats them into portal-compliant rich text (HTML) to preserve line breaks and code formatting in the Customer Portal web UI.
+* **Interactive Terminal User Interface (TUI)**: A responsive, split-pane dashboard (`tui`) featuring instant Stale-While-Revalidate (SWR) case rendering, auto-scrolling to unread comments, and full keyboard navigation.
+* **Automation & Sizing Templates**: Pre-fill complex case details and enforce standard fields using Jinja2-compatible YAML templates and filter bookmarks.
+* **Stateful Offline Mock Mode**: Built-in mock portal server (`--mock`) for zero-credential demos and offline scripting.
+
+---
+
+## 5-Minute Quick Start
+
+### 1. Installation
+
+Install the CLI and dependencies using `pip`:
 
 ```bash
-# Install from source
+# Install from source:
 pip install .
 
-# Or for development (editable mode)
+# Or for development (editable mode):
 pip install -e .
 ```
 
-### Dependencies
-The following Python packages are required (automatically installed via pip):
-- `requests`
-- `pyyaml`
-- `jinja2`
-- `dateparser`
+### 2. Authentication
 
-## Authentication
+Generate an Offline Token from the [Red Hat API Portal - Offline Token Generator](https://access.redhat.com/management/api) and export it in your shell:
 
-The tool requires a Red Hat Offline Token to authenticate. You can obtain this from the [Red Hat Customer Portal](https://access.redhat.com/articles/3626371#bgenerating-a-new-offline-tokenb-3).
-
-The tool looks for the token in the following order of priority:
-
-1.  **CLI Argument:** Pass the path to a file containing the token using `--token-file`.
-    ```bash
-    rh-support-cli --token-file /path/to/token.txt list
-    ```
-2.  **Environment Variable:** Set `REDHAT_SUPPORT_OFFLINE_TOKEN`.
-    ```bash
-    export REDHAT_SUPPORT_OFFLINE_TOKEN="your_offline_token_here"
-    ```
-3.  **Config File:** Place the token in `~/.config/rh-support-cli/token`.
-    ```bash
-    mkdir -p ~/.config/rh-support-cli
-    echo "your_offline_token_here" > ~/.config/rh-support-cli/token
-    chmod 600 ~/.config/rh-support-cli/token
-    ```
-4.  **Interactive Prompt:** If none of the above are found, the tool will securely prompt you for the token.
-
-## Usage
-
-If installed via pip:
 ```bash
-rh-support-cli [global options] <subcommand> [options]
+export REDHAT_SUPPORT_OFFLINE_TOKEN="your_offline_token_here"
 ```
 
-Or running the script directly:
+*(You can also save it permanently to `~/.config/rh-support-cli/token` with permissions `600`.)*
+
+### 3. Essential Commands
+
 ```bash
-rh-support-cli [global options] <subcommand> [options]
-```
+# 1. List active support cases:
+rh-support-cli list --status open
 
-**Global Options:**
-- `-j`, `--json`: Output structured results in JSON format (silences banner logs for clean pipe processing).
-- `--format`: Output format: `text` (default), `json`, or `yaml`.
-- `--no-cache`: Bypass reading from and updating local XDG disk cache.
-- `--simple-output`: Disable colored output and visual indicators.
-- `--token-file`: Path to file containing the offline token.
-### 1. List Cases (`list`)
-
-Lists support cases with options to filter by account, status, severity, and owner.
-
-**Options:**
-- `--account`: Account Number
-- `--status`: Filter by status (can be used multiple times)
-- `--severity`: Filter by severity (can be used multiple times)
-- `--owner`: Filter by owner
-- `--bookmark`: Use a filter bookmark from config (can be used multiple times)
-- `--no-default-bookmark`: Ignore default bookmark from config
-- `--all`: Fetch all matching cases across all pages (auto-paginates until exhausted)
-- `--limit`: Maximum number of cases to fetch (default: 100)
-**Examples:**
-
-*List all cases:*
-```bash
-rh-support-cli list
-```
-
-*List high severity cases for a specific account:*
-```bash
-rh-support-cli list --account 12345 --status "Waiting on Red Hat" --severity High
-```
-
-### 2. Show Case Details (`show`)
-
-Displays detailed information about a case, including description and comments (automatically paginates through all comment batches to ensure complete thread history). Output is piped to a pager by default.
-
-**Options:**
-- `-c`, `--case`: The Case Number (required)
-- `--no-pager`: Disable the pager (print to stdout directly)
-- `--mark-read`: Mark this case's updates as read in local tracking
-**Example:**
-```bash
+# 2. View a case, description, and full comment thread:
 rh-support-cli show -c 12345678
-```
 
-### 3. Get Case Link (`link`)
+# 3. Search cases and Knowledgebase (KCS) solutions:
+rh-support-cli search "ingress cert expired" --type all
 
-Generates the browser URL for a specific support case. This command does not require authentication.
-
-**Options:**
-- `-c`, `--case`: The Case Number (required)
-
-**Example:**
-```bash
-rh-support-cli link -c 12345678
-# Output: https://access.redhat.com/support/cases/12345678
-```
-
-### 4. Create a New Case (`create`)
-
-Creates a new support case. If options are omitted, the tool will interactively prompt you for the necessary information, fetching available products and versions from the API.
-
-**Options:**
-- `--product`: Product name (e.g., "Red Hat Enterprise Linux")
-- `--version`: Product version (e.g., "8.4")
-- `--summary`: Short summary of the issue
-- `--description-file`: Path to a file containing the detailed description. If omitted, opens your default `$EDITOR`.
-- `--severity`: Case severity (Low, Normal, High, Urgent)
-- `--type`: Case type (Standard, Bug)
-- `--attachment`: Path to a file to attach. Can be used multiple times.
-- `--no-default-template`: Ignore default create template from config.
-- `--format`: Formatting style for description (`markdown` [default], `plain`, `html`, `raw`). Converts to portal rich text (HTML).
-
-**Examples:**
-
-*Interactive Mode:*
-```bash
-rh-support-cli create
-```
-
-*Non-Interactive Mode:*
-```bash
-rh-support-cli create \
-  --product "Red Hat Enterprise Linux" \
-  --version "8.6" \
-  --summary "Server crash on boot" \
-  --description-file ./crash_log.txt \
-  --severity "High" \
-  --type "Bug" \
-  --attachment /var/log/messages \
-  --attachment /var/log/dmesg
-```
-
-### 5. Attach a File (`attach` / `attachment upload`)
-
-Uploads a file to an existing support case directly using presigned storage URLs and handles multipart upload for large files (> 5 GB).
-
-**No Manual Splitting Needed**: Files larger than 5 GB (up to **5 TB**, such as large core dumps, `vmcore` archives, or multi-gigabyte log bundles) are **automatically handled via multipart uploads**. You do not need to manually run `split -b`.
-
-**Options:**
-- `-c`, `--case`: The Case Number (required)
-- `-f`, `--file`: Path to the file to attach (required)
-- `-d`, `--description`: Optional description of the attachment
-
-**Examples:**
-```bash
-# Attach a standard diagnostic bundle:
+# 4. Attach a diagnostic archive (automatically handles files up to 5 TB):
 rh-support-cli attach -c 12345678 -f /tmp/sosreport.tar.xz
 
-# Attach a massive 20 GB vmcore archive (automatically uses multipart streaming):
-rh-support-cli attach -c 12345678 -f /var/crash/vmcore.tar.gz -d "Kernel panic memory dump"
-```
-### 6. List Attachments (`list-attachments` / `attachments`)
+# 5. Post a Markdown comment and update status:
+rh-support-cli comment -c 12345678 -f update.md -s redhat
 
-Lists all file attachments uploaded to a support case, displaying their UUID, filename, size, uploader, date, and upload status.
-
-**Examples:**
-
-*List attachments using the shortcut or attachments command:*
-```bash
-rh-support-cli list-attachments 12345678
-rh-support-cli attachments 12345678
-rh-support-cli attachment -c 12345678 list
-```
-
-### 7. Download an Attachment (`download`)
-
-Downloads an attachment file from a support case.
-
-**Options:**
-- `-c`, `--case`: The Case Number (required)
-- `-a`, `--attachment`: Attachment UUID or filename (required)
-- `-o`, `--output`: Destination path or filename (default: original filename in current directory)
-
-**Examples:**
-
-*Download an attachment by filename or UUID:*
-```bash
-rh-support-cli download -c 12345678 -a sosreport.tar.xz -o /tmp/sosreport.tar.xz
-```
-
-### 8. Comment & Update Status (`comment`)
-Adds a comment to a case and optionally updates its status.
-
-**Options:**
-- `-c`, `--case`: The Case Number (required)
-- `-f`, `--file`: Path to a file containing the comment text. If omitted, opens `$EDITOR`.
-- `-s`, `--status`: Update case status. Choices: `redhat` (Waiting on Red Hat), `customer` (Waiting on Customer), `closed`. Default: `redhat`.
-- `--format`: Formatting style for comment body (`markdown` [default], `plain`, `html`, `raw`). Default: `markdown`.
-
-**Examples:**
-
-*Add comment from a file and set status to "Waiting on Red Hat":*
-```bash
-rh-support-cli comment -c 12345678 -f response.txt
-```
-
-*Open editor to write comment and close the case:*
-```bash
-rh-support-cli comment -c 12345678 -s closed
-```
-
-### 9. Close a Case (`close`)
-
-Closes an existing support case with a comment. Works identically to `comment`, but automatically sets the status to `closed`.
-
-**Options:**
-- `-c`, `--case`: The Case Number (required)
-- `-f`, `--file`: Path to a file containing the closing comment. If omitted, opens `$EDITOR`.
-- `-t`, `--template`: Name of local template to apply (optional)
-- `--include-previous-comments`: Include the last N comments in the editor header (default: 1)
-- `--edit`: Open editor to edit the content from `--file` before submitting
-- `--format`: Formatting style for closing comment body (`markdown` [default], `plain`, `html`, `raw`). Default: `markdown`.
-
-**Examples:**
-
-*Close a case with an interactive editor prompt:*
-```bash
-rh-support-cli close -c 12345678
-```
-
-*Close a case with comment from a file:*
-```bash
-rh-support-cli close -c 12345678 -f resolution.txt
-```
-
-### Rich Text & Markdown Formatting (`--format`)
-
-In Red Hat Customer Portal case comments and descriptions are stored and displayed as **Rich Text (HTML)** rather than native Markdown or plain text. Unformatted plain-text newlines posted to the portal collapse into whitespace, causing comments to render without line breaks.
-
-`rh-support-cli` automatically formats your comments and descriptions to ensure they look properly formatted both in the terminal and on the Customer Portal web UI:
-
-* **`markdown` (Default)**: Converts GitHub-Flavored Markdown to semantic HTML with soft line breaks enabled:
-  * Single newlines (`\n`) become `<br />` line breaks.
-  * Double newlines (`\n\n`) become `<p>...</p>` paragraphs.
-  * Code blocks (`` ``` ``) become monospace `<pre><code>...</code></pre>` blocks.
-  * Inline code (`` `code` ``) becomes `<code>...</code>`.
-  * Lists, links, and bold/italic markup are properly formatted for web view.
-  * When retrieved back via `show`, `updates`, or the TUI, comments are automatically converted back into clean terminal Markdown.
-* **`plain`**: HTML-escapes all entities and wraps text in `<p>` and `<br />` tags to preserve line breaks and paragraphs without parsing Markdown syntax. Ideal for raw logs or diagnostics containing characters like `*`, `#`, or `_`.
-* **`html`**: Sends verbatim HTML directly to the portal.
-* **`raw`**: Sends the verbatim unformatted string without any HTML tag wrapping or conversion.
-
-**Examples:**
-```bash
-# Post a Markdown-formatted comment (default):
-rh-support-cli comment -c 12345678 -f update.md
-
-# Post raw logs preserving line breaks without Markdown parsing:
-rh-support-cli comment -c 12345678 -f /var/log/messages --format plain
-
-# Close a case with raw plain-text output:
-rh-support-cli close -c 12345678 -f resolution.txt --format raw
-
-# Create a case with plain text paragraph formatting:
-rh-support-cli create --summary "Issue" --description-file ./desc.txt --format plain
-```
-
-### 10. Apply Template (`apply`)
-
-Applies a local YAML template over an existing support case. It compares the template fields with the case's current values, and performs the minimal required API requests to bring the case to the target state.
-
-**Options:**
-- `-c`, `--case`: The Case Number (required)
-- `-t`, `--template`: Name of local template to apply (required, can be used multiple times)
-- `--template-var`: Variables to interpolate in the template (can be used multiple times)
-- `--dry-run`: Show what changes would be applied without actually making them
-
-**Examples:**
-
-*Verify template application without saving (Dry Run):*
-```bash
-rh-support-cli apply -c 12345678 -t prod-standard --dry-run
-```
-
-*Apply template and interpolate template variables:*
-```bash
-rh-support-cli apply -c 12345678 -t project-team --template-var team_lead=alice
-```
-
-### 11. List Local Templates (`list-templates` / `list-template`)
-
-Lists all local templates stored in `~/.config/rh-support-cli/templates/` along with details like their description, fields they configure, and parent templates they include. **Note:** This command runs completely offline and bypasses authentication.
-
-**Example:**
-```bash
-rh-support-cli list-templates
-```
-
-### 12. Following & Tracking Cases Locally (`follow` / `unfollow` / `following`)
-
-Maintain a local tracking register in `~/.local/state/rh-support-cli/state.yaml` (or via `$XDG_STATE_HOME`) to monitor support tickets across CLI and TUI sessions:
-
-```bash
-# Follow one or more cases
-rh-support-cli follow 12345678
-rh-support-cli follow 12345678 23456789
-
-# List all followed cases
-rh-support-cli following
-rh-support-cli list --following
-
-# Unfollow cases
-rh-support-cli unfollow 12345678
-```
-
-### 13. Synchronize Tracked Cases & Background Service (`sync`)
-
-Poll the Red Hat GraphQL API across all followed and owned cases in parallel to detect remote updates:
-
-```bash
-# Manual synchronization
-rh-support-cli sync
-
-# Sync with desktop notification on new comments / status changes
-rh-support-cli sync --notify
-
-# Install systemd user service & timer for background synchronization
-rh-support-cli sync --install-systemd --interval 15m
-systemctl --user daemon-reload
-systemctl --user enable --now rh-support-sync.timer
-```
-
-### 14. Querying Unread Case Updates (`updates`)
-
-Quickly inspect remote changes and new comments across tracked cases:
-
-```bash
-# View excerpt summaries of unread updates
-rh-support-cli updates
-
-# View full comments
-rh-support-cli updates --full
-
-# Mark updates as read
-rh-support-cli updates --mark-read
-```
-
-### 15. Search Cases & Knowledgebase (`search`)
-
-Searches support cases (default) and Red Hat Knowledgebase (KCS) solutions/articles directly from the terminal. All results clearly display their browser URLs for easy reference.
-
-**Options:**
-- `query`: Search keywords, error message, or case number (required positional argument)
-- `-t`, `--type`: Search target: `cases` (default), `kcs` (knowledgebase), or `all` (both)
-- `-b`, `--bookmark`: Apply filter bookmark from config (can be used multiple times)
-- `--no-default-bookmark`: Ignore default bookmark from config
-- `--language`, `--lang`: Filter KCS results by language code (default: `en`, or from config/bookmark)
-- `-p`, `--product`: Filter by product name (e.g. `RHEL`, `OpenShift`)
-- `-s`, `--status`: Filter cases by status (e.g. `open`, `closed`, `redhat`, `customer`)
-- `--severity`: Filter cases by severity (`urgent`, `high`, `normal`, `low`)
-- `-a`, `--account`: Filter cases by account number
-- `-u`, `--owner`: Filter cases by owner name or SSO username
-- `-l`, `--limit`: Maximum number of results to display (default: 20)
-- `--local`: Search locally cached cases and comments only (completely offline)
-- `-o`, `--open`, `--browser`: Open the top result URL in the default system web browser
-- `--format`: Output format: `text` (default, Rich table with URLs), `json`, or `yaml`
-**Examples:**
-```bash
-# Search support cases by symptom or keyword (default):
-rh-support-cli search "ingress cert expired"
-
-# Search by specific case number:
-rh-support-cli search 04526149
-
-# Search Knowledgebase (KCS) solutions and articles:
-rh-support-cli search "failed to mount API filesystem" --type kcs
-
-# Search both cases and knowledgebase solutions simultaneously:
-rh-support-cli search "kernel panic" --type all
-
-# Search knowledgebase and automatically open the top solution in the browser:
-rh-support-cli search "CRI-O pod sandbox deadline" --type kcs --open
-
-# Fast offline search across locally cached cases, descriptions, and comments:
-rh-support-cli search "out of memory" --local
-
-# Filter KCS solutions by language (e.g. Japanese or English default):
-rh-support-cli search "networking" --type kcs --language ja
-
-# Search cases incorporating default bookmark (or bypass with --no-default-bookmark):
-rh-support-cli search "storage" --no-default-bookmark
-
-# Export search results as structured JSON:
-rh-support-cli search "OpenShift upgrade failure" --type kcs --format json
-```
-
-### 16. Interactive Terminal User Interface (`tui`)
-
-Launches a beautiful, interactive Terminal User Interface (TUI) to browse and manage your Red Hat support cases directly inside your terminal session.
-
-**Options:**
-- `-l`, `--layout`: Split layout: `horizontal` / `mailbox` (default mailbox style) or `vertical` (side-by-side)
-- `-b`, `--bookmark`: Use a preset bookmark of filters on startup instead of the default bookmark
-- `--no-default-bookmark`: Do not load any default bookmark on startup (loads all cases unfiltered)
-
-**Features:**
-- **Dual Layout Topologies (Horizontal Mailbox Default & Vertical)**: Features a mailbox-style layout by default (full-width case list on top and details below, maximizing wide terminals and multiplexers). Toggle dynamically to vertical side-by-side split at any time using **`v`** or **`l`**, or set via `--layout <horizontal|mailbox|vertical>`.
-- **Compact Zero-Margin Panes**: Panes sit flush with zero margin gap between borders, maximizing visible columns and rows for tables, logs, and comments.
-- **Asynchronous Background Processing & Live Visual Indicators**: Keeps the UI highly responsive by executing all network operations (fetching cases, detail lookups, live polling, uploads, downloads, and templates) in non-blocking threaded workers, displaying a live `⟳ <job_status>` indicator in the header bar while in flight.
-- **Stale-While-Revalidate (SWR) Instant Render**: Cached case details render immediately (0 ms) on selection with zero UI lag or blank loading screens, while non-blocking background workers validate freshness.
-- **Periodic Live Background Polling**: Periodically polls for remote updates in the background (default: 60s), updating unread badges and active case comments without disrupting keyboard focus or table cursor position.
-- **Vim / Arrow Navigation**: Navigate intuitively with standard keyboard binds.
-- **Directional Pane Switching**: Switch focus between top and bottom panes using **`Ctrl+Up`** / **`Ctrl+Down`** in horizontal split mode, and between left and right panes using **`Ctrl+Left`** / **`Ctrl+Right`** in vertical mode.
-- **Single-Pane Focus / Zoom**:
-  - Highlight either the case list on the left or case details on the right, and press **`f`** to "zoom" that panel into fullscreen mode (fully hiding the other pane to maximize reading space).
-  - **Intuitive Toggling**: Press **`f`** again or press **`Escape`** to instantly exit single-pane mode and restore the standard dual-pane split dashboard layout!
-- **Quick Modals & Action Buttons**:
-  - Press **`c`** (or click `Comment (C)`) to open the inline **Comment Pane** at the bottom of your case view, allowing you to scroll through and read the case description and comment history while drafting. Includes status dropdown integration (displaying and pre-selecting the auto-detected target status, e.g. `"Waiting on Red Hat"` if the case is `"Waiting on Customer"`), "dirty-state" draft auto-saving under `~/.config/rh-support-cli/drafts/`, and global **`ctrl+x`** keybinding to close/cancel commenting from anywhere.
-  - Press **`a`** (or click `Attach (A)`) to easily specify and upload local file attachments in the background.
-  - Press **`d`** (or click `Download (D)`) to select and download case attachments locally via modal.
-  - Press **`v`** (or **`l`**) to toggle between vertical (side-by-side) and horizontal (mailbox) split layouts.
-  - Press **`w`** to toggle follow/unfollow for the active case.
-  - Press **`m`** to explicitly mark the active case as read.
-  - Press **`t`** (or click `Template (T)`) to select and apply a local template to the active case.
-  - Press **`r`** (or click `Refresh (R)`) to trigger a contextual refresh (refreshes the active case view if the details panel is active; refreshes the case list if the table panel is active).
-  - **Visual Badges & Auto-Scroll**: Cases display `★` (followed) and `●` (unread updates) badges. Opening an unread case automatically scrolls to the yellow dotted checkpoint divider (`┈┈┈┈ 📍 Last read checkpoint ... ┈┈┈┈`). Dwelling for 2.5 seconds automatically marks the case as read.
-**Examples:**
-
-*Launch TUI with default bookmark filters:*
-```bash
+# 6. Launch the interactive split-pane dashboard:
 rh-support-cli tui
 ```
 
-*Launch TUI with a specific bookmark override:*
+---
+
+## Documentation Directory
+
+Detailed guides, configuration specifications, and technical design documents are organized inside the [`docs/`](docs/) directory:
+
+| Document | Audience | Contents |
+| :--- | :--- | :--- |
+| **[User Guide](docs/user_guide.md)** | Operators & Users | Complete command reference, configuration (`config.yaml`), bookmarks, templates, rich text formatting options, attachment handling, and TUI keyboard shortcuts. |
+| **[Developer Guide](docs/developer_guide.md)** | Developers & Contributors | Codebase file structure, domain decoupling, GraphQL & Hydra API protocols, multipart streaming engine (`FilePartStream`), thread safety, caching, and testing. |
+| **[Vision Guidelines](docs/vision.md)** | Strategic Compass | North Star mission statement, target personas, and the 5 immutable architectural design pillars governing the project. |
+
+---
+
+## Running the Test Suite
+
+The project includes an extensive test suite simulating Red Hat SSO, CRM GraphQL, and v3 Attachment APIs with zero external dependencies:
+
 ```bash
-rh-support-cli tui -b my_cases
+# Run unit tests:
+python3 test_rh_support_cli.py
+
+# Run Ruff linter and code formatting validation:
+ruff check .
+ruff format --check .
 ```
 
-*Launch TUI in horizontal mailbox style:*
-```bash
-rh-support-cli tui --layout mailbox
-```
-
-*Launch TUI unfiltered (all cases):*
-```bash
-rh-support-cli tui --no-default-bookmark
-```
-
-## Configuration & Bookmarks
-
-You can define bookmarks (presets of filters) in a YAML configuration file.
-
-**File Location:**
-1.  Default: `~/.config/rh-support-cli/config.yaml`
-2.  Environment Variable: `RH_SUPPORT_CONFIG`
-3.  CLI Argument: `--config-file <path>`
-
-**Example `config.yaml`:**
-```yaml
-default_bookmark: "my_team"
-default_create_template: "base_openshift"
-debug_file: "/path/to/debug.log"  # Log all API requests/responses in background
-
-bookmarks:
-  my_team:
-    account: "12345678"
-    status: ["redhat", "customer"]
-    severity: ["High", "Urgent"]
-  
-  my_cases:
-    owner: "jdoe"
-    status: ["open"]
-```
-
-**Usage:**
-
-*   **Use Default:** If `default_bookmark` is set, it applies automatically to `list`.
-*   **Use Specific:** `rh-support-cli list --bookmark my_cases`
-*   **Combine:** `rh-support-cli list --bookmark my_team --bookmark my_cases` (Later bookmarks override earlier ones)
-*   **Disable Default:** `rh-support-cli list --no-default-bookmark`
-*   **Override:** Explicit CLI flags override bookmarks.
-    ```bash
-    # Uses 'my_team' account but overrides status to 'Closed'
-    rh-support-cli list --status Closed
-    ```
-
-## Templates
-
-You can use templates to pre-fill case details during creation, or post-creation to verify and bring cases into compliance with standard fields and watchers. Templates are YAML files stored in `~/.config/rh-support-cli/templates/`.
-
-**Structure:**
-- Templates can define any case field (product, version, summary, description, severity, etc.).
-- They can define lists of watchers / notified users to be added (using `watchers`, `notified_users`, or `notifiedUsers` keys).
-- `include_templates`: List of other templates to include (merged in order).
-- Values are **Jinja2** templates.
-- `currentDoc`: Available in Jinja context, representing the merged data so far.
-- CLI Variables: Pass variables using `--template-var key=value`.
-
-**Example:**
-`~/.config/rh-support-cli/templates/base_openshift.yaml`:
-```yaml
-product: "OpenShift Container Platform"
-version: "4.12"
-severity: "3 (Normal)"
-caseType: "Bug"
-```
-
-`~/.config/rh-support-cli/templates/proactive.yaml`:
-```yaml
-include_templates: ["base_openshift"]
-caseType: "Other"
-severity: "4 (Low)"
-summary: "[Proactive] {{ product }} {{ version }} update on {{ cluster_name }}"
-description: |
-  Planning upgrade to {{ next_version }}.
-  ClusterID: {{ cluster_id }}
-severity: "1 (Urgent)"
-```
-
-**Usage:**
-
-*For Case Creation (`create`):*
-```bash
-rh-support-cli create \
-  --template proactive \
-  --template-var cluster_name=Prod1 \
-  --template-var next_version=4.13 \
-  --template-var cluster_id=12345
-```
-
-**Requirements:**
-- `jinja2`
-- `dateparser` (optional, for `parse_date` filter)
-```bash
-pip install jinja2 dateparser
-```
-
-## Bash Completion
-
-This tool supports Bash completion via `argcomplete`.
-
-1.  Ensure `argcomplete` is installed:
-    ```bash
-    pip install argcomplete
-    ```
-2.  Activate completion:
-    ```bash
-    eval "$(rh-support-cli completion)"
-    ```
-    Add this line to your `~/.bashrc` or `~/.zshrc` for persistent completion.
-
-### API URLs
-
-The following environment variables can be used to override default API URLs (useful for testing or pointing to different environments):
-
-- `RH_API_URL`: Base URL for the Support API (Default: `https://api.access.redhat.com/support/v3`)
-- `RH_SSO_URL`: URL for the SSO Token endpoint (Default: `https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token`)
-
-## API Documentation
-
-For more details on the available endpoints and data structures, you can consult the official Red Hat Support Case API Swagger documentation:
-
-[Red Hat Support Case API Swagger (JSON)](https://access.redhat.com/management/api/case_management/swagger.json) (Authentication required)
+---
 
 ## License
 
-This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
-
-## Testing
-
-The project includes a comprehensive test suite that uses a built-in mock server to simulate the Red Hat API. This allows you to run tests without needing real credentials or network access to the actual API.
-
-To run the tests:
-
-```bash
-python3 test_rh_support_cli.py
-```
-
-The test suite covers:
-- Authentication flow (including missing token handling)
-- File attachments (success and error states)
-- Commenting and status updates
-- Case creation (verifying flags and attachment uploads)
+This project is licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
