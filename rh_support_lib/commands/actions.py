@@ -53,12 +53,27 @@ def cmd_comment(args, api_client):
         template_status = template_data.get("status")
 
     # Determine status label
-    status_key = (
-        args.status
-        if args.status
-        else (template_status if template_status else "redhat")
+    no_status_change = getattr(args, "no_status_change", False) or getattr(
+        args, "keep_status", False
     )
-    final_status = STATUS_MAP.get(str(status_key).lower(), status_key)
+    if no_status_change:
+        final_status = None
+    else:
+        status_key = (
+            args.status
+            if args.status
+            else (template_status if template_status else "redhat")
+        )
+        if str(status_key).lower() in (
+            "none",
+            "keep",
+            "unchanged",
+            "no_change",
+            "no-change",
+        ):
+            final_status = None
+        else:
+            final_status = STATUS_MAP.get(str(status_key).lower(), status_key)
 
     # Get Content
     comment_body = ""

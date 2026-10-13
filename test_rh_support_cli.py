@@ -1255,6 +1255,94 @@ class TestRhSupportCli(unittest.TestCase):
             if os.path.exists("status_update.txt"):
                 os.remove("status_update.txt")
 
+    def test_comment_no_status_change_flag(self):
+        """Test that --no-status-change and --keep-status post comments without altering case status."""
+        with open("no_change_comment.txt", "w") as f:
+            f.write("Informational update without status transition.")
+
+        try:
+            # 1. Test --no-status-change flag
+            MockRedHatHandler.last_update_payload = None
+            result1 = self.run_cli(
+                [
+                    "comment",
+                    "-c",
+                    "01234567",
+                    "-f",
+                    "no_change_comment.txt",
+                    "--no-status-change",
+                ]
+            )
+            self.assertEqual(result1.returncode, 0)
+            self.assertIn("Success: Comment added.", result1.stdout)
+            self.assertNotIn("Case status updated to", result1.stdout)
+            self.assertIsNone(MockRedHatHandler.last_update_payload)
+
+            # 2. Test --keep-status alias
+            MockRedHatHandler.last_update_payload = None
+            result2 = self.run_cli(
+                [
+                    "comment",
+                    "-c",
+                    "01234567",
+                    "-f",
+                    "no_change_comment.txt",
+                    "--keep-status",
+                ]
+            )
+            self.assertEqual(result2.returncode, 0)
+            self.assertIn("Success: Comment added.", result2.stdout)
+            self.assertNotIn("Case status updated to", result2.stdout)
+            self.assertIsNone(MockRedHatHandler.last_update_payload)
+        finally:
+            if os.path.exists("no_change_comment.txt"):
+                os.remove("no_change_comment.txt")
+
+    def test_comment_status_none_or_keep(self):
+        """Test that passing -s none or --status keep avoids changing case status."""
+        with open("status_none_comment.txt", "w") as f:
+            f.write("Update with explicit status none.")
+
+        try:
+            # 1. -s none
+            MockRedHatHandler.last_update_payload = None
+            result1 = self.run_cli(
+                [
+                    "comment",
+                    "-c",
+                    "01234567",
+                    "-f",
+                    "status_none_comment.txt",
+                    "-s",
+                    "none",
+                ]
+            )
+            self.assertEqual(result1.returncode, 0)
+            self.assertIn("Success: Comment added.", result1.stdout)
+            self.assertNotIn("Case status updated to", result1.stdout)
+            self.assertIsNone(MockRedHatHandler.last_update_payload)
+
+            # 2. --status keep
+            MockRedHatHandler.last_update_payload = None
+            result2 = self.run_cli(
+                [
+                    "comment",
+                    "-c",
+                    "01234567",
+                    "-f",
+                    "status_none_comment.txt",
+                    "--status",
+                    "keep",
+                ]
+            )
+            self.assertEqual(result2.returncode, 0)
+            self.assertIn("Success: Comment added.", result2.stdout)
+            self.assertNotIn("Case status updated to", result2.stdout)
+            self.assertIsNone(MockRedHatHandler.last_update_payload)
+        finally:
+            if os.path.exists("status_none_comment.txt"):
+                os.remove("status_none_comment.txt")
+
     def test_close_case_command(self):
         """Test close subcommand: posts closing comment and sets status to Closed"""
         with open("close_comment.txt", "w") as f:

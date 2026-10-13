@@ -356,7 +356,14 @@ Authentication:
     parser_comment.add_argument(
         "-s",
         "--status",
-        help="Update case status (e.g. redhat, customer, in_progress, closed)",
+        help="Update case status (e.g. redhat, customer, in_progress, closed, or 'none'/'keep' to leave unchanged)",
+    )
+    parser_comment.add_argument(
+        "--no-status-change",
+        "--keep-status",
+        action="store_true",
+        dest="no_status_change",
+        help="Post comment without modifying the case status",
     )
     parser_comment.add_argument(
         "-t",

@@ -261,8 +261,10 @@ def open_editor(case_number, status_label, header_content=None, initial_body=Non
     # Create temp file but do NOT delete it automatically here
     with tempfile.NamedTemporaryFile(mode="w+", suffix=".tmp", delete=False) as tf:
         tf.write(f"# Enter comment for Case {case_number}.\n")
-        tf.write(f"# Status will be set to: '{status_label}'\n")
-
+        if status_label:
+            tf.write(f"# Status will be set to: '{status_label}'\n")
+        else:
+            tf.write("# Status will remain unchanged.\n")
         if header_content:
             tf.write("#\n# --- PREVIOUS COMMENTS ---\n")
             for line in header_content.splitlines():

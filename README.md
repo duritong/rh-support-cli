@@ -58,9 +58,8 @@ rh-support-cli search "ingress cert expired" --type all
 # 4. Attach a diagnostic archive (automatically handles files up to 5 TB):
 rh-support-cli attach -c 12345678 -f /tmp/sosreport.tar.xz
 
-# 5. Post a Markdown comment and update status:
-rh-support-cli comment -c 12345678 -f update.md -s redhat
-
+# 5. Post a Markdown comment (optionally update status or use --no-status-change):
+rh-support-cli comment -c 12345678 -f update.md --no-status-change
 # 6. Launch the interactive split-pane dashboard:
 rh-support-cli tui
 

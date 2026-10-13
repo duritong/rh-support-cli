@@ -197,11 +197,17 @@ rh-support-cli create --template proactive_upgrade --template-var cluster="OCP-P
 ```
 
 ### 5.5 Commenting & Status Updates (`comment`)
-Posts a comment to an existing case and optionally transitions its status:
+Posts a comment to an existing case and optionally transitions its status (defaults to `Waiting on Red Hat`):
 
 ```bash
-# Add comment from file and set status to Waiting on Red Hat:
+# Add comment from file and transition status to Waiting on Red Hat:
 rh-support-cli comment -c 12345678 -f update.txt -s redhat
+
+# Post an informational comment WITHOUT changing the case status:
+rh-support-cli comment -c 12345678 -f update.txt --no-status-change
+# or using the alias / status value:
+rh-support-cli comment -c 12345678 -f update.txt --keep-status
+rh-support-cli comment -c 12345678 -f update.txt -s none
 
 # Open $EDITOR with last comment for context:
 rh-support-cli comment -c 12345678 --include-previous-comments 2
@@ -209,7 +215,6 @@ rh-support-cli comment -c 12345678 --include-previous-comments 2
 # Edit draft file in editor before submitting:
 rh-support-cli comment -c 12345678 -f draft.txt --edit
 ```
-
 ### 5.6 Closing Cases (`close`)
 Closes a support case with a final comment (automatically sets status to `closed`):
 

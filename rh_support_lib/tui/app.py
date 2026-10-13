@@ -6,7 +6,7 @@ import pathlib
 import re
 import threading
 import time
-from typing import ClassVar
+from typing import ClassVar, Optional
 
 from rich.box import ROUNDED
 from rich.markdown import Markdown
@@ -307,7 +307,7 @@ class AttachModal(ModalScreen[str]):
         self.dismiss("")
 
 
-class DownloadModal(ModalScreen[tuple[str, str] | None]):
+class DownloadModal(ModalScreen[Optional[tuple[str, str]]]):
     """Modal screen for selecting an attachment and destination to download."""
 
     def __init__(self, attachments: list[Attachment]):
