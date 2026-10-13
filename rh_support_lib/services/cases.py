@@ -613,6 +613,8 @@ class CaseService:
         status: list[str] | str | None = None,
         severity: list[str] | str | None = None,
         owner: str | None = None,
+        product: str | None = None,
+        query: str | None = None,
         first: int = 100,
         after: str | None = None,
         all_pages: bool = False,
@@ -627,7 +629,7 @@ class CaseService:
             limit=limit,
             all_pages=all_pages,
         )
-        if use_cache and not after and self.cache_service.enabled:
+        if use_cache and not after and not query and self.cache_service.enabled:
             cached_list = self.cache_service.get_case_list(cache_key)
             if cached_list is not None:
                 return cached_list
@@ -637,12 +639,14 @@ class CaseService:
             status=status,
             severity=severity,
             owner=owner,
+            product=product,
+            query=query,
             first=first,
             after=after,
             all_pages=all_pages,
             limit=limit,
         )
-        if use_cache and not after and self.cache_service.enabled and cases:
+        if use_cache and not after and not query and self.cache_service.enabled and cases:
             self.cache_service.set_case_list(cache_key, cases)
         return cases
 
@@ -652,6 +656,8 @@ class CaseService:
         status: list[str] | str | None = None,
         severity: list[str] | str | None = None,
         owner: str | None = None,
+        product: str | None = None,
+        query: str | None = None,
         first: int = 100,
         after: str | None = None,
         all_pages: bool = False,
@@ -684,6 +690,15 @@ class CaseService:
 
         if owner:
             where["Owner"] = {"Name": {"eq": owner}}
+        if query:
+            q_clean = str(query).strip()
+            if q_clean.isdigit():
+                where["CaseNumber__c"] = {"like": f"%{q_clean}%"}
+            else:
+                where["Subject"] = {"like": f"%{q_clean}%"}
+
+        if product:
+            where["Product"] = {"Name": {"eq": str(product).strip()}}
 
         cases = []
         user = self.get_current_user()
@@ -756,6 +771,143 @@ class CaseService:
             current_after = end_cursor
 
         return cases
+
+    def search_local_cases(
+        self,
+        query: str,
+        status: list[str] | str | None = None,
+        severity: list[str] | str | None = None,
+        product: str | None = None,
+        account: str | None = None,
+    ) -> list[Case]:
+        """Searches locally cached case records and tracked state across subjects, descriptions, comments, and IDs."""
+        q_lower = (query or "").strip().lower()
+        records = self.cache_service.get_all_cached_case_records()
+        user = self.get_current_user()
+        tracked = self.state_service.get_tracked_cases(user)
+        results: list[Case] = []
+        seen: set[str] = set()
+
+        for rec in records:
+            case_data = rec.get("case", {})
+            c_num = str(case_data.get("case_number", ""))
+            if not c_num or c_num in seen:
+                continue
+
+            summary = str(case_data.get("summary", "")).lower()
+            desc = str(rec.get("description", "")).lower()
+            prod = str(case_data.get("product", "")).lower()
+            comments_text = " ".join(
+                str(c.get("body", "")).lower() for c in rec.get("comments", [])
+            )
+
+            if q_lower and not (
+                q_lower in c_num.lower()
+                or q_lower in summary
+                or q_lower in desc
+                or q_lower in prod
+                or q_lower in comments_text
+            ):
+                continue
+
+            c_status = str(case_data.get("status", "")).lower()
+            if status:
+                statuses = [str(s).lower() for s in (status if isinstance(status, list) else [status])]
+                if c_status not in statuses and not any(s in c_status for s in statuses):
+                    continue
+
+            c_sev = str(case_data.get("severity", "")).lower()
+            if severity:
+                sevs = [str(s).lower() for s in (severity if isinstance(severity, list) else [severity])]
+                if c_sev not in sevs and not any(s in c_sev for s in sevs):
+                    continue
+
+            if product and product.lower() not in prod:
+                continue
+
+            c_acc = str(case_data.get("account_number", ""))
+            if account and str(account) != c_acc:
+                continue
+
+            tc = tracked.get(c_num)
+            c_obj = Case(
+                case_number=c_num,
+                summary=case_data.get("summary", ""),
+                status=case_data.get("status", ""),
+                severity=case_data.get("severity", ""),
+                product=case_data.get("product", ""),
+                version=case_data.get("version", ""),
+                account_number=c_acc,
+                created_date=case_data.get("created_date", ""),
+                last_modified_date=case_data.get("last_modified_date", ""),
+                owner=case_data.get("owner", ""),
+                contact_name=case_data.get("contact_name", ""),
+                contact_sso=case_data.get("contact_sso", ""),
+                case_type=case_data.get("case_type", "Standard"),
+                id=case_data.get("id", ""),
+                is_followed=tc.relationship in ("followed", "both") if tc else False,
+                has_unread=(tc.latest_known.unread_comment_count > 0 or tc.latest_known.status_changed) if tc else False,
+                unread_count=tc.latest_known.unread_comment_count if tc else 0,
+            )
+            seen.add(c_num)
+            results.append(c_obj)
+
+        return results
+
+    def search_cases(
+        self,
+        query: str,
+        account: str | None = None,
+        status: list[str] | str | None = None,
+        severity: list[str] | str | None = None,
+        owner: str | None = None,
+        product: str | None = None,
+        limit: int = 20,
+        local_only: bool = False,
+    ) -> list[Case]:
+        """Searches support cases via GraphQL API and local cache."""
+        if local_only:
+            return self.search_local_cases(
+                query=query,
+                status=status,
+                severity=severity,
+                product=product,
+                account=account,
+            )[:limit]
+
+        try:
+            remote_cases = self.list_cases(
+                account=account,
+                status=status,
+                severity=severity,
+                owner=owner,
+                product=product,
+                query=query,
+                limit=limit,
+                use_cache=False,
+            )
+        except Exception:  # noqa: BLE001
+            remote_cases = []
+
+        # Also search local cache (which matches full description and comment bodies) and merge
+        local_cases = self.search_local_cases(
+            query=query,
+            status=status,
+            severity=severity,
+            product=product,
+            account=account,
+        )
+
+        seen = {c.case_number for c in remote_cases}
+        merged = list(remote_cases)
+        for lc in local_cases:
+            if lc.case_number not in seen:
+                seen.add(lc.case_number)
+                merged.append(lc)
+            if len(merged) >= limit:
+                break
+
+        return merged[:limit]
 
     def get_case_details(
         self,

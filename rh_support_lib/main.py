@@ -15,6 +15,7 @@ from rh_support_lib.commands.apply_template import cmd_apply, cmd_list_templates
 from rh_support_lib.commands.attachments import cmd_attachment
 from rh_support_lib.commands.create_case import cmd_create
 from rh_support_lib.commands.list_cases import cmd_list
+from rh_support_lib.commands.search import cmd_search
 from rh_support_lib.commands.show_case import cmd_show
 from rh_support_lib.commands.tracking import cmd_sync, cmd_updates
 from rh_support_lib.commands.watchers import (
@@ -566,6 +567,70 @@ Authentication:
     parser_updates.add_argument(
         "-u", "--user", help="SSO username (defaults to current user)"
     )
+
+    # Search Subcommand
+    parser_search = subparsers.add_parser(
+        "search", help="Search support cases and Red Hat Knowledgebase (KCS) solutions"
+    )
+    parser_search.add_argument("query", help="Search keywords, error message, or case number")
+    parser_search.add_argument(
+        "-t",
+        "--type",
+        choices=["cases", "kcs", "all"],
+        default="cases",
+        help="Search target: 'cases' (support tickets, default), 'kcs' (knowledgebase), or 'all'",
+    )
+    parser_search.add_argument("-p", "--product", help="Filter by product name")
+    parser_search.add_argument(
+        "-s",
+        "--status",
+        help="Filter cases by status (e.g. open, closed, redhat, customer)",
+    )
+    parser_search.add_argument(
+        "--severity", help="Filter cases by severity (e.g. urgent, high, normal, low)"
+    )
+    parser_search.add_argument("-a", "--account", help="Filter cases by account number")
+    parser_search.add_argument("-u", "--owner", help="Filter cases by owner name or SSO")
+    parser_search.add_argument(
+        "-l",
+        "--limit",
+        type=int,
+        default=20,
+        help="Maximum results to return (default: 20)",
+    )
+    parser_search.add_argument(
+        "--local",
+        action="store_true",
+        help="Search locally cached cases and comments only (offline mode)",
+    )
+    parser_search.add_argument(
+        "-b",
+        "--bookmark",
+        action="append",
+        help="Use a filter bookmark from config (can be used multiple times)",
+    )
+    parser_search.add_argument(
+        "--no-default-bookmark",
+        action="store_true",
+        help="Ignore default bookmark from config",
+    )
+    parser_search.add_argument(
+        "--language",
+        "--lang",
+        dest="language",
+        help="Filter KCS results by language code (e.g. 'en', 'ja', default: 'en' or from config/bookmark)",
+    )
+    parser_search.add_argument(
+        "-o",
+        "--open",
+        "--browser",
+        action="store_true",
+        dest="open",
+        help="Open the top result URL in the system web browser",
+    )
+    parser_search.add_argument(
+        "--simple-output", action="store_true", help="Disable colored output"
+    )
     # List Templates Subcommand
     subparsers.add_parser(
         "list-templates", help="List all local templates and their details"
@@ -737,6 +802,8 @@ Authentication:
         cmd_updates(args, api_client, config)
     elif args.command == "tui":
         cmd_tui(args, api_client, config)
+    elif args.command == "search":
+        cmd_search(args, api_client, config)
 
 
 if __name__ == "__main__":

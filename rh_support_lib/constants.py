@@ -4,14 +4,15 @@ import os
 DEFAULT_GRAPHQL_URL = "https://graphql.redhat.com"
 DEFAULT_ATTACHMENT_URL = "https://api.access.redhat.com/support"
 
+DEFAULT_KCS_SEARCH_URL = "https://access.redhat.com/hydra/rest/search/kcs"
 GRAPHQL_URL = os.environ.get("RH_GRAPHQL_URL", DEFAULT_GRAPHQL_URL)
 API_URL = os.environ.get("RH_API_URL", GRAPHQL_URL)
 ATTACHMENT_API_URL = os.environ.get("RH_ATTACHMENT_API_URL", DEFAULT_ATTACHMENT_URL)
+KCS_SEARCH_URL = os.environ.get("RH_KCS_SEARCH_URL", DEFAULT_KCS_SEARCH_URL)
 SSO_URL = os.environ.get(
     "RH_SSO_URL",
     "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token",
 )
-
 
 SEVERITY_MAP = {
     "1": "1 (Urgent)",
@@ -58,7 +59,9 @@ __all__ = [
     "COMMENT_STATUS_CHOICES",
     "DEFAULT_ATTACHMENT_URL",
     "DEFAULT_GRAPHQL_URL",
+    "DEFAULT_KCS_SEARCH_URL",
     "GRAPHQL_URL",
+    "KCS_SEARCH_URL",
     "SEVERITY_MAP",
     "SSO_URL",
     "STATUS_CLOSED",

@@ -435,6 +435,58 @@ Apply a template over an existing case. Only fields that differ will be updated:
 ```bash
 rh-support-cli apply -c 12345678 -t prod-standard --dry-run
 ```
+
+### Searching Cases & Knowledgebase (`search`)
+The `search` subcommand provides unified search across your support cases (primary focus) and the Red Hat Knowledgebase (KCS):
+
+```bash
+# Search support cases (default):
+rh-support-cli search "ingress cert expired"
+
+# Search support cases by case number:
+rh-support-cli search 04526149
+
+# Search Red Hat Knowledgebase (KCS) solutions and articles:
+rh-support-cli search "failed to mount API filesystem" --type kcs
+
+# Search both cases and knowledgebase solutions simultaneously:
+rh-support-cli search "kernel panic" --type all
+
+# Search knowledgebase and open the top solution in your system browser:
+rh-support-cli search "CRI-O pod sandbox deadline" --type kcs --open
+
+# Fast offline search across locally cached cases, descriptions, and comments:
+rh-support-cli search "out of memory" --local
+
+# Filter cases by product and severity:
+rh-support-cli search "crash" --product "Red Hat Enterprise Linux" --severity high
+
+# Filter KCS solutions by language (defaults to 'en', avoids untranslated/foreign results):
+rh-support-cli search "networking" --type kcs --language en
+rh-support-cli search "networking" --type kcs --language ja
+
+# Search cases incorporating default bookmark (or bypass with --no-default-bookmark):
+rh-support-cli search "storage" --no-default-bookmark
+```
+
+All search results include full browser URLs (`https://access.redhat.com/support/cases/<num>` and `https://access.redhat.com/solutions/<id>`) so you can open or share links directly from the terminal. Documentation results automatically omit long URLs from the ID column to keep tables clean.
+
+#### Bookmark & Language Configuration in `config.yaml`
+You can define your default bookmark and preferred KCS language in `~/.config/rh-support-cli/config.yaml`:
+
+```yaml
+# Default filter bookmark applied to both list and search commands
+default_bookmark: ocp-team
+
+# Default language for Knowledgebase (KCS) queries (default: en)
+default_kcs_language: en
+
+bookmarks:
+  ocp-team:
+    product: "OpenShift Container Platform"
+    status: ["Waiting on Red Hat", "Waiting on Customer"]
+    language: "en"  # Preferred KCS language for this bookmark
+```
 ### Machine-Readable Output (`--json` & `--format`)
 For shell scripting, Ansible playbooks, and pipe processing with `jq`, any CLI command supports structured machine-readable outputs:
 *   **`--json` / `-j`**: Output formatted JSON with zero terminal noise (suppresses authentication headers and banners).

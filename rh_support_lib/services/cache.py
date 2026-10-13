@@ -125,6 +125,19 @@ class CacheService:
         data = self._read_json(path)
         return data if isinstance(data, dict) else None
 
+    def get_all_cached_case_records(self) -> list[dict[str, Any]]:
+        """Returns all cached raw case records from cases_dir."""
+        if not self.enabled or not os.path.isdir(self.cases_dir):
+            return []
+        records: list[dict[str, Any]] = []
+        for fname in os.listdir(self.cases_dir):
+            if fname.endswith(".json"):
+                path = os.path.join(self.cases_dir, fname)
+                rec = self._read_json(path)
+                if isinstance(rec, dict) and rec.get("case"):
+                    records.append(rec)
+        return records
+
     def get_case_details(
         self, case_number: str, ttl: int | None = None
     ) -> tuple[CaseDetails, list[Attachment], str] | None:

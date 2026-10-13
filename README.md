@@ -346,7 +346,56 @@ rh-support-cli updates --full
 rh-support-cli updates --mark-read
 ```
 
-### 15. Interactive Terminal User Interface (`tui`)
+### 15. Search Cases & Knowledgebase (`search`)
+
+Searches support cases (default) and Red Hat Knowledgebase (KCS) solutions/articles directly from the terminal. All results clearly display their browser URLs for easy reference.
+
+**Options:**
+- `query`: Search keywords, error message, or case number (required positional argument)
+- `-t`, `--type`: Search target: `cases` (default), `kcs` (knowledgebase), or `all` (both)
+- `-b`, `--bookmark`: Apply filter bookmark from config (can be used multiple times)
+- `--no-default-bookmark`: Ignore default bookmark from config
+- `--language`, `--lang`: Filter KCS results by language code (default: `en`, or from config/bookmark)
+- `-p`, `--product`: Filter by product name (e.g. `RHEL`, `OpenShift`)
+- `-s`, `--status`: Filter cases by status (e.g. `open`, `closed`, `redhat`, `customer`)
+- `--severity`: Filter cases by severity (`urgent`, `high`, `normal`, `low`)
+- `-a`, `--account`: Filter cases by account number
+- `-u`, `--owner`: Filter cases by owner name or SSO username
+- `-l`, `--limit`: Maximum number of results to display (default: 20)
+- `--local`: Search locally cached cases and comments only (completely offline)
+- `-o`, `--open`, `--browser`: Open the top result URL in the default system web browser
+- `--format`: Output format: `text` (default, Rich table with URLs), `json`, or `yaml`
+**Examples:**
+```bash
+# Search support cases by symptom or keyword (default):
+rh-support-cli search "ingress cert expired"
+
+# Search by specific case number:
+rh-support-cli search 04526149
+
+# Search Knowledgebase (KCS) solutions and articles:
+rh-support-cli search "failed to mount API filesystem" --type kcs
+
+# Search both cases and knowledgebase solutions simultaneously:
+rh-support-cli search "kernel panic" --type all
+
+# Search knowledgebase and automatically open the top solution in the browser:
+rh-support-cli search "CRI-O pod sandbox deadline" --type kcs --open
+
+# Fast offline search across locally cached cases, descriptions, and comments:
+rh-support-cli search "out of memory" --local
+
+# Filter KCS solutions by language (e.g. Japanese or English default):
+rh-support-cli search "networking" --type kcs --language ja
+
+# Search cases incorporating default bookmark (or bypass with --no-default-bookmark):
+rh-support-cli search "storage" --no-default-bookmark
+
+# Export search results as structured JSON:
+rh-support-cli search "OpenShift upgrade failure" --type kcs --format json
+```
+
+### 16. Interactive Terminal User Interface (`tui`)
 
 Launches a beautiful, interactive Terminal User Interface (TUI) to browse and manage your Red Hat support cases directly inside your terminal session.
 

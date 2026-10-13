@@ -29,6 +29,11 @@ class Case:
     status_changed: bool = False
     old_status: str = ""
 
+    @property
+    def url(self) -> str:
+        num = self.case_number or self.id
+        return f"https://access.redhat.com/support/cases/{num}" if num else ""
+
 
 @dataclass
 class CaseComment:
@@ -81,6 +86,38 @@ class ProductItem:
     family: str = ""
     parent_id: str | None = None
 
+
+
+@dataclass
+class KCSSearchResult:
+    """Represents a Knowledgebase (KCS) solution or article search result."""
+
+    id: str
+    title: str
+    summary: str = ""
+    document_kind: str = "Solution"  # "Solution" or "Article"
+    url: str = ""
+    product: str = ""
+    view_uri: str = ""
+    published_date: str = ""
+
+    def __post_init__(self) -> None:
+        # If id is a URL or documentation path, migrate it to url and omit id to avoid confusion
+        if self.id and (self.id.startswith(("http://", "https://", "/", "www.")) or "/" in self.id):
+            if not self.url and not self.view_uri:
+                self.url = self.id
+            self.id = ""
+
+        if not self.url:
+            if self.view_uri:
+                self.url = self.view_uri
+            elif self.id:
+                path = (
+                    "articles"
+                    if str(self.document_kind).lower() == "article"
+                    else "solutions"
+                )
+                self.url = f"https://access.redhat.com/{path}/{self.id}"
 
 @dataclass
 class CaseCheckpoint:

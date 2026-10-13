@@ -648,6 +648,24 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                     own = where_clause["Owner"].get("Name", {}).get("eq")
                     if own:
                         filters_received.append(f"OWN={own}")
+                if "Subject" in where_clause:
+                    subj = where_clause["Subject"]
+                    sub_val = subj.get("like", "") if isinstance(subj, dict) else str(subj)
+                    clean_sub = sub_val.replace("%", "")
+                    filters_received.append(f"SUBJ={clean_sub}")
+                if "CaseNumber__c" in where_clause:
+                    c_filter = where_clause["CaseNumber__c"]
+                    c_val = (
+                        c_filter.get("like", c_filter.get("eq", ""))
+                        if isinstance(c_filter, dict)
+                        else str(c_filter)
+                    )
+                    clean_c = str(c_val).replace("%", "")
+                    filters_received.append(f"CNUM={clean_c}")
+                if "Product" in where_clause:
+                    prod = where_clause["Product"].get("Name", {}).get("eq")
+                    if prod:
+                        filters_received.append(f"PROD={prod}")
 
                 summary_str = "Filters: " + "|".join(filters_received)
                 self.send_response(200)
@@ -841,6 +859,64 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             return
 
+        # Knowledgebase (KCS) Search Endpoint
+        if "/search/kcs" in self.path or "/hydra/rest/search/kcs" in self.path:
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            self.wfile.write(
+                json.dumps(
+                    {
+                        "response": {
+                            "numFound": 4,
+                            "docs": [
+                                {
+                                    "id": "7008126",
+                                    "title": "Failed to mount API filesystem during boot",
+                                    "summary": "Systemd unit fails during boot with mount error",
+                                    "documentKind": "Solution",
+                                    "view_uri": "https://access.redhat.com/solutions/7008126",
+                                    "product": "Red Hat Enterprise Linux",
+                                    "published_date": "2026-03-15T08:00:00Z",
+                                    "language": "en",
+                                },
+                                {
+                                    "id": "6911201",
+                                    "title": "Ingress controller certificate expiration and rotation",
+                                    "summary": "Procedure to rotate expired router certs in OpenShift",
+                                    "documentKind": "Article",
+                                    "view_uri": "https://access.redhat.com/articles/6911201",
+                                    "product": "Red Hat OpenShift Container Platform",
+                                    "published_date": "2026-02-10T11:00:00Z",
+                                    "language": "en",
+                                },
+                                {
+                                    "id": "https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/networking/index",
+                                    "title": "Configuring Networking on RHEL 9",
+                                    "summary": "Official product documentation for network configuration",
+                                    "documentKind": "Documentation",
+                                    "view_uri": "https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/networking/index",
+                                    "product": "Red Hat Enterprise Linux",
+                                    "published_date": "2026-01-20T09:00:00Z",
+                                    "language": "en",
+                                },
+                                {
+                                    "id": "https://docs.redhat.com/ja/documentation/red_hat_enterprise_linux/9/html/networking/index",
+                                    "title": "RHEL 9 ネットワークの設定 (日本語)",
+                                    "summary": "Japanese translation of networking documentation",
+                                    "documentKind": "Documentation",
+                                    "view_uri": "https://docs.redhat.com/ja/documentation/red_hat_enterprise_linux/9/html/networking/index",
+                                    "product": "Red Hat Enterprise Linux",
+                                    "published_date": "2026-01-22T09:00:00Z",
+                                    "language": "ja",
+                                },
+                            ],
+                        }
+                    }
+                ).encode()
+            )
+            return
+
         # Attachment Download URL endpoint
         match_download = re.search(
             r"/attachments/downloadFile/([^/]+)/([^/]+)$", self.path
@@ -1024,6 +1100,7 @@ class TestRhSupportCli(unittest.TestCase):
         self.env["RH_ATTACHMENT_API_URL"] = self.base_url
         self.env["REDHAT_SUPPORT_OFFLINE_TOKEN"] = "mock_offline_token"
         self.env["FORCE_COLOR"] = "1"
+        self.env["RH_KCS_SEARCH_URL"] = f"{self.base_url}/search/kcs"
 
         # Ensure subprocess finds requests even if HOME is changed
         self.env["PYTHONPATH"] = os.pathsep.join(sys.path)
@@ -4837,5 +4914,162 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 if os.path.exists(p):
                     os.remove(p)
 
+    def test_search_cases_default(self):
+        """Test search command default behavior searching cases."""
+        res = self.run_cli(["search", "kernel panic"])
+        self.assertEqual(res.returncode, 0)
+        self.assertIn("CASE #", res.stdout)
+        self.assertIn("SUMMARY", res.stdout)
+        self.assertIn("URL", res.stdout)
+        self.assertIn("https://access.redhat.com/support/cases/", res.stdout)
+        self.assertIn("SUBJ=kernel panic", res.stdout)
+
+    def test_search_kcs_and_urls(self):
+        """Test search command querying Knowledgebase (KCS) with solution/article URLs."""
+        res = self.run_cli(["search", "boot mount", "--type", "kcs"])
+        self.assertEqual(res.returncode, 0)
+        self.assertIn("ID", res.stdout)
+        self.assertIn("TYPE", res.stdout)
+        self.assertIn("7008126", res.stdout)
+        self.assertIn("Solution", res.stdout)
+        self.assertIn("Failed to mount API filesystem", res.stdout)
+        self.assertIn("https://access.redhat.com/solutions/7008126", res.stdout)
+        self.assertIn("https://access.redhat.com/articles/6911201", res.stdout)
+
+    def test_search_all_combined(self):
+        """Test search --type all queries both cases and knowledgebase."""
+        res = self.run_cli(["search", "ingress", "--type", "all"])
+        self.assertEqual(res.returncode, 0)
+        self.assertIn("SUPPORT CASES", res.stdout)
+        self.assertIn("KNOWLEDGEBASE", res.stdout)
+        self.assertIn("SOLUTIONS", res.stdout)
+        self.assertIn("https://access.redhat.com/solutions/7008126", res.stdout)
+
+    def test_search_open_browser_flag(self):
+        """Test search with --open flag announces opening browser URL."""
+        res = self.run_cli(["search", "boot mount", "--type", "kcs", "--open"])
+        self.assertEqual(res.returncode, 0)
+        self.assertIn("Opening https://access.redhat.com/solutions/7008126 in browser...", res.stdout)
+
+    def test_search_local_cache(self):
+        """Test search --local searches cached cases across description and comments without hitting network."""
+        import json
+
+        # Pre-populate a unique case in the isolated test cache
+        case_file = os.path.join(
+            self.test_cache_dir, "rh-support-cli", "cases", "987654.json"
+        )
+        os.makedirs(os.path.dirname(case_file), exist_ok=True)
+        cached_record = {
+            "cached_at": time.time(),
+            "last_modified_date": "2026-10-12T00:00:00Z",
+            "status": "Waiting on Customer",
+            "case": {
+                "case_number": "987654",
+                "summary": "Local Cache Case",
+                "status": "Waiting on Customer",
+                "severity": "2 (High)",
+                "product": "RHEL",
+            },
+            "description": "Unique description token: XYZ_LOCAL_DEBUG",
+            "comments": [
+                {
+                    "id": "c1",
+                    "body": "Comment containing secret diagnostic fingerprint: ALPHA_BETA_DIAG",
+                    "created_date": "2026-10-12T01:00:00Z",
+                    "created_by": "Red Hat Support",
+                }
+            ],
+            "attachments": [],
+            "notified_users": [],
+        }
+        with open(case_file, "w") as f:
+            json.dump(cached_record, f)
+
+        res = self.run_cli(["search", "ALPHA_BETA_DIAG", "--local"])
+        self.assertEqual(res.returncode, 0)
+        self.assertIn("987654", res.stdout)
+        self.assertIn("Local Cache Case", res.stdout)
+
+    def test_search_structured_output(self):
+        """Test search with --format json and yaml."""
+        res_json = self.run_cli(["search", "boot mount", "--type", "kcs", "--format", "json"])
+        self.assertEqual(res_json.returncode, 0)
+        data = json.loads(res_json.stdout)
+        self.assertTrue(isinstance(data, list))
+        self.assertTrue(any(d.get("id") == "7008126" for d in data))
+        self.assertTrue(any("https://access.redhat.com/solutions/7008126" in d.get("url", "") for d in data))
+
+
+    def test_search_kcs_language_and_doc_id(self):
+        """Test KCS search omits docs URL as ID, filters non-English by default, and allows --language."""
+        # 1. Default (en): excludes Japanese doc, includes English doc with omitted ID
+        res_default = self.run_cli(["search", "networking", "--type", "kcs"])
+        self.assertEqual(res_default.returncode, 0)
+        self.assertIn("Configuring Networking on RHEL 9", res_default.stdout)
+        self.assertIn("https://docs.redhat.com/en/documentation/", res_default.stdout)
+        # Japanese result excluded
+        self.assertNotIn("RHEL 9 ネットワークの設定", res_default.stdout)
+        # Ensure documentation ID does not display the full docs URL as an ID
+        for line in res_default.stdout.splitlines():
+            if "Configuring Networking" in line:
+                self.assertNotIn("https://docs.redhat.com", line.split()[0])
+
+        # 2. Querying with --language ja returns Japanese result
+        res_ja = self.run_cli(["search", "networking", "--type", "kcs", "--language", "ja"])
+        self.assertEqual(res_ja.returncode, 0)
+        self.assertIn("RHEL 9 ネットワークの設定", res_ja.stdout)
+        self.assertIn("https://docs.redhat.com/ja/documentation/", res_ja.stdout)
+
+    def test_search_bookmarks(self):
+        """Test search command incorporates default bookmark and supports --no-default-bookmark."""
+        import shutil
+        import tempfile
+
+        import yaml
+
+        temp_home = tempfile.mkdtemp()
+        orig_home = self.env.get("HOME")
+        orig_config = self.env.get("XDG_CONFIG_HOME")
+        self.env["HOME"] = temp_home
+        cfg_dir = os.path.join(temp_home, ".config", "rh-support-cli")
+        os.makedirs(cfg_dir, exist_ok=True)
+        self.env["XDG_CONFIG_HOME"] = os.path.join(temp_home, ".config")
+
+        config_data = {
+            "default_bookmark": "test-bm",
+            "bookmarks": {
+                "test-bm": {
+                    "product": "Red Hat OpenShift Container Platform",
+                    "status": "Waiting on Customer Action Required",
+                }
+            },
+        }
+        with open(os.path.join(cfg_dir, "config.yaml"), "w") as f:
+            yaml.dump(config_data, f)
+
+        try:
+            # 1. Default search incorporates bookmark filters into query
+            res_bm = self.run_cli(["search", "cert", "--format", "json"])
+            self.assertEqual(res_bm.returncode, 0)
+            self.assertIn("STAT=Waiting on Customer Action Required", res_bm.stdout)
+            self.assertIn("PROD=Red Hat OpenShift Container Platform", res_bm.stdout)
+
+            # 2. --no-default-bookmark skips bookmark filters
+            res_no_bm = self.run_cli(["search", "cert", "--no-default-bookmark", "--format", "json"])
+            self.assertEqual(res_no_bm.returncode, 0)
+            self.assertNotIn("PROD=Red Hat OpenShift", res_no_bm.stdout)
+
+            # 3. CLI override takes precedence over bookmark
+            res_override = self.run_cli(["search", "cert", "--product", "RHEL", "--format", "json"])
+            self.assertEqual(res_override.returncode, 0)
+            self.assertIn("PROD=RHEL", res_override.stdout)
+            self.assertNotIn("PROD=Red Hat OpenShift", res_override.stdout)
+        finally:
+            if orig_home:
+                self.env["HOME"] = orig_home
+            if orig_config:
+                self.env["XDG_CONFIG_HOME"] = orig_config
+            shutil.rmtree(temp_home)
 if __name__ == "__main__":
     unittest.main()
