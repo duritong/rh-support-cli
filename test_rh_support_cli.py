@@ -2536,19 +2536,38 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             )
 
         try:
+            # 1. Simple output mode
             result = self.run_cli(["--simple-output", "list-templates"])
             self.assertEqual(result.returncode, 0)
             self.assertIn("Found 2 template(s)", result.stdout)
             self.assertIn("Template:    tmpl_a", result.stdout)
             self.assertIn("Desc:      Template A Description", result.stdout)
             self.assertIn("Fields:    severity: Low", result.stdout)
-
             self.assertNotIn("_some_ignored_meta", result.stdout)
-
             self.assertIn("Template:    tmpl_b", result.stdout)
             self.assertIn("Desc:      Template B Description", result.stdout)
             self.assertIn("Fields:    product: RHEL", result.stdout)
             self.assertIn("Includes:  tmpl_a", result.stdout)
+
+            # 2. Default Rich mode (verifies Panel rendering without AttributeError)
+            result_rich = self.run_cli(["list-templates"])
+            self.assertEqual(result_rich.returncode, 0)
+            self.assertIn("Found 2 template(s)", result_rich.stdout)
+            self.assertIn("Template: tmpl_a", result_rich.stdout)
+            self.assertIn("Template: tmpl_b", result_rich.stdout)
+
+            # 3. Structured JSON output mode
+            result_json = self.run_cli(["list-templates", "--json"])
+            self.assertEqual(result_json.returncode, 0)
+            parsed = json.loads(result_json.stdout)
+            self.assertEqual(len(parsed), 2)
+            self.assertEqual(parsed[0]["name"], "tmpl_a")
+            self.assertEqual(parsed[1]["name"], "tmpl_b")
+
+            # 4. Alias list-template
+            result_alias = self.run_cli(["list-template", "--simple-output"])
+            self.assertEqual(result_alias.returncode, 0)
+            self.assertIn("Found 2 template(s)", result_alias.stdout)
         finally:
             shutil.rmtree(temp_home)
 
@@ -5555,6 +5574,196 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         finally:
             AttachmentService.MULTIPART_THRESHOLD = orig_threshold
             os.remove(temp_file.name)
+
+    def test_all_cli_commands_work_as_expected(self):
+        """Comprehensive end-to-end test verifying that every registered CLI command operates as expected."""
+        import tempfile
+
+        import yaml
+
+        temp_dir = tempfile.mkdtemp()
+        try:
+            # 1. Setup local template in user's config directory
+            config_dir = os.path.join(temp_dir, ".config", "rh-support-cli")
+            tpl_dir = os.path.join(config_dir, "templates")
+            os.makedirs(tpl_dir, exist_ok=True)
+            with open(os.path.join(tpl_dir, "sample.yaml"), "w") as f:
+                yaml.safe_dump(
+                    {
+                        "_template_description": "Sample test template",
+                        "product": "RHEL",
+                        "severity": "Low",
+                    },
+                    f,
+                )
+
+            # Create scratch files for description, comment, and attachment
+            desc_file = os.path.join(temp_dir, "desc.txt")
+            with open(desc_file, "w") as f:
+                f.write("Test ticket description")
+
+            comm_file = os.path.join(temp_dir, "comment.txt")
+            with open(comm_file, "w") as f:
+                f.write("Automated test comment")
+
+            close_file = os.path.join(temp_dir, "close.txt")
+            with open(close_file, "w") as f:
+                f.write("Closing case cleanly")
+
+            att_file = os.path.join(temp_dir, "diag.txt")
+            with open(att_file, "w") as f:
+                f.write("Log file diagnostics")
+
+            down_file = os.path.join(temp_dir, "downloaded.txt")
+            down_file2 = os.path.join(temp_dir, "downloaded2.txt")
+
+            orig_home = self.env.get("HOME")
+            self.env["HOME"] = temp_dir
+
+            # List of all commands, expected stdout substrings, and optional stdin input
+            commands_to_verify = [
+                (["list"], "NUMBER", None),
+                (["list", "--status", "open"], "NUMBER", None),
+                (["follow", "12345"], "Added", None),
+                (["list", "--following"], "12345", None),
+                (["list", "--json"], "[", None),
+                (["show", "-c", "12345", "--no-pager"], "CASE: 12345", None),
+                (
+                    ["show", "-c", "12345", "--newest-first", "--no-pager"],
+                    "newest first",
+                    None,
+                ),
+                (
+                    ["show", "-c", "12345", "--oldest-first", "--no-pager"],
+                    "oldest first",
+                    None,
+                ),
+                (
+                    ["link", "-c", "12345"],
+                    "https://access.redhat.com/support/cases/12345",
+                    None,
+                ),
+                (
+                    [
+                        "create",
+                        "--product",
+                        "RHEL",
+                        "--version",
+                        "9.0",
+                        "--summary",
+                        "Comprehensive Test Case",
+                        "--description-file",
+                        desc_file,
+                        "--severity",
+                        "Low",
+                        "--type",
+                        "Bug",
+                    ],
+                    "created",
+                    "y\n",
+                ),
+                (["comment", "-c", "12345", "-f", comm_file], "Comment added", None),
+                (
+                    ["comment", "-c", "12345", "-f", comm_file, "--no-status-change"],
+                    "Comment added",
+                    None,
+                ),
+                (["close", "-c", "12345", "-f", close_file], "Closed", None),
+                (
+                    ["apply", "-c", "12345", "-t", "sample", "--dry-run"],
+                    "Dry-run",
+                    None,
+                ),
+                (["list-templates"], "Template: sample", None),
+                (["list-template", "--simple-output"], "Template:    sample", None),
+                (["list-templates", "--json"], "Sample test template", None),
+                (["attach", "-c", "12345", "-f", att_file], "attached", None),
+                (["list-attachments", "12345"], "Attachments for Case #12345", None),
+                (
+                    ["attachment", "list", "-c", "12345"],
+                    "Attachments for Case #12345",
+                    None,
+                ),
+                (
+                    ["attachment", "upload", "-c", "12345", "-f", att_file],
+                    "attached",
+                    None,
+                ),
+                (["attachment", "status", "-c", "12345"], "COMPLETED", None),
+                (
+                    [
+                        "attachment",
+                        "download",
+                        "-c",
+                        "12345",
+                        "-a",
+                        "att_1001_uuid",
+                        "-o",
+                        down_file,
+                    ],
+                    "downloaded",
+                    None,
+                ),
+                (
+                    [
+                        "attachment",
+                        "delete",
+                        "-c",
+                        "12345",
+                        "-a",
+                        "att_1001_uuid",
+                        "-y",
+                    ],
+                    "deleted",
+                    None,
+                ),
+                (
+                    [
+                        "download",
+                        "-c",
+                        "12345",
+                        "-a",
+                        "att_1001_uuid",
+                        "-o",
+                        down_file2,
+                    ],
+                    "downloaded",
+                    None,
+                ),
+                (["following"], "12345", None),
+                (["sync"], "Sync complete", None),
+                (["updates"], "No unread updates", None),
+                (["unfollow", "12345"], "Removed", None),
+                (["search", "kernel"], "CASE #", None),
+                (["search", "kernel", "--type", "kcs"], "Solution", None),
+                (["search", "kernel", "--type", "all"], "CASE #", None),
+                (["completion"], "register-python-argcomplete", None),
+                (
+                    ["install-systemd", "--interval", "15m"],
+                    "Installed systemd user",
+                    None,
+                ),
+                (["systemd", "status"], "Timer unit:", None),
+                (["systemd", "uninstall"], "uninstalled", None),
+            ]
+
+            for cmd_args, expected_str, stdin_input in commands_to_verify:
+                with self.subTest(command=" ".join(cmd_args)):
+                    res = self.run_cli(cmd_args, input=stdin_input)
+                    self.assertEqual(
+                        res.returncode,
+                        0,
+                        f"Command failed (exit code {res.returncode}): {' '.join(cmd_args)}\nSTDERR: {res.stderr}\nSTDOUT: {res.stdout}",
+                    )
+                    self.assertIn(
+                        expected_str,
+                        res.stdout,
+                        f"Expected string '{expected_str}' not in output for command: {' '.join(cmd_args)}\nSTDOUT: {res.stdout}",
+                    )
+        finally:
+            if orig_home:
+                self.env["HOME"] = orig_home
+            shutil.rmtree(temp_dir)
 
 
 if __name__ == "__main__":

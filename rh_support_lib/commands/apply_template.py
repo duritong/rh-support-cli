@@ -5,7 +5,7 @@ import yaml
 
 from rh_support_lib.constants import COLORS, SEVERITY_MAP, STATUS_MAP
 from rh_support_lib.services.cases import CaseService
-from rh_support_lib.templates import TemplateEngine
+from rh_support_lib.templates import TemplateEngine, resolve_templates_dir
 from rh_support_lib.utils import colorize
 
 # Full set of valid fields in UpdateCaseRequest
@@ -85,10 +85,9 @@ def cmd_apply(args, api_client, config):
                 except yaml.YAMLError:
                     template_vars[k] = v
 
-    templates_dir = os.path.expanduser("~/.config/rh-support-cli/templates")
+    templates_dir = resolve_templates_dir(config)
     engine = TemplateEngine(templates_dir)
     template_data = engine.process(templates_to_process, template_vars)
-    # Ignore fields starting with '_' across all actions
     template_data = {k: v for k, v in template_data.items() if not k.startswith("_")}
 
     # 3. Compute field differences
@@ -163,8 +162,16 @@ def cmd_apply(args, api_client, config):
 
 
 def cmd_list_templates(args, config):
-    templates_dir = os.path.expanduser("~/.config/rh-support-cli/templates")
+    templates_dir = resolve_templates_dir(config)
+    fmt = getattr(args, "format", "text")
+    is_structured = fmt in ("json", "yaml") or getattr(args, "json", False)
+
     if not os.path.isdir(templates_dir):
+        if is_structured:
+            from rh_support_lib.utils import format_structured_output
+
+            print(format_structured_output([], fmt="yaml" if fmt == "yaml" else "json"))
+            sys.exit(0)
         print(f"Template directory does not exist: {templates_dir}")
         sys.exit(0)
 
@@ -175,9 +182,6 @@ def cmd_list_templates(args, config):
                 files.append(f)
     except OSError as e:
         sys.exit(f"Error listing template files: {e}")
-
-    fmt = getattr(args, "format", "text")
-    is_structured = fmt in ("json", "yaml") or getattr(args, "json", False)
 
     if not files:
         if is_structured:
@@ -291,9 +295,10 @@ def cmd_list_templates(args, config):
                 body_text.append("Includes:  ", style="bold yellow")
                 body_text.append(f"{includes_str}\n")
 
+            body_text.rstrip()
             console.print(
                 Panel(
-                    body_text.strip(),
+                    body_text,
                     title=f"Template: [bold cyan]{name}[/]",
                     border_style="cyan",
                 )

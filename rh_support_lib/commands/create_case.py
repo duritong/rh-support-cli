@@ -8,7 +8,7 @@ import yaml
 
 from rh_support_lib.services.attachments import AttachmentService
 from rh_support_lib.services.cases import CaseService
-from rh_support_lib.templates import TemplateEngine
+from rh_support_lib.templates import TemplateEngine, resolve_templates_dir
 from rh_support_lib.utils import prompt_text, select_from_list, strip_header_comments
 
 
@@ -37,7 +37,7 @@ def cmd_create(args, api_client, config):
                     except yaml.YAMLError:
                         template_vars[k] = v
 
-        templates_dir = os.path.expanduser("~/.config/rh-support-cli/templates")
+        templates_dir = resolve_templates_dir(config)
         engine = TemplateEngine(templates_dir)
         defaults = engine.process(templates_to_process, template_vars)
         # Ignore fields starting with '_' across all actions

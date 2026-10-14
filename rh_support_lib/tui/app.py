@@ -43,6 +43,7 @@ from rh_support_lib.statuses import (
     determine_reply_status,
     get_status_choices_for_case,
 )
+from rh_support_lib.templates import resolve_templates_dir
 from rh_support_lib.utils import is_comment_newer
 
 __all__ = [
@@ -144,7 +145,7 @@ class TemplateModal(ModalScreen[str]):
 
     def compose(self) -> ComposeResult:
         # Load local templates
-        templates_dir = os.path.expanduser("~/.config/rh-support-cli/templates")
+        templates_dir = resolve_templates_dir()
         choices = []
         if os.path.isdir(templates_dir):
             import contextlib

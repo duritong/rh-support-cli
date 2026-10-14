@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import sys
 
@@ -9,6 +11,22 @@ try:
 except ImportError:
     jinja2 = None
     dateparser = None
+
+
+def resolve_templates_dir(config: dict | None = None) -> str:
+    """Resolves the directory containing case YAML templates."""
+    if config and config.get("templates_dir"):
+        return os.path.expanduser(config["templates_dir"])
+    if os.environ.get("RH_SUPPORT_TEMPLATES"):
+        return os.path.expanduser(os.environ["RH_SUPPORT_TEMPLATES"])
+    if os.environ.get("RH_SUPPORT_CONFIG"):
+        return os.path.join(
+            os.path.dirname(
+                os.path.abspath(os.path.expanduser(os.environ["RH_SUPPORT_CONFIG"]))
+            ),
+            "templates",
+        )
+    return os.path.expanduser("~/.config/rh-support-cli/templates")
 
 
 class TemplateEngine:

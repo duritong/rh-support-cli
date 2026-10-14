@@ -26,7 +26,7 @@ def cmd_comment(args, api_client):
     if getattr(args, "template", None):
         import yaml
 
-        from rh_support_lib.templates import TemplateEngine
+        from rh_support_lib.templates import TemplateEngine, resolve_templates_dir
 
         template_vars = {}
         if getattr(args, "template_var", None):
@@ -38,7 +38,7 @@ def cmd_comment(args, api_client):
                     except yaml.YAMLError:
                         template_vars[k] = v
 
-        templates_dir = os.path.expanduser("~/.config/rh-support-cli/templates")
+        templates_dir = resolve_templates_dir()
         engine = TemplateEngine(templates_dir)
         template_data = engine.process(args.template, template_vars)
 

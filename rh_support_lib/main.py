@@ -846,6 +846,12 @@ Authentication:
         p.add_argument(
             "--no-cache", action="store_true", help="Bypass local disk cache"
         )
+        if not any(a.dest == "simple_output" for a in p._actions):
+            p.add_argument(
+                "--simple-output",
+                action="store_true",
+                help="Disable colored output and visual indicators",
+            )
     for att_p in set(att_sub.choices.values()):
         att_p.add_argument(
             "-j", "--json", action="store_true", help="Output in JSON format"
@@ -859,6 +865,12 @@ Authentication:
         att_p.add_argument(
             "--no-cache", action="store_true", help="Bypass local disk cache"
         )
+        if not any(a.dest == "simple_output" for a in att_p._actions):
+            att_p.add_argument(
+                "--simple-output",
+                action="store_true",
+                help="Disable colored output and visual indicators",
+            )
 
     if argcomplete:
         argcomplete.autocomplete(parser)
