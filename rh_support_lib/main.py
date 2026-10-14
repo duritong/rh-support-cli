@@ -210,6 +210,25 @@ Authentication:
         "--mark-read", action="store_true", help="Mark this case's updates as read"
     )
     parser_show.add_argument(
+        "--order",
+        choices=["newest", "oldest", "desc", "asc"],
+        default=None,
+        help="Comment display order: 'newest' (default, matches portal) or 'oldest'",
+    )
+    parser_show.add_argument(
+        "--newest-first",
+        "--reverse",
+        action="store_true",
+        dest="newest_first",
+        help="Display comments in reverse chronological order (newest first, default)",
+    )
+    parser_show.add_argument(
+        "--oldest-first",
+        action="store_true",
+        dest="oldest_first",
+        help="Display comments in chronological order (oldest first)",
+    )
+    parser_show.add_argument(
         "--simple-output", action="store_true", help="Disable colored output"
     )
 
@@ -249,13 +268,22 @@ Authentication:
             att_name,
             help="Manage case file attachments (list, upload, download, delete, status)",
         )
-        parser_att.add_argument("-c", "--case", required=True, help="Case Number")
+        parser_att.add_argument("-c", "--case", help="Case Number")
         att_sub = parser_att.add_subparsers(
             dest="attachment_action", help="Attachment action"
         )
 
         # list
         p_att_list = att_sub.add_parser("list", help="List attachments for a case")
+        p_att_list.add_argument(
+            "-c", "--case", default=argparse.SUPPRESS, help="Case Number"
+        )
+        p_att_list.add_argument(
+            "case_pos",
+            nargs="?",
+            default=argparse.SUPPRESS,
+            help="Case Number (positional)",
+        )
         p_att_list.add_argument(
             "--include-deleted", action="store_true", help="Include deleted files"
         )
@@ -266,6 +294,15 @@ Authentication:
                 up_name, help="Upload attachment(s) to a case"
             )
             p_att_up.add_argument(
+                "-c", "--case", default=argparse.SUPPRESS, help="Case Number"
+            )
+            p_att_up.add_argument(
+                "case_pos",
+                nargs="?",
+                default=argparse.SUPPRESS,
+                help="Case Number (positional)",
+            )
+            p_att_up.add_argument(
                 "-f", "--file", required=True, action="append", help="File to attach"
             )
             p_att_up.add_argument("-d", "--description", help="Attachment description")
@@ -274,6 +311,15 @@ Authentication:
         for down_name in ("download", "get"):
             p_att_down = att_sub.add_parser(
                 down_name, help="Download an attachment from a case"
+            )
+            p_att_down.add_argument(
+                "-c", "--case", default=argparse.SUPPRESS, help="Case Number"
+            )
+            p_att_down.add_argument(
+                "case_pos",
+                nargs="?",
+                default=argparse.SUPPRESS,
+                help="Case Number (positional)",
             )
             p_att_down.add_argument(
                 "-a", "--attachment", required=True, help="Attachment UUID"
@@ -288,6 +334,15 @@ Authentication:
                 del_name, help="Delete an attachment from a case"
             )
             p_att_del.add_argument(
+                "-c", "--case", default=argparse.SUPPRESS, help="Case Number"
+            )
+            p_att_del.add_argument(
+                "case_pos",
+                nargs="?",
+                default=argparse.SUPPRESS,
+                help="Case Number (positional)",
+            )
+            p_att_del.add_argument(
                 "-a", "--attachment", required=True, help="Attachment UUID"
             )
             p_att_del.add_argument(
@@ -298,9 +353,16 @@ Authentication:
         p_att_stat = att_sub.add_parser(
             "status", help="Get upload status of case attachments"
         )
+        p_att_stat.add_argument(
+            "-c", "--case", default=argparse.SUPPRESS, help="Case Number"
+        )
+        p_att_stat.add_argument(
+            "case_pos",
+            nargs="?",
+            default=argparse.SUPPRESS,
+            help="Case Number (positional)",
+        )
         p_att_stat.add_argument("-a", "--attachment", help="Attachment UUID (optional)")
-
-    # List Attachments Subcommand (shortcut)
     parser_list_att = subparsers.add_parser(
         "list-attachments", help="List all attachments for a support case (shortcut)"
     )
@@ -728,7 +790,25 @@ Authentication:
         choices=["vertical", "horizontal", "mailbox"],
         help="Split layout: 'horizontal' / 'mailbox' (default, top-and-bottom) or 'vertical' (side-by-side)",
     )
-
+    parser_tui.add_argument(
+        "--order",
+        choices=["newest", "oldest", "desc", "asc"],
+        default=None,
+        help="Comment display order: 'newest' (default, matches portal) or 'oldest'",
+    )
+    parser_tui.add_argument(
+        "--newest-first",
+        "--reverse",
+        action="store_true",
+        dest="newest_first",
+        help="Display comments in reverse chronological order (newest first, default)",
+    )
+    parser_tui.add_argument(
+        "--oldest-first",
+        action="store_true",
+        dest="oldest_first",
+        help="Display comments in chronological order (oldest first)",
+    )
     # Mock Portal Subcommand
     parser_mock_portal = subparsers.add_parser(
         "mock-portal",
@@ -873,7 +953,7 @@ Authentication:
     elif args.command == "list":
         cmd_list(args, api_client, config)
     elif args.command == "show":
-        cmd_show(args, api_client)
+        cmd_show(args, api_client, config=config)
     elif args.command == "apply":
         cmd_apply(args, api_client, config)
     elif args.command == "follow":

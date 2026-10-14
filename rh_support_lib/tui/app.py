@@ -6,7 +6,7 @@ import pathlib
 import re
 import threading
 import time
-from typing import ClassVar, Optional
+from typing import Any, ClassVar, Optional
 
 from rich.box import ROUNDED
 from rich.markdown import Markdown
@@ -409,9 +409,9 @@ class SupportApp(App):
         ("t", "apply_template", "Apply Template"),
         ("w", "toggle_follow", "Follow"),
         ("m", "mark_read", "Mark Read"),
+        ("o", "toggle_comment_order", "Order (New/Old)"),
         ("v", "toggle_layout", "Split (H/V)"),
         Binding("l", "toggle_layout", "Toggle Layout", show=False),
-        ("f", "focus_pane", "Focus Pane"),
         Binding("ctrl+up", "focus_top", "Focus Top", priority=True),
         Binding("ctrl+down", "focus_bottom", "Focus Bottom", priority=True),
         Binding("ctrl+left", "focus_left", "Focus Left", priority=True),
@@ -620,11 +620,12 @@ class SupportApp(App):
 
     def __init__(
         self,
-        token: str,
+        token: Any,
         config: dict | None = None,
         bookmark: str | None = None,
         no_default_bookmark: bool = False,
         layout: str | None = None,
+        comments_order: str | None = None,
     ):
         super().__init__()
         from rh_support_lib.api import LegacyAPIClient, RedHatAPIClient
@@ -669,6 +670,20 @@ class SupportApp(App):
         ).lower()
         self.layout = (
             "vertical" if initial_layout in ("vertical", "vsplit") else "horizontal"
+        )
+        # Resolve comments order: CLI arg > config > default ('newest')
+        initial_order = (
+            (
+                comments_order
+                or (config.get("comments_order") if config else None)
+                or (config.get("comment_order") if config else None)
+                or "newest"
+            )
+            .lower()
+            .strip()
+        )
+        self.comments_order = (
+            "oldest" if initial_order in ("oldest", "asc") else "newest"
         )
 
     def _safe_call(self, fn, *args, **kwargs) -> None:
@@ -1230,24 +1245,56 @@ class SupportApp(App):
         widgets.append(Static("\n[bold magenta]DESCRIPTION:[/]\n"))
         widgets.append(Static(Markdown(description)))
 
-        # Comments Header
-        widgets.append(Static(f"\n[bold cyan]COMMENTS ({len(comments)}):[/]\n"))
+        # Determine comment ordering
+        order = getattr(self, "comments_order", "oldest")
+        order_desc = "Newest First" if order == "newest" else "Oldest First"
+        widgets.append(
+            Static(
+                f"\n[bold cyan]COMMENTS ({len(comments)})[/] [dim]({order_desc}):[/]\n"
+            )
+        )
 
+        display_comments = (
+            list(reversed(comments)) if order == "newest" else list(comments)
+        )
         checkpoint_shown = False
-        for idx, c in enumerate(comments):
-            is_unread = idx in unread_indices
-            if is_unread and not checkpoint_shown:
+        unread_count = len(unread_indices)
+        for c in display_comments:
+            is_unread = (
+                is_comment_newer(
+                    created_date=c.created_date,
+                    comment_id=c.id,
+                    checkpoint_date=last_read_date,
+                    checkpoint_id=last_read_id,
+                )
+                if tc and tc.read_checkpoint
+                else False
+            )
+            if order == "oldest" and is_unread and not checkpoint_shown:
                 checkpoint_shown = True
-                count_unread = len(unread_indices)
                 ckpt_time = (
                     tc.read_checkpoint.marked_read_at or last_read_date or "previous"
                 )
                 divider = Panel(
-                    f"[bold yellow]┈┈┈┈ 📍 Last read checkpoint ({ckpt_time}) │ ▼ {count_unread} unread below ┈┈┈┈[/]",
+                    f"[bold yellow]┈┈┈┈ 📍 Last read checkpoint ({ckpt_time}) │ ▼ {unread_count} unread below ┈┈┈┈[/]",
                     border_style="yellow",
                 )
                 widgets.append(Static(divider, classes="tui-checkpoint-divider"))
-
+            elif (
+                order == "newest"
+                and not is_unread
+                and not checkpoint_shown
+                and unread_count > 0
+            ):
+                checkpoint_shown = True
+                ckpt_time = (
+                    tc.read_checkpoint.marked_read_at or last_read_date or "previous"
+                )
+                divider = Panel(
+                    f"[bold yellow]┈┈┈┈ 📍 Last read checkpoint ({ckpt_time}) │ ▲ {unread_count} unread above ┈┈┈┈[/]",
+                    border_style="yellow",
+                )
+                widgets.append(Static(divider, classes="tui-checkpoint-divider"))
             c_date = c.created_date or ""
             c_by = c.created_by or "Unknown"
             is_public = (
@@ -1274,6 +1321,16 @@ class SupportApp(App):
                     )
                 )
             )
+
+        if order == "newest" and unread_count > 0 and not checkpoint_shown:
+            ckpt_time = (
+                tc.read_checkpoint.marked_read_at or last_read_date or "previous"
+            )
+            divider = Panel(
+                f"[bold yellow]┈┈┈┈ 📍 Last read checkpoint ({ckpt_time}) │ ▲ {unread_count} unread above ┈┈┈┈[/]",
+                border_style="yellow",
+            )
+            widgets.append(Static(divider, classes="tui-checkpoint-divider"))
         detail_container.mount(*widgets)
 
         if checkpoint_shown:
@@ -1910,11 +1967,36 @@ class SupportApp(App):
         if self.screen.has_class("commenting"):
             self.action_exit_commenting()
 
+    def action_toggle_comment_order(self) -> None:
+        """Toggles comment display order between oldest first and newest first."""
+        self.comments_order = (
+            "newest"
+            if getattr(self, "comments_order", "oldest") == "oldest"
+            else "oldest"
+        )
+        order_desc = (
+            "Newest First" if self.comments_order == "newest" else "Oldest First"
+        )
+        self.notify(f"Comments Order: {order_desc}")
+        self._update_case_details_view()
+
 
 def cmd_tui(args, api_client, config):
     """Entry point to run the TUI."""
     bookmark = getattr(args, "bookmark", None)
     no_default = getattr(args, "no_default_bookmark", False)
     layout = getattr(args, "layout", None)
-    app = SupportApp(api_client, config, bookmark, no_default, layout=layout)
+    comments_order = (
+        "newest"
+        if getattr(args, "newest_first", False)
+        else getattr(args, "order", None)
+    )
+    app = SupportApp(
+        api_client,
+        config,
+        bookmark,
+        no_default,
+        layout=layout,
+        comments_order=comments_order,
+    )
     app.run()

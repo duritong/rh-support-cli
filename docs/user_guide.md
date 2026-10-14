@@ -60,6 +60,8 @@ default_create_template: base-template
 # Default language for Knowledgebase (KCS) queries (default: en)
 default_kcs_language: en
 
+# Default comment display order ('newest' or 'oldest', default: newest)
+comments_order: newest
 # Background debug logging (redacted HTTP requests/responses)
 debug_file: ~/.config/rh-support-cli/debug_log.txt
 
@@ -83,6 +85,25 @@ bookmarks:
     status: ["open"]
 ```
 
+### Custom Configuration File (`--config-file` / `RH_SUPPORT_CONFIG`)
+You can specify an alternate configuration file using `--config-file` or the `RH_SUPPORT_CONFIG` environment variable:
+```bash
+rh-support-cli --config-file /path/to/custom_config.yaml list
+```
+
+### Debugging & HTTP Logging (`--debug` / `--debug-file`)
+Inspect network communication and API payloads:
+* `--debug`: Prints redacted HTTP requests and responses directly to `stderr`.
+* `--debug-file <path>`: Logs full, untruncated requests and responses to the specified file while keeping console output clean.
+
+```bash
+# Output debug logs to terminal:
+rh-support-cli --debug list
+
+# Log full HTTP payload exchanges to a file:
+rh-support-cli --debug-file /tmp/rh_debug.log show -c 12345678
+```
+
 ### Global Cache Control (`--no-cache`)
 To bypass reading from or writing to the local disk cache, pass `--no-cache` or set `export RH_NO_CACHE=1`:
 ```bash
@@ -90,6 +111,20 @@ rh-support-cli list --no-cache
 rh-support-cli show -c 12345678 --no-cache
 ```
 
+### Environment Variables Reference
+
+| Variable | Purpose | Default |
+| :--- | :--- | :--- |
+| `REDHAT_SUPPORT_OFFLINE_TOKEN` | Red Hat SSO offline API token | None (prompted/resolved) |
+| `RH_SUPPORT_CONFIG` | Path to custom YAML configuration file | `~/.config/rh-support-cli/config.yaml` |
+| `RH_SUPPORT_STATE` | Path to persistent local operational state | `~/.local/state/rh-support-cli/state.yaml` |
+| `RH_NO_CACHE` | Set to `1` or `true` to bypass local disk cache globally | `0` |
+| `RH_GRAPHQL_URL` | Override CRM GraphQL API endpoint | `https://graphql.redhat.com` |
+| `RH_ATTACHMENT_API_URL` | Override v3 Attachment API endpoint | `https://api.access.redhat.com/support` |
+| `RH_KCS_SEARCH_URL` | Override Hydra KCS search endpoint | `https://access.redhat.com/hydra/rest/search/kcs` |
+| `RH_SSO_URL` | Override Red Hat SSO OAuth token endpoint | `https://sso.redhat.com/...` |
+| `EDITOR` | Terminal text editor for comments and descriptions | `vi` |
+| `FORCE_COLOR` | Set to `1` to force ANSI colors when redirected or piped | `auto` |
 ---
 
 ## 4. Case Sizing Templates
@@ -140,32 +175,38 @@ Lists support cases matching account, status, severity, product, or owner filter
 # List all cases (uses default bookmark if configured):
 rh-support-cli list
 
+# Filter to cases you are locally following:
+rh-support-cli list --following
+
 # List high severity cases for an account:
 rh-support-cli list --account 12345 --status "Waiting on Red Hat" --severity High
 
-# Filter using an explicit bookmark:
+# Filter using an explicit bookmark (or bypass default bookmark):
 rh-support-cli list -b my-rhel
+rh-support-cli list --no-default-bookmark
 
 # Fetch all cases across all pages:
 rh-support-cli list --status open --all
 
 # Limit number of cases returned:
 rh-support-cli list --limit 50
-```
 
 ### 5.2 Showing Case Details (`show`)
 Displays complete case metadata, descriptions, attachments, and the comment thread (piped to `$PAGER` by default):
 
 ```bash
-# View case details:
+# View case details (newest comments first by default, matching portal):
 rh-support-cli show -c 12345678
 
+# View in chronological order (oldest comments first):
+rh-support-cli show -c 12345678 --oldest-first
+# or:
+rh-support-cli show -c 12345678 --order oldest
 # Print directly to stdout without pager:
 rh-support-cli show -c 12345678 --no-pager
 
 # Mark unread updates on this case as read:
 rh-support-cli show -c 12345678 --mark-read
-```
 
 ### 5.3 Case Browser Link (`link`)
 Generates the browser URL for a support case (bypasses authentication):
@@ -194,7 +235,9 @@ rh-support-cli create \
 
 # Create from template:
 rh-support-cli create --template proactive_upgrade --template-var cluster="OCP-Prod"
-```
+
+# Ignore default create template defined in config:
+rh-support-cli create --no-default-template
 
 ### 5.5 Commenting & Status Updates (`comment`)
 Posts a comment to an existing case and optionally transitions its status (defaults to `Waiting on Red Hat`):
@@ -219,12 +262,14 @@ rh-support-cli comment -c 12345678 -f draft.txt --edit
 Closes a support case with a final comment (automatically sets status to `closed`):
 
 ```bash
-# Interactively draft closing comment in $EDITOR:
-rh-support-cli close -c 12345678
+# Interactively draft closing comment in $EDITOR (includes context from previous comments):
+rh-support-cli close -c 12345678 --include-previous-comments 1
 
-# Close case with comment from file:
-rh-support-cli close -c 12345678 -f resolution.txt
-```
+# Close case with comment from file (optionally edit before submitting):
+rh-support-cli close -c 12345678 -f resolution.txt --edit
+
+# Close case using a template:
+rh-support-cli close -c 12345678 -t resolve_incident --template-var root_cause="DNS timeout"
 
 ### 5.7 Comment & Description Formatting (`--format`)
 The Red Hat Customer Portal displays comments and descriptions as Rich Text (HTML). Unformatted plain text with raw newlines collapses into single lines on the web portal.
@@ -254,9 +299,10 @@ Manage diagnostic archives and log bundles attached to support cases:
 # Upload an attachment (shortcut):
 rh-support-cli attach -c 12345678 -f /tmp/sosreport.tar.xz
 
-# Upload with optional description:
-rh-support-cli attachment -c 12345678 upload -f /tmp/sosreport.tar.xz -d "Post-OOM report"
-
+# Upload via attachment subcommand (supports -c after or before upload, or positional case):
+rh-support-cli attachment upload -c 12345678 -f /tmp/sosreport.tar.xz -d "Post-OOM report"
+rh-support-cli attachment upload 12345678 -f /tmp/sosreport.tar.xz
+rh-support-cli attachment -c 12345678 upload -f /tmp/sosreport.tar.xz
 # List attachments:
 rh-support-cli list-attachments 12345678
 
@@ -285,20 +331,28 @@ rh-support-cli follow 12345678 23456789
 # List followed cases:
 rh-support-cli following
 
+# Filter followed cases using bookmarks or user:
+rh-support-cli following -b ocp-team
+rh-support-cli following -u colleague_sso
+
+# Sync latest status from account before listing followed cases:
+rh-support-cli following --sync
+
 # Unfollow cases:
 rh-support-cli unfollow 12345678
-```
 
 ### 5.10 Synchronizing Tracked Cases & Systemd Timer (`sync` / `install-systemd` / `systemd`)
 Polls Red Hat's backend across all followed and owned cases in parallel to detect remote updates:
 
 ```bash
-# Run manual synchronization:
+# Run manual synchronization across all tracked cases:
 rh-support-cli sync
+
+# Sync tracked cases for a specific account or user:
+rh-support-cli sync --account 12345 -u myself@redhat.com
 
 # Sync with desktop notifications on new comments or status transitions:
 rh-support-cli sync --notify
-```
 
 #### Installing the Background Systemd Timer
 You can automate regular case synchronization using a systemd user timer:
@@ -320,15 +374,20 @@ rh-support-cli systemd uninstall
 Inspects what changed across your tracked cases since your last checkpoint:
 
 ```bash
-# View summary of unread updates:
+# View summary of unread updates across all tracked cases:
 rh-support-cli updates
+
+# Filter updates to a specific case number:
+rh-support-cli updates -c 12345678
+
+# Inspect all tracked cases, including those without new updates:
+rh-support-cli updates --all
 
 # View full unread comment bodies:
 rh-support-cli updates --full
 
 # Mark all inspected updates as read:
 rh-support-cli updates --mark-read
-```
 
 #### Tracking Indicators
 * **Table Badges**: Followed cases display `★` (`[F]` in `--simple-output`); cases with unread updates display `●` with comment count (`*` in `--simple-output`).
@@ -395,8 +454,21 @@ rh-support-cli show -c 12345678 --format yaml
 Strips all ANSI coloring, box-drawing characters, and layout grids for clean pipe processing:
 ```bash
 rh-support-cli --simple-output list
+rh-support-cli --simple-output show -c 12345678
 ```
 
+### 5.16 Shell Auto-Completion (`completion`)
+Generates shell auto-completion for commands, options, and bookmarks:
+```bash
+# Print bash completion script:
+rh-support-cli completion
+
+# Enable tab-completion in your current shell:
+eval "$(rh-support-cli completion)"
+
+# Persist bash completion in ~/.bashrc:
+echo 'eval "$(rh-support-cli completion)"' >> ~/.bashrc
+```
 ---
 
 ## 6. Interactive TUI Mode (`tui`)
@@ -410,9 +482,9 @@ rh-support-cli tui
 ### Options:
 * `-l <layout>` / `--layout <layout>`: Split layout (`horizontal` / `mailbox` default or `vertical` side-by-side).
 * `-b <name>` / `--bookmark <name>`: Launch with a specific bookmark filter.
+* `--newest-first` / `--order <newest|oldest>`: Comment display ordering on startup (newest or oldest first).
 * `--no-default-bookmark`: Launch unfiltered.
 * `--no-cache`: Bypass disk cache on startup.
-
 ### Keyboard Controls:
 | Key | Action |
 | :--- | :--- |
@@ -420,8 +492,8 @@ rh-support-cli tui
 | **`j` / `k` / `Up/Down`** | Navigate row-by-row / scroll lines |
 | **`PageUp` / `PageDown`** | Scroll screen-by-screen |
 | **`c`** | Open inline Comment drafting pane |
+| **`o`** | Toggle comment ordering (newest first vs oldest first) |
 | **`a`** | Upload file attachment (Attach Modal) |
-| **`d`** | Download case attachment (Download Modal) |
 | **`t`** | Select and apply template (Template Modal) |
 | **`b`** | Switch active filter bookmark (Bookmark Modal) |
 | **`v` / `l`** | Toggle layout (horizontal mailbox vs vertical side-by-side) |

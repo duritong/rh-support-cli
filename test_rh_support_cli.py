@@ -3155,15 +3155,26 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             sample_file = os.path.join(temp_dir, "test_diag.log")
             with open(sample_file, "w") as f:
                 f.write("System diagnostic log line 1\nLine 2")
-            result_up = self.run_cli(
+            # 1. Upload with -c before upload action
+            result_up1 = self.run_cli(
                 ["--graphql", "attachment", "-c", "12345", "upload", "-f", sample_file]
             )
-            self.assertEqual(result_up.returncode, 0)
-            self.assertIn(
-                "Attaching 'test_diag.log' to Case #12345...", result_up.stdout
-            )
-            self.assertIn("Success: File 'test_diag.log' attached.", result_up.stdout)
+            self.assertEqual(result_up1.returncode, 0)
+            self.assertIn("Success: File 'test_diag.log' attached.", result_up1.stdout)
 
+            # 2. Upload with -c after upload action
+            result_up2 = self.run_cli(
+                ["--graphql", "attachment", "upload", "-c", "12345", "-f", sample_file]
+            )
+            self.assertEqual(result_up2.returncode, 0)
+            self.assertIn("Success: File 'test_diag.log' attached.", result_up2.stdout)
+
+            # 3. Upload with positional case after upload action
+            result_up3 = self.run_cli(
+                ["--graphql", "attachment", "upload", "12345", "-f", sample_file]
+            )
+            self.assertEqual(result_up3.returncode, 0)
+            self.assertIn("Success: File 'test_diag.log' attached.", result_up3.stdout)
             # Download
             dest_file = os.path.join(temp_dir, "downloaded.log")
             result_down = self.run_cli(
@@ -4084,6 +4095,139 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             self.assertIn(
                 "No unread updates across tracked cases.", res_upd_clean.stdout
             )
+        finally:
+            if orig_home:
+                self.env["HOME"] = orig_home
+            if orig_config:
+                self.env["XDG_CONFIG_HOME"] = orig_config
+            if orig_state:
+                self.env["XDG_STATE_HOME"] = orig_state
+            shutil.rmtree(temp_home)
+
+    def test_show_case_comment_ordering_and_newest_first(self):
+        """Test comment ordering flags (--newest-first, --order, --oldest-first) and config defaults."""
+        import json
+        import shutil
+        import tempfile
+
+        import yaml
+
+        from rh_support_lib.services.state import StateService
+
+        temp_home = tempfile.mkdtemp()
+        orig_home = self.env.get("HOME")
+        orig_config = self.env.get("XDG_CONFIG_HOME")
+        orig_state = self.env.get("XDG_STATE_HOME")
+        self.env["HOME"] = temp_home
+        self.env["XDG_CONFIG_HOME"] = os.path.join(temp_home, ".config")
+        self.env["XDG_STATE_HOME"] = os.path.join(temp_home, ".local", "state")
+
+        try:
+            # Setup tracking with older checkpoint on case 1001 so some comments are unread
+            state_path = os.path.join(
+                temp_home, ".local", "state", "rh-support-cli", "state.yaml"
+            )
+            user = self.env.get("REDHAT_SUPPORT_USERNAME") or self.env.get(
+                "USER", "jdeveloper"
+            )
+            svc = StateService(state_file=state_path)
+            svc.add_tracked_case(
+                user, "1001", relationship="followed", summary="Test Case"
+            )
+            state_data = svc.load_state()
+            u_state = svc._get_user_state(state_data, user)
+            u_state["tracked_cases"]["1001"]["read_checkpoint"] = {
+                "last_read_comment_date": "2023-01-02T10:00:00Z",
+                "last_read_comment_id": "comment_1",
+                "status": "Waiting on Red Hat",
+                "marked_read_at": "2023-01-02T10:00:00Z",
+            }
+            svc.save_state(state_data)
+
+            # 1. Default (newest-first, matches portal default)
+            res_default = self.run_cli(
+                ["show", "-c", "1001", "--simple-output", "--no-pager"]
+            )
+            self.assertEqual(res_default.returncode, 0)
+            self.assertIn("COMMENTS (2) [newest first]:", res_default.stdout)
+            self.assertIn("▲ 1 unread above", res_default.stdout)
+
+            # Verify comment order: in newest-first default, Comment 2 comes before Comment 1
+            idx_c2 = res_default.stdout.find("Comment 2")
+            idx_c1 = res_default.stdout.find("Comment 1")
+            self.assertTrue(idx_c2 != -1 and idx_c1 != -1)
+            self.assertLess(idx_c2, idx_c1)
+
+            # 2. Flag --oldest-first: comments chronological and divider points below
+            res_oldest = self.run_cli(
+                [
+                    "show",
+                    "-c",
+                    "1001",
+                    "--oldest-first",
+                    "--simple-output",
+                    "--no-pager",
+                ]
+            )
+            self.assertEqual(res_oldest.returncode, 0)
+            self.assertIn("COMMENTS (2) [oldest first]:", res_oldest.stdout)
+            self.assertIn("▼ 1 unread below", res_oldest.stdout)
+            idx_old_c1 = res_oldest.stdout.find("Comment 1")
+            idx_old_c2 = res_oldest.stdout.find("Comment 2")
+            self.assertTrue(idx_old_c1 != -1 and idx_old_c2 != -1)
+            self.assertLess(idx_old_c1, idx_old_c2)
+
+            # 3. Flag --order asc: same as oldest-first
+            res_asc = self.run_cli(
+                [
+                    "show",
+                    "-c",
+                    "1001",
+                    "--order",
+                    "asc",
+                    "--simple-output",
+                    "--no-pager",
+                ]
+            )
+            self.assertEqual(res_asc.returncode, 0)
+            self.assertIn("COMMENTS (2) [oldest first]:", res_asc.stdout)
+
+            # 4. JSON format with default order
+            res_json = self.run_cli(["show", "-c", "1001", "--format", "json"])
+            self.assertEqual(res_json.returncode, 0)
+            parsed = json.loads(res_json.stdout)
+            self.assertEqual(parsed.get("order"), "newest")
+            self.assertIn("Comment 2", parsed["comments"][0]["body"])
+
+            # 5. Config file default comments_order: oldest
+            os.makedirs(
+                os.path.join(temp_home, ".config", "rh-support-cli"), exist_ok=True
+            )
+            config_file = os.path.join(
+                temp_home, ".config", "rh-support-cli", "config.yaml"
+            )
+            with open(config_file, "w") as f:
+                yaml.safe_dump({"comments_order": "oldest"}, f)
+
+            res_cfg = self.run_cli(
+                ["show", "-c", "1001", "--simple-output", "--no-pager"]
+            )
+            self.assertEqual(res_cfg.returncode, 0)
+            self.assertIn("COMMENTS (2) [oldest first]:", res_cfg.stdout)
+
+            # Explicit --newest-first overrides config default
+            res_override = self.run_cli(
+                [
+                    "show",
+                    "-c",
+                    "1001",
+                    "--newest-first",
+                    "--simple-output",
+                    "--no-pager",
+                ]
+            )
+            self.assertEqual(res_override.returncode, 0)
+            self.assertIn("COMMENTS (2) [newest first]:", res_override.stdout)
         finally:
             if orig_home:
                 self.env["HOME"] = orig_home

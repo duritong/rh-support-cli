@@ -28,9 +28,9 @@ rh-support-cli/
     │   ├── list_cases.py       # list subcommand (Rich Table rendering)
     │   ├── search.py           # search subcommand (Cases and KCS Knowledgebase)
     │   ├── show_case.py        # show subcommand (Rich Panels and Markdown paging)
-    │   ├── tracking.py         # sync and updates subcommands, systemd timer generator
+    │   ├── systemd.py          # systemd and install-systemd unit installation/management
+    │   ├── tracking.py         # sync and updates subcommands
     │   └── watchers.py         # follow, unfollow, following subcommands
-    ├── services/               # Decoupled domain service layer
     │   ├── attachments.py      # AttachmentService (v3 presigned upload, multipart, download)
     │   ├── cache.py            # CacheService (Atomic XDG disk cache, SWR, TTL management)
     │   ├── cases.py            # CaseService (GraphQL queries, mutations, case lookups)

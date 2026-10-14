@@ -109,8 +109,14 @@ def cmd_attachment_list(args, api_client):
 def cmd_attachment_upload(args, api_client):
     """Uploads one or more files to a support case."""
     service = AttachmentService(api_client)
-    case_num = args.case
-    files = args.file
+    case_num = str(
+        getattr(args, "case", None) or getattr(args, "case_pos", None) or ""
+    ).strip()
+    if not case_num:
+        sys.exit(
+            "Error: Case number is required (e.g. -c 12345678 or 'attachment upload 12345678 -f ...')."
+        )
+    files = getattr(args, "file", []) or []
     if not isinstance(files, list):
         files = [files]
 
@@ -178,8 +184,12 @@ def cmd_attachment_upload(args, api_client):
 def cmd_attachment_download(args, api_client):
     """Downloads an attachment from a support case."""
     service = AttachmentService(api_client)
-    case_num = args.case
-    att_id = args.attachment or getattr(args, "attachment_id", None)
+    case_num = str(
+        getattr(args, "case", None) or getattr(args, "case_pos", None) or ""
+    ).strip()
+    if not case_num:
+        sys.exit("Error: Case number is required (e.g. -c 12345678).")
+    att_id = getattr(args, "attachment", None) or getattr(args, "attachment_id", None)
     if not att_id:
         sys.exit("Error: Attachment ID (--attachment / -a) is required.")
 
@@ -214,8 +224,12 @@ def cmd_attachment_download(args, api_client):
 def cmd_attachment_delete(args, api_client):
     """Deletes an attachment from a support case."""
     service = AttachmentService(api_client)
-    case_num = args.case
-    att_id = args.attachment or getattr(args, "attachment_id", None)
+    case_num = str(
+        getattr(args, "case", None) or getattr(args, "case_pos", None) or ""
+    ).strip()
+    if not case_num:
+        sys.exit("Error: Case number is required (e.g. -c 12345678).")
+    att_id = getattr(args, "attachment", None) or getattr(args, "attachment_id", None)
     if not att_id:
         sys.exit("Error: Attachment ID (--attachment / -a) is required.")
 
@@ -239,9 +253,12 @@ def cmd_attachment_delete(args, api_client):
 def cmd_attachment_status(args, api_client):
     """Fetches upload status for attachments on a case."""
     service = AttachmentService(api_client)
-    case_num = args.case
+    case_num = str(
+        getattr(args, "case", None) or getattr(args, "case_pos", None) or ""
+    ).strip()
+    if not case_num:
+        sys.exit("Error: Case number is required (e.g. -c 12345678).")
     att_id = getattr(args, "attachment", None) or getattr(args, "attachment_id", None)
-
     try:
         statuses = service.get_attachment_status(case_num, att_id)
     except Exception as e:  # noqa: BLE001

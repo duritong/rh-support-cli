@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import pydoc
 import sys
@@ -6,7 +8,7 @@ from rh_support_lib.services.cases import CaseService
 from rh_support_lib.utils import is_comment_newer
 
 
-def cmd_show(args, api_client):
+def cmd_show(args, api_client, config: dict | None = None):
     fmt = getattr(args, "format", "text")
     is_structured = fmt in ("json", "yaml") or getattr(args, "json", False)
     if not is_structured:
@@ -60,19 +62,25 @@ def cmd_show(args, api_client):
         )
         tc = service.state_service.get_tracked_cases(user).get(str(num))
 
-    if is_structured:
-        from rh_support_lib.utils import format_structured_output
-
-        data = {
-            "case": case,
-            "description": description,
-            "comments": comments,
-            "attachments": attachments,
-        }
-        print(format_structured_output(data, fmt="yaml" if fmt == "yaml" else "json"))
-        if getattr(args, "mark_read", False):
-            service.state_service.mark_case_read(user, str(num))
-        return
+    # Determine comment display order (defaults to 'newest' matching portal default)
+    order = "newest"
+    if getattr(args, "oldest_first", False):
+        order = "oldest"
+    elif getattr(args, "newest_first", False):
+        order = "newest"
+    elif getattr(args, "order", None):
+        order = (
+            "newest"
+            if getattr(args, "order", "").lower() in ("newest", "desc")
+            else "oldest"
+        )
+    elif config and (config.get("comments_order") or config.get("comment_order")):
+        cfg_order = (
+            str(config.get("comments_order") or config.get("comment_order"))
+            .lower()
+            .strip()
+        )
+        order = "newest" if cfg_order in ("newest", "desc") else "oldest"
     status_changed = False
     old_status = ""
     last_read_date = ""
@@ -88,16 +96,38 @@ def cmd_show(args, api_client):
         )
         last_read_id = tc.read_checkpoint.last_read_comment_id or ""
 
-    unread_indices = set()
+    # Annotate unread status on comments
+    unread_count = 0
     if tc and tc.read_checkpoint:
-        for idx, c in enumerate(comments):
-            if is_comment_newer(
+        for c in comments:
+            c.is_unread = is_comment_newer(
                 created_date=c.created_date,
                 comment_id=c.id,
                 checkpoint_date=last_read_date,
                 checkpoint_id=last_read_id,
-            ):
-                unread_indices.add(idx)
+            )
+            if c.is_unread:
+                unread_count += 1
+    else:
+        for c in comments:
+            c.is_unread = False
+
+    display_comments = list(reversed(comments)) if order == "newest" else list(comments)
+
+    if is_structured:
+        from rh_support_lib.utils import format_structured_output
+
+        data = {
+            "case": case,
+            "description": description,
+            "comments": display_comments,
+            "attachments": attachments,
+            "order": order,
+        }
+        print(format_structured_output(data, fmt="yaml" if fmt == "yaml" else "json"))
+        if getattr(args, "mark_read", False):
+            service.state_service.mark_case_read(user, str(num))
+        return
     if args.simple_output:
         lines = []
         lines.append(f"CASE: {num}")
@@ -134,12 +164,26 @@ def cmd_show(args, api_client):
         lines.append("DESCRIPTION:\n")
         lines.append(description)
         lines.append("\n" + "=" * 80 + "\n")
-        lines.append(f"COMMENTS ({len(comments)}):\n")
+        order_label = "newest first" if order == "newest" else "oldest first"
+        lines.append(f"COMMENTS ({len(display_comments)}) [{order_label}]:\n")
         checkpoint_shown_simple = False
-        for idx, c in enumerate(comments):
-            if idx in unread_indices and not checkpoint_shown_simple:
+        for c in display_comments:
+            if order == "oldest" and c.is_unread and not checkpoint_shown_simple:
                 checkpoint_shown_simple = True
-                lines.append("┈┈┈┈ 📍 Last read checkpoint │ Unread below ┈┈┈┈\n")
+                lines.append(
+                    f"┈┈┈┈ 📍 Last read checkpoint │ ▼ {unread_count} unread below ┈┈┈┈\n"
+                )
+            elif (
+                order == "newest"
+                and not c.is_unread
+                and not checkpoint_shown_simple
+                and unread_count > 0
+            ):
+                checkpoint_shown_simple = True
+                lines.append(
+                    f"┈┈┈┈ 📍 Last read checkpoint │ ▲ {unread_count} unread above ┈┈┈┈\n"
+                )
+
             c_date = c.created_date or ""
             c_by = c.created_by or "Unknown"
             is_public = (
@@ -156,6 +200,11 @@ def cmd_show(args, api_client):
             lines.append(header_str)
             lines.append(c_body)
             lines.append("")
+
+        if order == "newest" and unread_count > 0 and not checkpoint_shown_simple:
+            lines.append(
+                f"┈┈┈┈ 📍 Last read checkpoint │ ▲ {unread_count} unread above ┈┈┈┈\n"
+            )
 
         output = "\n".join(lines)
         if args.no_pager:
@@ -237,21 +286,34 @@ def cmd_show(args, api_client):
             con.print(Markdown(description))
             con.print()
 
-            con.print(f"\n[bold cyan]COMMENTS ({len(comments)}):[/]\n")
+            order_label = "newest first" if order == "newest" else "oldest first"
+            con.print(
+                f"\n[bold cyan]COMMENTS ({len(display_comments)})[/] [dim]({order_label})[/]:\n"
+            )
             checkpoint_shown_rich = False
-            for idx, c in enumerate(comments):
-                is_unread = idx in unread_indices
-                if is_unread and not checkpoint_shown_rich:
+            ckpt_time = (
+                (tc.read_checkpoint.marked_read_at or last_read_date or "previous")
+                if tc and tc.read_checkpoint
+                else "previous"
+            )
+
+            for c in display_comments:
+                if order == "oldest" and c.is_unread and not checkpoint_shown_rich:
                     checkpoint_shown_rich = True
-                    count_unread = len(unread_indices)
-                    ckpt_time = (
-                        tc.read_checkpoint.marked_read_at
-                        or last_read_date
-                        or "previous"
-                    )
                     con.print(
-                        f"[bold yellow]┈┈┈┈ 📍 Last read checkpoint ({ckpt_time}) │ ▼ {count_unread} unread below ┈┈┈┈[/]\n"
+                        f"[bold yellow]┈┈┈┈ 📍 Last read checkpoint ({ckpt_time}) │ ▼ {unread_count} unread below ┈┈┈┈[/]\n"
                     )
+                elif (
+                    order == "newest"
+                    and not c.is_unread
+                    and not checkpoint_shown_rich
+                    and unread_count > 0
+                ):
+                    checkpoint_shown_rich = True
+                    con.print(
+                        f"[bold yellow]┈┈┈┈ 📍 Last read checkpoint ({ckpt_time}) │ ▲ {unread_count} unread above ┈┈┈┈[/]\n"
+                    )
+
                 c_date = c.created_date or ""
                 c_by = c.created_by or "Unknown"
                 is_public = (
@@ -264,9 +326,9 @@ def cmd_show(args, api_client):
                     )
                 )
                 border_style = (
-                    "yellow" if is_unread else ("green" if c.is_public else "red")
+                    "yellow" if c.is_unread else ("green" if c.is_public else "red")
                 )
-                badge = " [bold yellow][NEW][/]" if is_unread else ""
+                badge = " [bold yellow][NEW][/]" if c.is_unread else ""
                 c_body = c.body or ""
                 comment_header = f"{c_by} ({is_public}){badge} - {c_date}"
                 con.print(
@@ -277,6 +339,11 @@ def cmd_show(args, api_client):
                     )
                 )
                 con.print()
+
+            if order == "newest" and unread_count > 0 and not checkpoint_shown_rich:
+                con.print(
+                    f"[bold yellow]┈┈┈┈ 📍 Last read checkpoint ({ckpt_time}) │ ▲ {unread_count} unread above ┈┈┈┈[/]\n"
+                )
 
         if args.no_pager:
             render_rich(console)
