@@ -175,7 +175,7 @@ class ConfigurationTests(unittest.TestCase):
         self.assertEqual(bookmark_completer("te", parsed_args=args), ["team"])
         self.assertEqual(template_completer("inc", parsed_args=args), ["incident"])
 
-    def test_create_keeps_confirmation_and_configures_both_services(self):
+    def test_create_keeps_confirmation_and_configures_single_case_service(self):
         args = SimpleNamespace(
             no_default_template=True,
             template=None,
@@ -208,7 +208,7 @@ class ConfigurationTests(unittest.TestCase):
             self.assertEqual(cmd_create(args, self.client, self.config), "123")
         prompt.assert_called_once_with("Submit this case? (y/n/edit)", default="y")
         create.assert_called_once()
-        self.assertEqual(len(services), 2)
+        self.assertEqual(len(services), 1)
         for service in services:
             self.assert_cache_config(service)
 

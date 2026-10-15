@@ -263,12 +263,18 @@ Until the production version-filter contract is verified, the name lookup must r
 
 Creates a new support ticket interactively or via command-line flags:
 
+Creation always asks for confirmation unless you explicitly pass `create --yes`. With `--yes`, supply nonempty product, version, summary, severity, type, and description through flags or templates; missing values fail without prompts or an editor. Supply the description through `--description-file` or a template. JSON output alone never bypasses confirmation.
+
+Templates may use numeric YAML versions (such as `version: 9.0`) and integer severity codes (`1` urgent, `2` high, `3` normal, `4` low), including with `--yes`. If validation fails, check the product/version, required text, attachment readability, and contact/account/record-type lookup settings indicated on stderr. Set `REDHAT_SUPPORT_USERNAME` if SSO identity cannot be resolved; verify the Customer Portal before retrying creation.
+
+Use `create --json` (or global `--format json` before `create`) for one JSON receipt on stdout; global `--format yaml` emits the same receipt as YAML. The command-level `create --format` controls description content only. Prompts, overviews, progress, and errors go to stderr. Receipts contain `case_number`, `created`, `success`, and per-file `attachments` outcomes (`file`, `uploaded`, `attachment_id`, `error`). A created case with any unconfirmed attachment produces a receipt with `created: true`, `success: false` and a nonzero exit status. Do not repeat creation: check that existing case before retrying uploads. Description drafts are removed after confirmed creation even if attachments fail, since the description has already been submitted. A creation failure preserves generated drafts; if the creation outcome is unknown, check the Customer Portal before retrying.
+
 ```bash
 # Interactive mode (prompts for product, version, summary, severity):
 rh-support-cli create
 
-# Non-interactive mode:
-rh-support-cli create \
+# Non-interactive mode with a JSON receipt:
+rh-support-cli create --yes --json \
   --product "Red Hat Enterprise Linux" \
   --version "9.0" \
   --summary "Kernel panic on boot" \
@@ -282,6 +288,7 @@ rh-support-cli create --template proactive_upgrade --template-var cluster="OCP-P
 
 # Ignore default create template defined in config:
 rh-support-cli create --no-default-template
+```
 
 ### 5.5 Commenting & Status Updates (`comment`)
 Posts a comment to an existing case and optionally transitions its status (defaults to `Waiting on Red Hat`):

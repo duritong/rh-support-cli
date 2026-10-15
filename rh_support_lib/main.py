@@ -358,6 +358,11 @@ Authentication:
     )
     # Create Subcommand
     parser_create = subparsers.add_parser("create", help="Create a new support case")
+    parser_create.add_argument(
+        "--yes",
+        action="store_true",
+        help="Skip creation confirmation; requires all required values without prompts or editor",
+    )
     parser_create.add_argument("--product", help="Product name")
     parser_create.add_argument("--version", help="Product version")
     parser_create.add_argument("--summary", help="Case summary")

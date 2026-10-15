@@ -1522,8 +1522,12 @@ class TestRhSupportCli(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0)
             self.assertIn("Success: Case #20230001 created.", result.stdout)
-            self.assertIn("Attaching 'att1.txt'", result.stdout)
-            self.assertIn("Attaching 'att2.txt'", result.stdout)
+            self.assertIn("att1.txt: Uploaded", result.stdout)
+            self.assertIn("att2.txt: Uploaded", result.stdout)
+            self.assertIn("Creating case...", result.stderr)
+            self.assertIn("Submit this case?", result.stderr)
+            self.assertNotIn("Creating case...", result.stdout)
+            self.assertNotIn("Submit this case?", result.stdout)
         finally:
             for f in ["desc.txt", "att1.txt", "att2.txt"]:
                 if os.path.exists(f):
@@ -1555,8 +1559,10 @@ class TestRhSupportCli(unittest.TestCase):
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Case validation failed", result.stderr)
-        self.assertIn("version", result.stderr)
-        self.assertNotIn("Success: Case", result.stdout)
+        self.assertIn("Check product/version", result.stderr)
+        self.assertIn("REDHAT_SUPPORT_USERNAME", result.stderr)
+        self.assertIn("before retrying", result.stderr)
+        self.assertEqual(result.stdout, "")
         self.assertIsNone(MockRedHatHandler.last_case_payload)
         self.assertEqual(description.read_text(), "Retain this diagnostic description")
 
@@ -7442,6 +7448,8 @@ def load_tests(loader, standard_tests, pattern):
                 "test_p2_structured",
                 "test_p2_comment_outcomes",
                 "test_p2_comment_presenters",
+                "test_p2_creation_operations",
+                "test_p2_creation_cli",
             ]
         )
     )

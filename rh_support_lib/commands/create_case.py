@@ -2,15 +2,22 @@ import json
 import os
 import sys
 import tempfile
+from contextlib import redirect_stdout
 
 import yaml
 
+from rh_support_lib.operations import (
+    CaseCreationOutcomeUnknownError,
+    PartialCaseCreationError,
+    create_case_with_attachments,
+)
 from rh_support_lib.services.attachments import AttachmentService
 from rh_support_lib.services.cases import CaseService
 from rh_support_lib.templates import TemplateEngine, resolve_templates_dir
 from rh_support_lib.utils import (
     EditorError,
     edit_file,
+    format_structured_output,
     prompt_text,
     select_from_list,
     strip_header_comments,
@@ -18,6 +25,13 @@ from rh_support_lib.utils import (
 
 
 def cmd_create(args, api_client, config):
+    # Prompts and service diagnostics must not contaminate serialized receipts.
+    output = sys.stdout
+    with redirect_stdout(sys.stderr):
+        return _cmd_create(args, api_client, config, output)
+
+
+def _cmd_create(args, api_client, config, output):
 
     # Process Templates
     defaults = {}
@@ -51,9 +65,32 @@ def cmd_create(args, api_client, config):
         # Ignore fields starting with '_' across all actions
         defaults = {k: v for k, v in defaults.items() if not k.startswith("_")}
 
+    # YAML scalars should behave like their equivalent command-line strings.
+    if type(defaults.get("severity")) is int and defaults["severity"] in range(1, 5):
+        defaults["severity"] = str(defaults["severity"])
+    if type(defaults.get("version")) in (int, float):
+        defaults["version"] = str(defaults["version"])
+
     # 1. Gather Data (Flags or Interactive)
 
     case_service = CaseService(api_client, config=config)
+
+    skip_confirmation = getattr(args, "yes", False)
+    if skip_confirmation:
+        required = {
+            "product": args.product or defaults.get("product"),
+            "version": args.version or defaults.get("version"),
+            "severity": args.severity or defaults.get("severity"),
+            "type": args.type or defaults.get("caseType"),
+            "summary": args.summary or defaults.get("summary"),
+        }
+        missing = [
+            name
+            for name, value in required.items()
+            if not isinstance(value, str) or not value.strip()
+        ]
+        if missing:
+            sys.exit("Error: --yes requires supplied values for: " + ", ".join(missing))
 
     # Product
     product = args.product or defaults.get("product")
@@ -102,6 +139,11 @@ def cmd_create(args, api_client, config):
         description = defaults.get("description", "")
 
     if not description:
+        if skip_confirmation:
+            sys.exit(
+                "Error: --yes requires a description from --description-file or a template. "
+                "No case created."
+            )
         # If not provided, use editor
         with tempfile.NamedTemporaryFile(mode="w+", suffix=".tmp", delete=False) as tf:
             tf.write("# Enter description for new case.\n")
@@ -132,10 +174,12 @@ def cmd_create(args, api_client, config):
     attachments = args.attachment or []
     for fpath in attachments:
         if not os.path.isfile(fpath):
+            if temp_desc_path:
+                print(f"Draft description preserved at: {temp_desc_path}")
             sys.exit(f"Error: Attachment '{fpath}' not found.")
 
     # 2. Confirmation Loop
-    while True:
+    while not skip_confirmation:
         print("\n--- New Case Overview ---")
         print(f"Product:     {product}")
         print(f"Version:     {version}")
@@ -190,7 +234,6 @@ def cmd_create(args, api_client, config):
 
     # 3. Create Case
     print("Creating case...")
-    case_service = CaseService(api_client, config=config)
     extra_fields = {
         k: v
         for k, v in defaults.items()
@@ -205,39 +248,68 @@ def cmd_create(args, api_client, config):
         ]
         and not k.startswith("_")
     }
+    partial_error = None
     try:
         fmt = getattr(args, "format", "markdown") or "markdown"
-        case_number = case_service.create_case(
-            summary=summary,
-            description=description,
-            product_name=product or "Red Hat Enterprise Linux",
-            version_name=version or "9.0",
-            severity=severity or "3 (Normal)",
-            case_type=case_type or "Standard",
-            account_number=defaults.get("accountNumber"),
-            extra_fields=extra_fields,
-            body_format=fmt,
+        receipt = create_case_with_attachments(
+            case_service,
+            AttachmentService(api_client),
+            {
+                "summary": summary,
+                "description": description,
+                "product_name": product or "Red Hat Enterprise Linux",
+                "version_name": version or "9.0",
+                "severity": severity or "3 (Normal)",
+                "case_type": case_type or "Standard",
+                "account_number": defaults.get("accountNumber"),
+                "extra_fields": extra_fields,
+                "body_format": fmt,
+            },
+            files=attachments,
         )
-        print(f"Success: Case #{case_number} created.")
-        if temp_desc_path and os.path.exists(temp_desc_path):
-            os.remove(temp_desc_path)
+    except PartialCaseCreationError as error:
+        receipt = error.receipt
+        partial_error = error
+    except CaseCreationOutcomeUnknownError as error:
+        if temp_desc_path:
+            print(f"Description recovery copy preserved at: {temp_desc_path}")
+        sys.exit(str(error))
     except Exception as e:  # noqa: BLE001
         if temp_desc_path:
             print(f"Draft description preserved at: {temp_desc_path}")
-        label = (
-            "Case validation failed" if isinstance(e, ValueError) else "Network Error"
+        diagnostic = (
+            "Case validation failed: Check product/version, summary/description, "
+            "attachment readability, and contact/account/record-type lookups. "
+            "For SSO identity, set REDHAT_SUPPORT_USERNAME if needed. "
+            if isinstance(e, ValueError)
+            else "Network Error: "
         )
-        sys.exit(f"{label}: {e}")
+        sys.exit(
+            f"{diagnostic}Creation did not return a confirmed case. "
+            "Check the Red Hat Customer Portal before retrying."
+        )
 
-    # 4. Upload Attachments
-    if attachments and case_number:
-        print("Uploading attachments...")
-        att_service = AttachmentService(api_client)
-        for fpath in attachments:
-            print(f"Attaching '{os.path.basename(fpath)}'...")
-            try:
-                att_service.upload_attachment(case_number, fpath)
-                print(f"  - {os.path.basename(fpath)}: Uploaded")
-            except Exception as e:  # noqa: BLE001
-                print(f"  - {os.path.basename(fpath)}: Error ({e})")
-    return case_number
+    # The description is submitted even when attachments fail. Never call it unsent.
+    if temp_desc_path and os.path.exists(temp_desc_path):
+        try:
+            os.remove(temp_desc_path)
+        except OSError:
+            print(f"Submitted description copy remains at: {temp_desc_path}")
+
+    output_format = (
+        "json" if getattr(args, "json", False) else getattr(args, "output_format", None)
+    )
+    if output_format in ("json", "yaml"):
+        print(format_structured_output(receipt, fmt=output_format), file=output)
+    else:
+        print(f"Success: Case #{receipt['case_number']} created.", file=output)
+        for attachment in receipt["attachments"]:
+            status = "Uploaded" if attachment["uploaded"] else attachment["error"]
+            print(
+                f"  - {attachment['file']}: {status}",
+                file=output if attachment["uploaded"] else sys.stderr,
+            )
+    if partial_error:
+        print(str(partial_error), file=sys.stderr)
+        sys.exit(1)
+    return receipt["case_number"]
