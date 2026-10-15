@@ -226,6 +226,8 @@ The interactive dashboard (`rh_support_lib/tui/app.py`) is implemented using Tex
   Composer generations distinguish submitted drafts from newer drafts, including navigation back to the same case. Posting retains the editor until confirmed success and guards duplicate Post events before worker scheduling. Completion releases submission bookkeeping regardless of selection; it clears only the unchanged submitted draft. Refresh failures after posting do not restore it as unsent. Draft persistence writes unique private files in a worker, then performs UI cleanup/navigation/quit on the UI thread only if the saved draft still owns the composer. No worker sleeps or performs widget mutations during file I/O.
 * **Stale-While-Revalidate (SWR)**:
   When a row is selected, cached details render immediately (0 ms) from disk cache while a background worker validates remote freshness.
+* **Polling Ownership and Freshness**:
+  List requests capture filters, selection, and request generations on the UI thread before I/O. Only current results/loading/errors may update the UI, and an empty result is a valid list replacement. Background polls remain single-flight through list, probe, and detail I/O. Selected details are compared with displayed metadata, not cache TTL; unchanged list metadata triggers the existing lightweight case/comment probe, including when the selected case leaves the active filter. Changed or unknown metadata permits a guarded full fetch. Draft contents remain independent of these refreshes.
 
 ---
 

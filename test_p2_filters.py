@@ -195,21 +195,23 @@ class FilterContractTests(unittest.TestCase):
 
         from rh_support_lib.tui.app import SupportApp
 
-        app = object.__new__(SupportApp)
-        app.config = {
+        config = {
             "default_bookmark": "team",
             "bookmarks": {
                 "team": {"product": "OCP", "following": True, "owner": "team-a"}
             },
         }
-        app.active_bookmark = None
-        app.no_default_bookmark = False
-        app.selected_case_id = None
-        app.case_service = mock.Mock()
+        with (
+            mock.patch("rh_support_lib.tui.app.CaseService"),
+            mock.patch("rh_support_lib.tui.app.AttachmentService"),
+        ):
+            app = SupportApp("test-token", config=config, layout="horizontal")
         app.case_service.list_followed_cases.return_value = []
         app.track_job = lambda label: contextlib.nullcontext()
-        app._safe_call = mock.Mock()
-        app.call_from_thread = mock.Mock()
+        app._safe_call = lambda fn, *args: fn(*args)
+        app.call_from_thread = app._safe_call
+        app.populate_cases_table = mock.Mock()
+        app.update_table_rows_preserve_cursor = mock.Mock()
         app.fetch_cases()
         app.poll_cases_background()
         self.assertEqual(app.case_service.list_followed_cases.call_count, 2)

@@ -643,6 +643,8 @@ class SupportApp(App):
         self.cases: list[Case] = []
         self.selected_case_id: str | None = None
         self._detail_generation = 0
+        self._list_generation = 0
+        self._poll_in_flight = False
         self._comment_generation = 0
         self._pending_comments: set[int] = set()
         self.current_details: CaseDetails | None = None
@@ -693,12 +695,12 @@ class SupportApp(App):
             "oldest" if initial_order in ("oldest", "asc") else "newest"
         )
 
-    def _safe_call(self, fn, *args, **kwargs) -> None:
+    def _safe_call(self, fn, *args, **kwargs):
         """Invokes a UI callback directly if on main thread, or via call_from_thread if in worker."""
         if threading.current_thread() is threading.main_thread():
-            fn(*args, **kwargs)
+            return fn(*args, **kwargs)
         else:
-            self.call_from_thread(fn, *args, **kwargs)
+            return self.call_from_thread(fn, *args, **kwargs)
 
     def _call_for_case(self, case_id, generation, fn, *args) -> None:
         """Discard callbacks belonging to an obsolete selection or detail request."""
@@ -773,36 +775,137 @@ class SupportApp(App):
             self.screen.add_class("layout-vertical")
         if self.poll_interval > 0:
             self.set_interval(self.poll_interval, self.trigger_background_poll)
-        self.run_worker(self.fetch_cases, thread=True)
+        self._request_cases()
+
+    def _begin_case_list(self, poll=False):
+        """Capture request identity on the UI thread, before scheduling any I/O."""
+        if poll and self._poll_in_flight:
+            return None
+        params = build_filter_params(
+            self.config, self.active_bookmark, self.no_default_bookmark
+        )
+        if poll:
+            self._poll_in_flight = True
+        self._list_generation += 1
+        return (
+            self._list_generation,
+            params,
+            self.active_bookmark,
+            self.no_default_bookmark,
+            self.selected_case_id,
+            self._detail_generation,
+            self.current_details,
+        )
+
+    def _list_request_current(self, snapshot):
+        generation, params, bookmark, no_default = snapshot[:4]
+        return (
+            generation == self._list_generation
+            and bookmark == self.active_bookmark
+            and no_default == self.no_default_bookmark
+            and params
+            == build_filter_params(
+                self.config, self.active_bookmark, self.no_default_bookmark
+            )
+        )
+
+    def _request_cases(self, force=False):
+        snapshot = self._begin_case_list()
+        self.run_worker(lambda: self._fetch_cases(force, snapshot), thread=True)
 
     def fetch_cases(self, force: bool = False) -> None:
         """Fetches the list of cases in the background."""
+        snapshot = self._safe_call(self._begin_case_list)
+        self._fetch_cases(force, snapshot)
+
+    def _fetch_cases(self, force, snapshot):
         with self.track_job("Fetching cases..."):
 
             def show_loading():
+                if not self._list_request_current(snapshot) or self.selected_case_id:
+                    return
                 with contextlib.suppress(Exception):
                     container = self.query_one("#case-detail-container")
                     container.query("*").remove()
                     container.mount(Static("Loading cases..."))
 
-            if not self.selected_case_id:
-                self._safe_call(show_loading)
+            self._safe_call(show_loading)
             try:
-                params = build_filter_params(
-                    self.config, self.active_bookmark, self.no_default_bookmark
-                )
+                params = snapshot[1]
                 if params.get("following"):
-                    self.cases = self.case_service.list_followed_cases(
+                    cases = self.case_service.list_followed_cases(
                         **{k: v for k, v in params.items() if k != "following"}
                     )
                 else:
                     list_kwargs = {k: v for k, v in params.items() if k != "following"}
                     if force:
                         list_kwargs["use_cache"] = False
-                    self.cases = self.case_service.list_cases(**list_kwargs)
-                self._safe_call(self.populate_cases_table)
+                    cases = self.case_service.list_cases(**list_kwargs)
+                self._safe_call(self._apply_case_list, snapshot, cases)
             except Exception as e:  # noqa: BLE001
-                self._safe_call(self.show_error, f"Network Error: {e}")
+                self._safe_call(self._case_list_error, snapshot, f"Network Error: {e}")
+
+    def _case_list_error(self, snapshot, message):
+        if self._list_request_current(snapshot) and self.current_details is snapshot[6]:
+            self._call_for_case(snapshot[4], snapshot[5], self.show_error, message)
+
+    def _apply_case_list(self, snapshot, cases, poll=False):
+        if not self._list_request_current(snapshot):
+            return None
+        self.cases = cases
+        if not poll:
+            self.populate_cases_table()
+            return None
+        self.update_table_rows_preserve_cursor()
+        displayed = self._poll_displayed_details(snapshot)
+        if displayed is None:
+            return None
+        case_id = snapshot[4]
+        matching = next(
+            (c for c in cases if case_id in (str(c.case_number), str(c.id))), None
+        )
+        return bool(
+            matching
+            and (
+                (
+                    matching.last_modified_date
+                    and matching.last_modified_date != displayed.case.last_modified_date
+                )
+                or (matching.status and matching.status != displayed.case.status)
+                or (matching.severity and matching.severity != displayed.case.severity)
+            )
+        )
+
+    def _poll_displayed_details(self, snapshot):
+        """Validate poll identity and inspect displayed metadata only on the UI thread."""
+        if not self._list_request_current(snapshot):
+            return None
+        case_id, generation = snapshot[4:6]
+        if self.selected_case_id != case_id or self._detail_generation != generation:
+            return None
+        displayed = self.current_details
+        if not case_id or not displayed or not displayed.case:
+            return None
+        if case_id not in (str(displayed.case.case_number), str(displayed.case.id)):
+            return None
+        return displayed
+
+    def _prepare_polled_details(self, snapshot, probe):
+        displayed = self._poll_displayed_details(snapshot)
+        if displayed is None:
+            return None
+        latest = displayed.comments[-1] if displayed.comments else None
+        metadata = (
+            displayed.case.id,
+            displayed.case.last_modified_date,
+            displayed.case.status,
+            latest.id if latest else "",
+            latest.created_date if latest else "",
+        )
+        if probe and all(probe[:3]) and probe == metadata:
+            return None
+        self._detail_generation += 1
+        return self._detail_generation
 
     def populate_cases_table(self) -> None:
         table = self.query_one("#case-table", DataTable)
@@ -853,17 +956,43 @@ class SupportApp(App):
 
     def trigger_background_poll(self) -> None:
         """Periodic background poll for live case updates without disturbing active UI focus."""
-        self.run_worker(self.poll_cases_background, thread=True)
+        snapshot = self._begin_case_list(poll=True)
+        if snapshot is not None:
+            try:
+                self.run_worker(lambda: self._poll_cases(snapshot), thread=True)
+            except Exception:
+                self._poll_in_flight = False
+                raise
 
     def poll_cases_background(self) -> None:
         """Polls for updated cases and unread badges, and refreshes current details if modified."""
+        snapshot = self._safe_call(self._begin_case_list, True)
+        if snapshot is not None:
+            self._poll_cases(snapshot)
+
+    def _finish_poll(self):
+        self._poll_in_flight = False
+
+    def _apply_polled_details(
+        self, snapshot, case_id, generation, details, attachments
+    ):
+        if self._list_request_current(snapshot):
+            self._call_for_case(
+                case_id, generation, self.render_case_details, details, attachments
+            )
+
+    def _poll_cases(self, snapshot):
+        try:
+            self._poll_case_results(snapshot)
+        finally:
+            self._safe_call(self._finish_poll)
+
+    def _poll_case_results(self, snapshot):
         with (
             self.track_job("Syncing updates..."),
             contextlib.suppress(Exception),
         ):
-            params = build_filter_params(
-                self.config, self.active_bookmark, self.no_default_bookmark
-            )
+            params = snapshot[1]
             if params.get("following"):
                 fresh_cases = self.case_service.list_followed_cases(
                     **{k: v for k, v in params.items() if k != "following"}
@@ -873,45 +1002,33 @@ class SupportApp(App):
                 list_kwargs["use_cache"] = False
                 fresh_cases = self.case_service.list_cases(**list_kwargs)
 
-            if not fresh_cases:
+            changed = self._safe_call(
+                self._apply_case_list, snapshot, fresh_cases, True
+            )
+            if changed is None:
                 return
-
-            self.cases = fresh_cases
-            self.call_from_thread(self.update_table_rows_preserve_cursor)
-
-            case_id = self.selected_case_id
-            generation = self._detail_generation
-            if case_id:
-                matching = next(
-                    (
-                        c
-                        for c in fresh_cases
-                        if str(c.case_number) == str(case_id)
-                        or str(c.id) == str(case_id)
-                    ),
-                    None,
+            case_id = snapshot[4]
+            # List metadata cannot detect comment-only changes or cases leaving a filter.
+            probe = (
+                None if changed else self.case_service.check_case_last_modified(case_id)
+            )
+            generation = self._safe_call(self._prepare_polled_details, snapshot, probe)
+            if generation is None:
+                return
+            details = self.case_service.get_case_details(case_id, use_cache=False)
+            try:
+                atts = self.attachment_service.list_attachments(case_id)
+            except Exception:  # noqa: BLE001
+                atts = []
+            if details:
+                self._safe_call(
+                    self._apply_polled_details,
+                    snapshot,
+                    case_id,
+                    generation,
+                    details,
+                    atts,
                 )
-                known_lmd = matching.last_modified_date if matching else None
-                cached = self.case_service.cache_service.get_case_details(case_id)
-                cached_lmd = cached[2] if cached else None
-
-                if known_lmd and cached_lmd and known_lmd != cached_lmd:
-                    details = self.case_service.get_case_details(
-                        case_id, use_cache=False
-                    )
-                    try:
-                        atts = self.attachment_service.list_attachments(case_id)
-                    except Exception:  # noqa: BLE001
-                        atts = []
-                    if details:
-                        self.call_from_thread(
-                            self._call_for_case,
-                            case_id,
-                            generation,
-                            self.render_case_details,
-                            details,
-                            atts,
-                        )
 
     def update_table_rows_preserve_cursor(self) -> None:
         """Refreshes the DataTable with self.cases while preserving cursor row position."""
@@ -1061,7 +1178,7 @@ class SupportApp(App):
         if self.selected_case_id:
             self._request_case_details(self.selected_case_id, force=True)
         else:
-            self.run_worker(lambda: self.fetch_cases(force=True), thread=True)
+            self._request_cases(force=True)
 
     @on(Button.Pressed, ".tui-download-btn, #tui-download-btn")
     def on_download_click(self) -> None:
@@ -1114,29 +1231,25 @@ class SupportApp(App):
     ) -> None:
         """Fetches the details and comments for the selected case."""
         if generation is None:
-            generation = self._detail_generation
+            generation = self._safe_call(lambda: self._detail_generation)
 
         def update(fn, *args):
             self._safe_call(self._call_for_case, case_id, generation, fn, *args)
 
         with self.track_job(f"Loading #{case_id}..."):
-            is_already_rendered = (
-                self.selected_case_id == case_id
-                and self.current_details is not None
-                and (
-                    str(self.current_details.case.case_number) == str(case_id)
-                    or str(self.current_details.case.id) == str(case_id)
-                )
-            )
 
             def show_loading():
+                if self.current_details is not None and case_id in (
+                    str(self.current_details.case.case_number),
+                    str(self.current_details.case.id),
+                ):
+                    return
                 with contextlib.suppress(Exception):
                     container = self.query_one("#case-detail-container")
                     container.query("*").remove()
                     container.mount(Static(f"Fetching details for Case #{case_id}..."))
 
-            if not is_already_rendered:
-                update(show_loading)
+            update(show_loading)
 
             try:
                 details = self.case_service.get_case_details(
@@ -1542,7 +1655,7 @@ class SupportApp(App):
                 current = current.parent
 
         if is_left:
-            self.run_worker(lambda: self.fetch_cases(force=True), thread=True)
+            self._request_cases(force=True)
         else:
             if self.selected_case_id:
                 self._request_case_details(self.selected_case_id, force=True)
@@ -1989,7 +2102,7 @@ class SupportApp(App):
         def handle_bookmark(bookmark_name: str) -> None:
             if bookmark_name:
                 self.active_bookmark = bookmark_name
-                self.run_worker(self.fetch_cases, thread=True)
+                self._request_cases()
 
         self.push_screen(
             BookmarkModal(self.config, self.active_bookmark), handle_bookmark

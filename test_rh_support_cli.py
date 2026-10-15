@@ -7365,7 +7365,9 @@ class TestTuiOperationSafety(unittest.TestCase):
 
 def load_tests(loader, standard_tests, pattern):
     standard_tests.addTests(
-        loader.loadTestsFromNames(["test_p2_filters", "test_p2_state"])
+        loader.loadTestsFromNames(
+            ["test_p2_filters", "test_p2_state", "test_p2_polling"]
+        )
     )
     return standard_tests
 

@@ -508,6 +508,8 @@ Launch an interactive split-pane terminal dashboard:
 rh-support-cli tui
 ```
 
+Automatic refresh continues when caching is disabled or cached details expire. Empty queues clear the old rows, and obsolete refreshes cannot replace the current filter or selection. An open draft is preserved while case details refresh.
+
 ### Options:
 * `-l <layout>` / `--layout <layout>`: Split layout (`horizontal` / `mailbox` default or `vertical` side-by-side).
 * `-b <name>` / `--bookmark <name>`: Launch with a specific bookmark filter.
