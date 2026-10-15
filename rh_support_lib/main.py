@@ -111,6 +111,7 @@ Authentication:
     )
     parser.add_argument(
         "--format",
+        dest="output_format",
         choices=["text", "json", "yaml"],
         default=None,
         help="Output format: 'text' (default), 'json', or 'yaml'",
@@ -264,6 +265,7 @@ Authentication:
     )
     parser_download.add_argument("-o", "--output", help="Destination path or filename")
     # Attachment Subcommand Group
+    attachment_parsers = []
     for att_name in ("attachment", "attachments"):
         parser_att = subparsers.add_parser(
             att_name,
@@ -364,6 +366,7 @@ Authentication:
             help="Case Number (positional)",
         )
         p_att_stat.add_argument("-a", "--attachment", help="Attachment UUID (optional)")
+        attachment_parsers.extend(att_sub.choices.values())
     parser_list_att = subparsers.add_parser(
         "list-attachments", help="List all attachments for a support case (shortcut)"
     )
@@ -833,43 +836,37 @@ Authentication:
         parser_install_sys,
         p_sys_install,
     }
-    for p in set(subparsers.choices.values()):
+    # Child defaults must not overwrite options already parsed by a parent.
+    for p in set(subparsers.choices.values()) | set(attachment_parsers):
         p.add_argument(
-            "-j", "--json", action="store_true", help="Output in JSON format"
+            "-j",
+            "--json",
+            action="store_true",
+            default=argparse.SUPPRESS,
+            help="Output in JSON format",
         )
         if p not in content_format_parsers:
             p.add_argument(
                 "--format",
+                dest="output_format",
                 choices=["text", "json", "yaml"],
-                default=None,
+                default=argparse.SUPPRESS,
                 help="Output format: 'text', 'json', or 'yaml'",
             )
         p.add_argument(
-            "--no-cache", action="store_true", help="Bypass local disk cache"
+            "--no-cache",
+            action="store_true",
+            default=argparse.SUPPRESS,
+            help="Bypass local disk cache",
         )
-        if not any(a.dest == "simple_output" for a in p._actions):
+        simple_output = next((a for a in p._actions if a.dest == "simple_output"), None)
+        if simple_output is not None:
+            simple_output.default = argparse.SUPPRESS
+        else:
             p.add_argument(
                 "--simple-output",
                 action="store_true",
-                help="Disable colored output and visual indicators",
-            )
-    for att_p in set(att_sub.choices.values()):
-        att_p.add_argument(
-            "-j", "--json", action="store_true", help="Output in JSON format"
-        )
-        att_p.add_argument(
-            "--format",
-            choices=["text", "json", "yaml"],
-            default=None,
-            help="Output format: 'text', 'json', or 'yaml'",
-        )
-        att_p.add_argument(
-            "--no-cache", action="store_true", help="Bypass local disk cache"
-        )
-        if not any(a.dest == "simple_output" for a in att_p._actions):
-            att_p.add_argument(
-                "--simple-output",
-                action="store_true",
+                default=argparse.SUPPRESS,
                 help="Disable colored output and visual indicators",
             )
 
@@ -879,30 +876,15 @@ Authentication:
         setup_completers(parser)
         argcomplete.autocomplete(parser)
     args = parser.parse_args()
-    if "--simple-output" in sys.argv or getattr(args, "simple_output", False):
-        args.simple_output = True
 
     if getattr(args, "command", None) not in ("create", "comment", "close"):
-        if (
-            "--json" in sys.argv
-            or "-j" in sys.argv
-            or getattr(args, "json", False)
-            or getattr(args, "format", None) == "json"
-        ):
-            args.format = "json"
-            args.json = True
-        elif getattr(args, "format", None) == "yaml":
-            args.format = "yaml"
-            args.json = False
-        else:
-            args.format = "text"
-            args.json = False
+        args.format = "json" if args.json else args.output_format or "text"
+        args.json = args.format == "json"
 
     config = load_config(args.config_file)
     cache_cfg = config.get("cache") or {}
     no_cache = (
         getattr(args, "no_cache", False)
-        or "--no-cache" in sys.argv
         or cache_cfg.get("enabled") is False
         or os.environ.get("RH_NO_CACHE") in ("1", "true", "True")
     )

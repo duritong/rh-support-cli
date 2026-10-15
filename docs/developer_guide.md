@@ -57,6 +57,7 @@ rh-support-cli/
 * **Fail-Closed Template Rendering**: `TemplateEngine` raises `ValueError` on load/include/shape/render failures rather than returning partial data or terminating the host process. Jinja uses `StrictUndefined`; errors identify the field path. Include nesting is capped at 100, cycles are rejected, and recursive YAML data cannot reach mutation. CLI presenters translate errors to `Template Error` diagnostics and nonzero exits. Explicit optional-variable defaults remain supported.
 * **No-Auth Execution Paths**: Operations that inspect only local resources (e.g. `list-templates`, `completion`, or `--local` search) bypass OIDC token verification for instant execution.
 * **Structured Serialization**: All query commands provide pure JSON/YAML serialization via `format_structured_output` (`--json`, `--format yaml`), suppressing banners and ANSI sequences for clean pipe processing with tools like `jq`.
+* **Output Option Parsing**: Serialization uses the internal `output_format` destination; create/comment/close retain their content-format destination. Child options use `argparse.SUPPRESS` defaults so absent child flags cannot overwrite root values. Both attachment aliases register their nested options. JSON/simple-output/cache flags are resolved from parsed arguments, not raw argument-string scans that can mistake content values for flags.
 
 ---
 

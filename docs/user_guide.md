@@ -106,6 +106,8 @@ rh-support-cli --debug-file /tmp/rh_debug.log show -c 12345678
 ```
 
 ### Global Cache Control (`--no-cache`)
+Global JSON/YAML output, simple-output, and no-cache flags retain their values before or after supported subcommands, including nested `attachment` and `attachments` actions. For create/comment/close, command-level `--format` still selects content formatting (`markdown`, `plain`, `html`, or `raw`), not result serialization.
+
 Comment limits are honored on cached and fresh results. A cached partial thread cannot satisfy a full-thread request or appear as the instant full TUI view. Previous-comment editor context selects the latest requested comments rather than the beginning of a long thread.
 
 Product-scoped bookmarks and combined account/status/severity/owner filters also apply to followed-case lists in the CLI and TUI. Combined case/KCS search keeps case-specific filters on its case results. Locally cached case search honors owner restrictions as well.
