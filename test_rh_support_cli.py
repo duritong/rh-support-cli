@@ -4971,7 +4971,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
                     # Post comment
                     app.execute_comment_submission(
-                        "New comment from test", "Waiting on Customer"
+                        "12345", "New comment from test", "Waiting on Customer"
                     )
                     await app.workers.wait_for_complete()
                     await pilot.pause()
@@ -6088,6 +6088,170 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             if orig_config:
                 self.env["XDG_CONFIG_HOME"] = orig_config
             shutil.rmtree(temp_dir)
+
+
+class TestTuiOperationSafety(unittest.TestCase):
+    def setUp(self):
+        import contextlib
+
+        from rh_support_lib.tui.app import SupportApp
+
+        for target in ("CaseService", "AttachmentService"):
+            patcher = mock.patch(f"rh_support_lib.tui.app.{target}")
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        screen = mock.patch.object(SupportApp, "screen", new_callable=mock.PropertyMock)
+        screen.start().return_value.has_class.return_value = False
+        self.addCleanup(screen.stop)
+        self.app = SupportApp("test-token", config={"tui": {"poll_interval": 0}})
+        self.app.selected_case_id = "A"
+        self.app.track_job = lambda description: contextlib.nullcontext()
+        self.app._safe_call = lambda fn, *args, **kwargs: fn(*args, **kwargs)
+        self.app.call_from_thread = self.app._safe_call
+        self.app.show_error = mock.Mock()
+        self.app.render_case_details = mock.Mock()
+        self.app.fetch_cases = mock.Mock()
+        self.app.run_worker = mock.Mock()
+
+    def test_queued_comment_keeps_original_case(self):
+        from types import SimpleNamespace
+
+        self.app.query_one = mock.Mock(
+            side_effect=lambda selector, *args: {
+                "#tui-comment-textarea": SimpleNamespace(text="Draft for A"),
+                "#tui-comment-status-select": SimpleNamespace(value="In Progress"),
+            }[selector]
+        )
+        self.app.fetch_case_details = mock.Mock()
+        self.app.on_comment_post_click()
+        self.app.selected_case_id = "B"
+        self.app.run_worker.call_args.args[0]()
+        self.app.case_service.add_comment.assert_called_once_with(
+            "A", "Draft for A", is_public=True, status="In Progress"
+        )
+
+    def test_modal_operations_keep_original_case(self):
+        for action, result in (
+            ("action_add_attachment", "diagnostics.tar"),
+            ("action_apply_template", "incident"),
+            ("action_download_attachment", ("att_1", "/tmp/download")),
+        ):
+            with self.subTest(action=action):
+                self.app.selected_case_id = "A"
+                self.app.current_attachments = [mock.Mock()]
+                self.app.push_screen = mock.Mock()
+                self.app.query_one = mock.Mock()
+                self.app.fetch_case_details = mock.Mock()
+                with (
+                    mock.patch("os.path.isfile", return_value=True),
+                    mock.patch(
+                        "rh_support_lib.commands.apply_template.cmd_apply"
+                    ) as apply,
+                ):
+                    getattr(self.app, action)()
+                    callback = self.app.push_screen.call_args.args[1]
+                    callback(result)
+                    self.app.selected_case_id = "B"
+                    self.app.run_worker.call_args.args[0]()
+                if action == "action_add_attachment":
+                    self.assertEqual(
+                        self.app.attachment_service.upload_attachment.call_args.args[0],
+                        "A",
+                    )
+                elif action == "action_apply_template":
+                    self.assertEqual(apply.call_args.args[0].case, "A")
+                else:
+                    self.assertEqual(
+                        self.app.attachment_service.download_attachment.call_args.args[
+                            0
+                        ],
+                        "A",
+                    )
+
+    def test_late_detail_results_and_errors_do_not_replace_new_selection(self):
+        from concurrent.futures import ThreadPoolExecutor
+
+        from rh_support_lib.models import Case, CaseDetails
+
+        for outcome in ("success", "missing", "error"):
+            with self.subTest(outcome=outcome):
+                started, release = threading.Event(), threading.Event()
+                details_a = CaseDetails(Case("A", "A", "Open", "Low"), "A")
+                details_b = CaseDetails(Case("B", "B", "Open", "Low"), "B")
+
+                def fetch(
+                    case_id,
+                    *,
+                    outcome=outcome,
+                    started=started,
+                    release=release,
+                    details_a=details_a,
+                    details_b=details_b,
+                    **kwargs,
+                ):
+                    if case_id == "B":
+                        return details_b
+                    started.set()
+                    if not release.wait(5):
+                        raise TimeoutError("Test did not release request A")
+                    if outcome == "error":
+                        raise RuntimeError("Old request failed")
+                    return details_a if outcome == "success" else None
+
+                self.app.case_service.get_case_details.side_effect = fetch
+                self.app.selected_case_id = "A"
+                self.app.show_error.reset_mock()
+                self.app.render_case_details.reset_mock()
+                with ThreadPoolExecutor(max_workers=1) as executor:
+                    pending = executor.submit(self.app.fetch_case_details, "A")
+                    try:
+                        self.assertTrue(started.wait(5))
+                        self.app.selected_case_id = "B"
+                        self.app.fetch_case_details("B")
+                    finally:
+                        release.set()
+                    pending.result(timeout=5)
+                self.app.render_case_details.assert_called_once_with(
+                    details_b, self.app.attachment_service.list_attachments.return_value
+                )
+                self.app.show_error.assert_not_called()
+
+    def test_queued_detail_requests_capture_target_and_generation(self):
+        from rh_support_lib.models import Case, CaseDetails
+
+        self.app.case_service.get_case_details.side_effect = lambda case_id, **kwargs: (
+            CaseDetails(Case(case_id, case_id, "Open", "Low"), case_id)
+        )
+        callbacks = []
+        self.app.run_worker.side_effect = lambda fn, **kwargs: callbacks.append(fn)
+        for case_id in ("A", "B", "A"):
+            self.app.selected_case_id = case_id
+            self.app.on_refresh_click()
+        for callback in reversed(callbacks):
+            callback()
+        self.assertEqual(self.app.render_case_details.call_count, 1)
+        self.assertEqual(
+            self.app.case_service.get_case_details.call_args_list,
+            [
+                mock.call("A", use_cache=False),
+                mock.call("B", use_cache=False),
+                mock.call("A", use_cache=False),
+            ],
+        )
+
+    def test_detail_guard_runs_when_ui_callback_is_applied(self):
+        from rh_support_lib.models import Case, CaseDetails
+
+        self.app.case_service.get_case_details.return_value = CaseDetails(
+            Case("A", "A", "Open", "Low"), "A"
+        )
+        callbacks = []
+        self.app._safe_call = lambda fn, *args: callbacks.append(lambda: fn(*args))
+        self.app.fetch_case_details("A")
+        self.app.selected_case_id = "B"
+        for callback in callbacks:
+            callback()
+        self.app.render_case_details.assert_not_called()
 
 
 if __name__ == "__main__":

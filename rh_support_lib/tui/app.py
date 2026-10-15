@@ -639,6 +639,7 @@ class SupportApp(App):
         self.no_default_bookmark = no_default_bookmark
         self.cases: list[Case] = []
         self.selected_case_id: str | None = None
+        self._detail_generation = 0
         self.current_details: CaseDetails | None = None
         self.current_attachments: list[Attachment] = []
         self.active_jobs: list[str] = []
@@ -693,6 +694,20 @@ class SupportApp(App):
             fn(*args, **kwargs)
         else:
             self.call_from_thread(fn, *args, **kwargs)
+
+    def _call_for_case(self, case_id, generation, fn, *args) -> None:
+        """Discard callbacks belonging to an obsolete selection or detail request."""
+        if self.selected_case_id == case_id and (
+            generation is None or generation == self._detail_generation
+        ):
+            fn(*args)
+
+    def _request_case_details(self, case_id: str, force: bool = False) -> None:
+        self._detail_generation += 1
+        generation = self._detail_generation
+        self.run_worker(
+            lambda: self.fetch_case_details(case_id, force, generation), thread=True
+        )
 
     @contextlib.contextmanager
     def track_job(self, description: str):
@@ -859,34 +874,39 @@ class SupportApp(App):
             self.cases = fresh_cases
             self.call_from_thread(self.update_table_rows_preserve_cursor)
 
-            if self.selected_case_id:
+            case_id = self.selected_case_id
+            generation = self._detail_generation
+            if case_id:
                 matching = next(
                     (
                         c
                         for c in fresh_cases
-                        if str(c.case_number) == str(self.selected_case_id)
-                        or str(c.id) == str(self.selected_case_id)
+                        if str(c.case_number) == str(case_id)
+                        or str(c.id) == str(case_id)
                     ),
                     None,
                 )
                 known_lmd = matching.last_modified_date if matching else None
-                cached = self.case_service.cache_service.get_case_details(
-                    self.selected_case_id
-                )
+                cached = self.case_service.cache_service.get_case_details(case_id)
                 cached_lmd = cached[2] if cached else None
 
                 if known_lmd and cached_lmd and known_lmd != cached_lmd:
                     details = self.case_service.get_case_details(
-                        self.selected_case_id, use_cache=False
+                        case_id, use_cache=False
                     )
                     try:
-                        atts = self.attachment_service.list_attachments(
-                            self.selected_case_id
-                        )
+                        atts = self.attachment_service.list_attachments(case_id)
                     except Exception:  # noqa: BLE001
                         atts = []
                     if details:
-                        self.call_from_thread(self.render_case_details, details, atts)
+                        self.call_from_thread(
+                            self._call_for_case,
+                            case_id,
+                            generation,
+                            self.render_case_details,
+                            details,
+                            atts,
+                        )
 
     def update_table_rows_preserve_cursor(self) -> None:
         """Refreshes the DataTable with self.cases while preserving cursor row position."""
@@ -1013,9 +1033,7 @@ class SupportApp(App):
             self.render_case_details(cached_details, cached_atts)
 
         # Proceed to validate/fetch fresh case details in background
-        self.run_worker(
-            lambda: self.fetch_case_details(self.selected_case_id), thread=True
-        )
+        self._request_case_details(next_case_id)
 
     @on(Button.Pressed, ".tui-comment-btn, #tui-comment-btn")
     def on_comment_click(self) -> None:
@@ -1036,10 +1054,7 @@ class SupportApp(App):
     @on(Button.Pressed, ".tui-refresh-btn, #tui-refresh-btn")
     def on_refresh_click(self) -> None:
         if self.selected_case_id:
-            self.run_worker(
-                lambda: self.fetch_case_details(self.selected_case_id, force=True),
-                thread=True,
-            )
+            self._request_case_details(self.selected_case_id, force=True)
         else:
             self.run_worker(lambda: self.fetch_cases(force=True), thread=True)
 
@@ -1057,9 +1072,12 @@ class SupportApp(App):
 
         select = self.query_one("#tui-comment-status-select", Select)
         target_status = select.value
+        case_id = self.selected_case_id
 
         self.run_worker(
-            lambda: self.execute_comment_submission(comment_body, target_status),
+            lambda: self.execute_comment_submission(
+                case_id, comment_body, target_status
+            ),
             thread=True,
         )
 
@@ -1076,8 +1094,16 @@ class SupportApp(App):
     def on_comment_cancel_click(self) -> None:
         self.action_exit_commenting()
 
-    def fetch_case_details(self, case_id: str, force: bool = False) -> None:
+    def fetch_case_details(
+        self, case_id: str, force: bool = False, generation: int | None = None
+    ) -> None:
         """Fetches the details and comments for the selected case."""
+        if generation is None:
+            generation = self._detail_generation
+
+        def update(fn, *args):
+            self._safe_call(self._call_for_case, case_id, generation, fn, *args)
+
         with self.track_job(f"Loading #{case_id}..."):
             is_already_rendered = (
                 self.selected_case_id == case_id
@@ -1095,7 +1121,7 @@ class SupportApp(App):
                     container.mount(Static(f"Fetching details for Case #{case_id}..."))
 
             if not is_already_rendered:
-                self._safe_call(show_loading)
+                update(show_loading)
 
             try:
                 details = self.case_service.get_case_details(
@@ -1103,7 +1129,7 @@ class SupportApp(App):
                     use_cache=not force,
                 )
                 if not details or not details.case:
-                    self._safe_call(self.show_error, f"Case {case_id} not found.")
+                    update(self.show_error, f"Case {case_id} not found.")
                     return
 
                 try:
@@ -1111,9 +1137,9 @@ class SupportApp(App):
                 except Exception:  # noqa: BLE001
                     attachments = []
 
-                self._safe_call(self.render_case_details, details, attachments)
+                update(self.render_case_details, details, attachments)
             except Exception as e:  # noqa: BLE001
-                self._safe_call(self.show_error, f"Failed to fetch details: {e}")
+                update(self.show_error, f"Failed to fetch details: {e}")
 
     def render_case_details(
         self, details: CaseDetails, attachments: list[Attachment]
@@ -1448,9 +1474,7 @@ class SupportApp(App):
             str(self.selected_case_id) == str(case_id)
             or str(self.selected_case_id).lstrip("0") == str(case_id).lstrip("0")
         ):
-            self.run_worker(
-                lambda: self.fetch_case_details(self.selected_case_id), thread=True
-            )
+            self._request_case_details(self.selected_case_id)
 
     def action_toggle_follow(self) -> None:
         case_id = self.selected_case_id
@@ -1506,10 +1530,7 @@ class SupportApp(App):
             self.run_worker(lambda: self.fetch_cases(force=True), thread=True)
         else:
             if self.selected_case_id:
-                self.run_worker(
-                    lambda: self.fetch_case_details(self.selected_case_id, force=True),
-                    thread=True,
-                )
+                self._request_case_details(self.selected_case_id, force=True)
 
     def action_add_comment(self) -> None:
         if not self.selected_case_id:
@@ -1596,8 +1617,10 @@ class SupportApp(App):
                 select.set_options(get_status_choices_for_case(target_status))
             select.value = target_status
 
-    def execute_comment_submission(self, comment_body: str, target_status: str) -> None:
-        with self.track_job(f"Posting comment on #{self.selected_case_id}..."):
+    def execute_comment_submission(
+        self, case_id: str, comment_body: str, target_status: str
+    ) -> None:
+        with self.track_job(f"Posting comment on #{case_id}..."):
 
             def show_posting():
                 self.screen.remove_class("commenting")
@@ -1608,20 +1631,29 @@ class SupportApp(App):
                     container.query("*").remove()
                     container.mount(Static("Posting comment..."))
 
-            self._safe_call(show_posting)
+            self._safe_call(self._call_for_case, case_id, None, show_posting)
             try:
                 self.case_service.add_comment(
-                    self.selected_case_id,
+                    case_id,
                     comment_body,
                     is_public=True,
                     status=target_status if target_status else None,
                 )
 
-                self.fetch_case_details(self.selected_case_id, force=True)
+                self._safe_call(
+                    self._call_for_case,
+                    case_id,
+                    None,
+                    self._request_case_details,
+                    case_id,
+                    True,
+                )
                 self.fetch_cases(force=True)
 
             except Exception as e:  # noqa: BLE001
-                self._safe_call(self.show_error, str(e))
+                self._safe_call(
+                    self._call_for_case, case_id, None, self.show_error, str(e)
+                )
 
     def action_exit_commenting(self) -> None:
         """Hides the comment pane, checking for unsaved changes if needed."""
@@ -1655,10 +1687,7 @@ class SupportApp(App):
                 self.screen.remove_class("commenting")
                 self.query_one("#tui-comment-textarea", TextArea).text = ""
                 self.selected_case_id = next_case_id
-                self.run_worker(
-                    lambda: self.fetch_case_details(self.selected_case_id),
-                    thread=True,
-                )
+                self._request_case_details(next_case_id)
             elif choice == "save":
                 self.save_comment_to_file(comment_text, next_case_id)
 
@@ -1692,10 +1721,7 @@ class SupportApp(App):
             if next_case_id:
                 time.sleep(1)
                 self.selected_case_id = next_case_id
-                self.run_worker(
-                    lambda: self.fetch_case_details(self.selected_case_id),
-                    thread=True,
-                )
+                self._request_case_details(next_case_id)
         except OSError as e:
             self.show_error(f"Failed to save draft to file: {e}")
 
@@ -1704,19 +1730,21 @@ class SupportApp(App):
             self.show_error("Please select a case first.")
             return
 
+        case_id = self.selected_case_id
+
         def handle_file(file_path: str) -> None:
             if file_path:
                 if not os.path.isfile(file_path):
                     self.show_error(f"Local file '{file_path}' does not exist.")
                     return
                 self.run_worker(
-                    lambda: self.execute_attachment_upload(file_path),
+                    lambda: self.execute_attachment_upload(case_id, file_path),
                     thread=True,
                 )
 
         self.push_screen(AttachModal(), handle_file)
 
-    def execute_attachment_upload(self, file_path: str) -> None:
+    def execute_attachment_upload(self, case_id: str, file_path: str) -> None:
         with self.track_job(f"Uploading '{os.path.basename(file_path)}'..."):
 
             def show_uploading():
@@ -1726,16 +1754,25 @@ class SupportApp(App):
                     Static(f"Uploading attachment '{os.path.basename(file_path)}'...")
                 )
 
-            self.call_from_thread(show_uploading)
+            self._safe_call(self._call_for_case, case_id, None, show_uploading)
 
             try:
-                self.attachment_service.upload_attachment(
-                    self.selected_case_id, file_path
+                self.attachment_service.upload_attachment(case_id, file_path)
+                self._safe_call(
+                    self._call_for_case,
+                    case_id,
+                    None,
+                    self._request_case_details,
+                    case_id,
+                    True,
                 )
-                self.fetch_case_details(self.selected_case_id, force=True)
             except Exception as e:  # noqa: BLE001
-                self.call_from_thread(
-                    self.show_error, f"Error uploading attachment: {e}"
+                self._safe_call(
+                    self._call_for_case,
+                    case_id,
+                    None,
+                    self.show_error,
+                    f"Error uploading attachment: {e}",
                 )
 
     def action_apply_template(self) -> None:
@@ -1743,18 +1780,18 @@ class SupportApp(App):
             self.show_error("Please select a case first.")
             return
 
+        case_id = self.selected_case_id
+
         def handle_template(template_name: str) -> None:
             if template_name:
                 self.run_worker(
-                    lambda: self.execute_template(template_name), thread=True
+                    lambda: self.execute_template(case_id, template_name), thread=True
                 )
 
         default_tmpl = self.config.get("default_create_template") or ""
-        self.push_screen(
-            TemplateModal(self.selected_case_id, default_tmpl), handle_template
-        )
+        self.push_screen(TemplateModal(case_id, default_tmpl), handle_template)
 
-    def execute_template(self, template_name: str) -> None:
+    def execute_template(self, case_id: str, template_name: str) -> None:
         with self.track_job(f"Applying template '{template_name}'..."):
 
             def show_applying():
@@ -1762,7 +1799,7 @@ class SupportApp(App):
                 container.query("*").remove()
                 container.mount(Static("Applying template..."))
 
-            self.call_from_thread(show_applying)
+            self._safe_call(self._call_for_case, case_id, None, show_applying)
 
             try:
                 from types import SimpleNamespace
@@ -1770,7 +1807,7 @@ class SupportApp(App):
                 from rh_support_lib.commands.apply_template import cmd_apply
 
                 args = SimpleNamespace(
-                    case=self.selected_case_id,
+                    case=case_id,
                     template=[template_name],
                     template_var=[],
                     dry_run=False,
@@ -1780,14 +1817,27 @@ class SupportApp(App):
                     cmd_apply(args, self.api_client, self.config)
                 except SystemExit as ex:
                     if ex.code != 0:
-                        self.call_from_thread(
-                            self.show_error, "Template application failed."
+                        self._safe_call(
+                            self._call_for_case,
+                            case_id,
+                            None,
+                            self.show_error,
+                            "Template application failed.",
                         )
                         return
 
-                self.fetch_case_details(self.selected_case_id, force=True)
+                self._safe_call(
+                    self._call_for_case,
+                    case_id,
+                    None,
+                    self._request_case_details,
+                    case_id,
+                    True,
+                )
             except Exception as e:  # noqa: BLE001
-                self.call_from_thread(self.show_error, f"Error: {e}")
+                self._safe_call(
+                    self._call_for_case, case_id, None, self.show_error, f"Error: {e}"
+                )
 
     def action_download_attachment(self) -> None:
         if not self.selected_case_id:
@@ -1802,14 +1852,14 @@ class SupportApp(App):
             )
             return
 
+        case_id = self.selected_case_id
+
         def handle_download(result: tuple[str, str] | None) -> None:
             if not result:
                 return
             att_uuid, dest_path = result
             self.run_worker(
-                lambda: self.execute_download(
-                    self.selected_case_id, att_uuid, dest_path
-                ),
+                lambda: self.execute_download(case_id, att_uuid, dest_path),
                 thread=True,
             )
 

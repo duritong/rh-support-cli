@@ -198,6 +198,8 @@ The interactive dashboard (`rh_support_lib/tui/app.py`) is implemented using Tex
   To prevent widget mounting collisions when navigating cases, `#case-detail-container` clears active views via `container.query("*").remove()` and mounts a freshly compiled `Vertical(*widgets)` layout tree.
 * **Non-Blocking Background Workers**:
   Network operations run on background threads via `self.run_worker(lambda: fn(), thread=True)`. UI updates are dispatched back to the main thread loop using thread-safe callbacks. Active tasks are visually reported in the header bar via `track_job(description)`.
+* **Operation Targets and Detail Generations**:
+  Comment, upload, template, and download actions capture their case identifier before scheduling a worker. Selection and refresh requests carry a monotonically increasing detail generation. Loading, result, and error callbacks check the target and generation on the UI thread before changing the detail pane, including when navigating away and back to the same case. Mutation refreshes and errors only affect the pane while its original target remains selected.
 * **Stale-While-Revalidate (SWR)**:
   When a row is selected, cached details render immediately (0 ms) from disk cache while a background worker validates remote freshness.
 
