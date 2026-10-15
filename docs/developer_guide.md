@@ -87,6 +87,7 @@ The CLI communicates with three backend endpoints:
 * **Child Relationship Constraints**: On Red Hat's Salesforce GraphQL UIAPI, child relationship queries (such as `CaseComments__r`) do not support cursor pagination with `after`. Secondary comment batches fall back to root queries with `where: { Case__c: { eq: <id> } }` guarded by error recovery.
 
 ### B. Hydra KCS Search API
+* **Response Normalization**: Search accepts Solr `response.docs`, top-level `docs`, or top-level document lists, guarding null/malformed containers before access. Nonpositive search limits return empty results without requests. The existing policy of mapping KCS transport failures to empty results is unchanged pending an explicit unavailable-versus-empty error-contract decision.
 * **Solr Filter Query (`fq`)**: Queries `https://access.redhat.com/hydra/rest/search/kcs?q=<term>` using Apache Solr parameters.
 * **Language & Product Scoping**: Passes `fq=language:<lang>` and `fq=product:"<name>"` to target localized documentation and solutions.
 

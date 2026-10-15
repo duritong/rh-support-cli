@@ -39,7 +39,8 @@ def cmd_search(args, api_client, config: dict[str, Any] | None = None) -> None:
     search_type = getattr(args, "type", "cases") or "cases"
     search_type = search_type.lower().strip()
 
-    limit = getattr(args, "limit", 20) or 20
+    limit = getattr(args, "limit", None)
+    limit = 20 if limit is None else limit
     local_only = bool(getattr(args, "local", False))
     open_browser = bool(getattr(args, "open", False) or getattr(args, "browser", False))
 

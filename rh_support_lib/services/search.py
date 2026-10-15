@@ -50,7 +50,7 @@ class SearchService:
         limit: int = 20,
     ) -> list[KCSSearchResult]:
         """Searches Red Hat Knowledgebase (KCS) solutions and articles via the REST search API."""
-        if not query or not str(query).strip():
+        if limit <= 0 or not query or not str(query).strip():
             return []
 
         clean_query = str(query).strip()
@@ -78,11 +78,18 @@ class SearchService:
             return []
 
         results: list[KCSSearchResult] = []
-        docs = (
-            data.get("response", {}).get("docs")
-            or data.get("docs")
-            or (data if isinstance(data, list) else [])
-        )
+        if isinstance(data, list):
+            docs = data
+        elif isinstance(data, dict):
+            response = data.get("response")
+            docs = (
+                (response.get("docs") if isinstance(response, dict) else None)
+                or data.get("docs")
+                or []
+            )
+        else:
+            docs = []
+        docs = docs if isinstance(docs, list) else []
         for doc in docs:
             if not isinstance(doc, dict):
                 continue
@@ -168,6 +175,8 @@ class SearchService:
         owner: str | None = None,
     ) -> dict[str, list[Any]]:
         """Searches both support cases and KCS solutions."""
+        if limit <= 0:
+            return {"cases": [], "kcs": []}
         cases = self.search_cases(
             query=query,
             product=product,

@@ -936,6 +936,8 @@ class CaseService:
         local_only: bool = False,
     ) -> list[Case]:
         """Searches support cases via GraphQL API and local cache."""
+        if limit <= 0:
+            return []
         if local_only:
             return self.search_local_cases(
                 query=query,
