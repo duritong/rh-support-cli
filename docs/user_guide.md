@@ -132,6 +132,9 @@ rh-support-cli show -c 12345678 --no-cache
 | `RH_SSO_URL` | Override Red Hat SSO OAuth token endpoint | `https://sso.redhat.com/...` |
 | `EDITOR` | Terminal text editor for comments and descriptions | `vi` |
 | `FORCE_COLOR` | Set to `1` to force ANSI colors when redirected or piped | `auto` |
+
+State changes use an empty `.lock` sidecar beside the selected state file so concurrent CLI, TUI, and background sync updates do not overwrite one another. Leave the sidecar in place while clients may be running. Ordinary state reads do not require write access.
+
 ---
 
 ## 4. Case Sizing Templates

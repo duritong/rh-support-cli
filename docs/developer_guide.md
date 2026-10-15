@@ -171,6 +171,10 @@ Terminal Display (Markdown) ◄── HTMLToMarkdownParser ◄──────
 Operational state (followed cases, sync checkpoints, unread counts, pinned cases) is managed by `StateService` (`rh_support_lib/services/state.py`) in `state.yaml` under `$XDG_STATE_HOME/rh-support-cli/`.
 
 ### Thread-Safe Re-Entrant Locking
+Each built-in mutation holds its instance `RLock` for the complete read-modify-write transaction. A persistent `<state_file>.lock` sidecar is protected with `fcntl.flock`, serializing separate service instances and CLI/TUI/background-sync processes across atomic YAML replacement. The empty sidecar must not be removed while clients may be running. Same-instance nested calls reuse the held lock; lock-acquisition failures prevent mutation. Legacy migration also locks and rechecks the destination before copying, retaining its best-effort legacy fallback if migration is unavailable.
+
+Standalone reads retain atomic-snapshot semantics and do not create directories or require a writable sidecar. A caller-managed `load_state()` / edit / `save_state()` sequence is not automatically transactional; use the built-in mutation methods. Advisory locking cannot protect against older clients or external writers that do not use the sidecar. Avoid nesting transactions across different instances on one thread.
+
 To prevent lost updates during concurrent operations, `StateService` uses a re-entrant lock:
 ```python
 self._lock = threading.RLock()

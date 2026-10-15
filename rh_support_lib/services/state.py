@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import contextlib
+import fcntl
 import os
 import shutil
 import tempfile
 import threading
 from datetime import datetime, timezone
+from functools import wraps
 from typing import Any
 
 import yaml
@@ -16,6 +18,15 @@ from rh_support_lib.models import (
     FollowedCase,
     TrackedCase,
 )
+
+
+def _locked(method):
+    @wraps(method)
+    def locked(self, *args, **kwargs):
+        with self._transaction():
+            return method(self, *args, **kwargs)
+
+    return locked
 
 
 class StateService:
@@ -31,6 +42,27 @@ class StateService:
     ):
         self.state_file = self._resolve_state_path(state_file, config_file)
         self._lock = threading.RLock()
+        self._lock_file = None
+
+    @contextlib.contextmanager
+    def _transaction(self):
+        with self._lock:
+            if self._lock_file is not None:
+                yield
+                return
+            os.makedirs(
+                os.path.dirname(os.path.abspath(self.state_file)), exist_ok=True
+            )
+            # Lock a stable sidecar inode, not the state inode replaced on every save.
+            # Keep it on disk: unlinking it would let waiters lock different inodes.
+            with open(self.state_file + ".lock", "a") as lock_file:
+                fcntl.flock(lock_file, fcntl.LOCK_EX)
+                self._lock_file = lock_file
+                try:
+                    yield
+                finally:
+                    self._lock_file = None
+                    fcntl.flock(lock_file, fcntl.LOCK_UN)
 
     @staticmethod
     def _resolve_state_path(
@@ -71,15 +103,21 @@ class StateService:
             else os.path.expanduser("~/.config/rh-support-cli/state.yaml")
         )
         if not os.path.exists(target_state_path) and os.path.exists(legacy_config_path):
-            with contextlib.suppress(Exception):
-                os.makedirs(
-                    os.path.dirname(os.path.abspath(target_state_path)), exist_ok=True
-                )
-                shutil.copy2(legacy_config_path, target_state_path)
-                with contextlib.suppress(Exception):
-                    os.remove(legacy_config_path)
-            if os.path.exists(target_state_path):
-                return target_state_path
+            migration = StateService(state_file=target_state_path)
+            try:
+                with migration._transaction():
+                    # Another process may have migrated or updated state while we waited.
+                    if os.path.exists(target_state_path):
+                        return target_state_path
+                    with contextlib.suppress(Exception):
+                        shutil.copy2(legacy_config_path, target_state_path)
+                        with contextlib.suppress(Exception):
+                            os.remove(legacy_config_path)
+                    if os.path.exists(target_state_path):
+                        return target_state_path
+            except OSError:
+                # Migration is best-effort; never write without acquiring its lock.
+                pass
             return legacy_config_path
 
         return target_state_path
@@ -100,6 +138,7 @@ class StateService:
             except (OSError, yaml.YAMLError):
                 return {"version": 1, "users": {}}
 
+    @_locked
     def save_state(self, data: dict[str, Any]) -> None:
         """Atomically saves state data to state.yaml."""
         with self._lock:
@@ -213,6 +252,7 @@ class StateService:
         following = self.get_followed_cases(user)
         return str(case_number) in following
 
+    @_locked
     def add_tracked_case(
         self,
         user: str,
@@ -350,6 +390,7 @@ class StateService:
             source="auto",
         )
 
+    @_locked
     def remove_followed_case(self, case_number: str, user: str) -> bool:
         """Removes a case from following. If the case is also owned, retains it as owned."""
         data = self.load_state()
@@ -388,6 +429,7 @@ class StateService:
             self.save_state(data)
         return modified
 
+    @_locked
     def toggle_follow(self, user: str, case_number: str) -> bool:
         """Toggles follow status for a case. Returns True if now following, False if unfollowed."""
         if self.is_following(case_number, user):
@@ -396,6 +438,7 @@ class StateService:
         self.add_followed_case(case_number, user)
         return True
 
+    @_locked
     def batch_update_latest_known(
         self,
         user: str,
@@ -496,6 +539,7 @@ class StateService:
             ],
         )
 
+    @_locked
     def mark_case_read(
         self,
         user: str,
@@ -564,6 +608,7 @@ class StateService:
         sync_accounts = user_state.get("sync", {}).get("accounts", {})
         return sync_accounts.get(str(account_number), {})
 
+    @_locked
     def update_sync_info(
         self,
         user: str,
@@ -590,6 +635,7 @@ class StateService:
         user_state = self._get_user_state(data, user)
         return list(user_state.get("pinned", []))
 
+    @_locked
     def set_pinned_cases(self, user: str, cases: list[str]) -> None:
         """Sets pinned case numbers for a user."""
         data = self.load_state()
@@ -603,6 +649,7 @@ class StateService:
         user_state = self._get_user_state(data, user)
         return list(user_state.get("recent", []))
 
+    @_locked
     def add_recent_case(
         self, user: str, case_number: str, meta: dict[str, Any] | None = None
     ) -> None:
@@ -633,6 +680,7 @@ class StateService:
         tags_dict = user_state.get("tags", {})
         return list(tags_dict.get(str(case_number), []))
 
+    @_locked
     def set_tags(self, user: str, case_number: str, tags: list[str]) -> None:
         """Sets local tags for a specific case."""
         data = self.load_state()
@@ -647,6 +695,7 @@ class StateService:
         user_state = self._get_user_state(data, user)
         return user_state.get("tui_layout", "horizontal")
 
+    @_locked
     def set_tui_layout(self, user: str, layout: str) -> None:
         """Sets persistent TUI layout for user ('horizontal' or 'vertical')."""
         data = self.load_state()
