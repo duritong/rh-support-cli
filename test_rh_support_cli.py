@@ -2059,14 +2059,17 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
             # 4. Expect failure
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("Error: Comment failed", result.stdout)
+            self.assertEqual(result.stdout, "")
+            self.assertIn("Comment submission was not confirmed", result.stderr)
 
             # 5. Extract path and verify existence
             import re
 
-            match = re.search(r"Draft comment preserved at: (.+)", result.stdout)
+            match = re.search(
+                r"Comment recovery copy preserved at: (.+)", result.stderr
+            )
             self.assertTrue(
-                match, f"Could not find preserved file path in output: {result.stdout}"
+                match, f"Could not find preserved file path in output: {result.stderr}"
             )
             preserved_path = match.group(1).strip()
 
@@ -7437,6 +7440,8 @@ def load_tests(loader, standard_tests, pattern):
                 "test_p2_isolation",
                 "test_p2_strict_config",
                 "test_p2_structured",
+                "test_p2_comment_outcomes",
+                "test_p2_comment_presenters",
             ]
         )
     )

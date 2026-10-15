@@ -1,10 +1,17 @@
 import os
 import sys
+from contextlib import redirect_stdout
 
 from rh_support_lib.api import AuthenticationError
 from rh_support_lib.constants import STATUS_MAP
+from rh_support_lib.errors import CommentOutcomeUnknownError, PartialCommentError
 from rh_support_lib.services.cases import CaseService
-from rh_support_lib.utils import EditorError, open_editor, strip_header_comments
+from rh_support_lib.utils import (
+    EditorError,
+    format_structured_output,
+    open_editor,
+    strip_header_comments,
+)
 
 
 def cmd_attach(args, api_client):
@@ -20,6 +27,12 @@ def cmd_download(args, api_client):
 
 
 def cmd_comment(args, api_client, config=None):
+    output = sys.stdout
+    with redirect_stdout(sys.stderr):
+        return _cmd_comment(args, api_client, config, output)
+
+
+def _cmd_comment(args, api_client, config, output):
 
     # 1. Process templates if specified
     template_content = ""
@@ -158,25 +171,63 @@ def cmd_comment(args, api_client, config=None):
 
     # 1. Post Comment and update status via CaseService
     print(f"Posting comment to Case #{args.case}...")
+    partial_error = None
     try:
         fmt = getattr(args, "format", "markdown") or "markdown"
-        case_service.add_comment(
+        comment = case_service.add_comment(
             args.case,
             comment_body,
             is_public=True,
             status=final_status if final_status else None,
             body_format=fmt,
         )
-        print("Success: Comment added.")
-        if final_status:
-            print(f"Success: Case status updated to '{final_status}'.")
-        if temp_file_path and os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
-    except Exception as e:  # noqa: BLE001
-        print(f"Error: Comment failed ({e})")
+    except PartialCommentError as error:
+        comment = error.comment
+        partial_error = error
+    except CommentOutcomeUnknownError as error:
+        if temp_file_path:
+            print(f"Comment recovery copy preserved at: {temp_file_path}")
+        sys.exit(str(error))
+    except AuthenticationError:
         if temp_file_path:
             print(f"Draft comment preserved at: {temp_file_path}")
-        sys.exit(f"Network Error: {e}")
+        raise
+    except Exception:  # noqa: BLE001
+        if temp_file_path:
+            print(f"Comment recovery copy preserved at: {temp_file_path}")
+        sys.exit(
+            "Comment submission was not confirmed. Check the case in the portal "
+            "before retrying; do not blindly repost the comment."
+        )
+
+    if temp_file_path and os.path.exists(temp_file_path):
+        try:
+            os.remove(temp_file_path)
+        except OSError:
+            print(f"Submitted comment copy remains at: {temp_file_path}")
+    status_confirmed = (
+        partial_error.status_confirmed if partial_error else bool(final_status)
+    )
+    receipt = {
+        "case_number": str(args.case),
+        "comment_id": comment.id,
+        "comment_posted": True,
+        "requested_status": final_status,
+        "status_confirmed": status_confirmed,
+        "success": partial_error is None,
+    }
+    output_format = (
+        "json" if getattr(args, "json", False) else getattr(args, "output_format", None)
+    )
+    if output_format in ("json", "yaml"):
+        print(format_structured_output(receipt, fmt=output_format), file=output)
+    else:
+        print("Success: Comment added.", file=output)
+        if final_status and status_confirmed:
+            print(f"Success: Case status updated to '{final_status}'.", file=output)
+    if partial_error:
+        print(str(partial_error), file=sys.stderr)
+        sys.exit(1)
 
 
 def cmd_close(args, api_client, config=None):

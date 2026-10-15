@@ -15,7 +15,9 @@ from rh_support_lib.constants import (
     STATUS_MAP,
 )
 from rh_support_lib.errors import (
+    CommentOutcomeUnknownError,
     IncompleteCaseHistoryError,
+    PartialCommentError,
     PartialSyncError,
     ReadError,
 )
@@ -1287,33 +1289,57 @@ class CaseService:
             GQL_CREATE_CASE_COMMENT, variables, url=self.graphql_url
         )
 
-        record = (
-            data.get("redhat_support_uiapi", {})
-            .get("CaseComment__cCreate", {})
-            .get("RedHatSupportRecord", {})
-        )
-        comment_id = record.get("Id", "")
+        record = data
+        for field in (
+            "redhat_support_uiapi",
+            "CaseComment__cCreate",
+            "RedHatSupportRecord",
+        ):
+            record = record.get(field) if isinstance(record, dict) else None
+        comment_id = record.get("Id") if isinstance(record, dict) else None
+        if not isinstance(comment_id, str) or not comment_id.strip():
+            raise CommentOutcomeUnknownError(case_number) from None
         created_date = (
             record.get("CreatedDate", {}).get("value", "")
             if isinstance(record.get("CreatedDate"), dict)
             else ""
         )
 
-        if status:
-            mapped_status = STATUS_MAP.get(status.lower(), status)
-            self.update_case(
-                case_number, status=mapped_status, case_internal_id=record_id
-            )
-
-        self.cache_service.invalidate_case(case_number)
-        return CaseComment(
-            id=str(comment_id),
+        comment = CaseComment(
+            id=comment_id,
             body=body,
             created_date=created_date,
             created_by="Customer",
             is_public=is_public,
             is_customer=True,
         )
+        status_confirmed = not bool(status)
+        if status:
+            try:
+                mapped_status = STATUS_MAP.get(status.lower(), status)
+                self.update_case(
+                    case_number, status=mapped_status, case_internal_id=record_id
+                )
+                status_confirmed = True
+            except (Exception, KeyboardInterrupt):  # noqa: BLE001
+                # Never let a follow-up failure imply that the comment was unsent.
+                status_confirmed = False
+
+        cache_invalidation_failed = False
+        try:
+            self.cache_service.invalidate_case(case_number)
+        except (Exception, KeyboardInterrupt):  # noqa: BLE001
+            # Cache errors must also retain the confirmed post for safe recovery.
+            cache_invalidation_failed = True
+        if not status_confirmed or cache_invalidation_failed:
+            raise PartialCommentError(
+                case_number,
+                comment,
+                status,
+                status_confirmed=status_confirmed,
+                cache_invalidation_failed=cache_invalidation_failed,
+            ) from None
+        return comment
 
     def update_case(
         self,

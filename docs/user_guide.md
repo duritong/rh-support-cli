@@ -286,6 +286,10 @@ rh-support-cli create --no-default-template
 ### 5.5 Commenting & Status Updates (`comment`)
 Posts a comment to an existing case and optionally transitions its status (defaults to `Waiting on Red Hat`):
 
+If the comment is posted but the status update is not confirmed, the command exits nonzero and tells you to check the case and change only its status. Do not repost the comment. Generated editor drafts are removed after confirmed posting, even on a later status failure; any cleanup warning identifies a submitted copy. An unknown posting outcome preserves a recovery copy and requires checking the portal before retrying. The TUI clears the submitted body on partial success while retaining any newer draft and displaying the recovery warning.
+
+`comment --json` and `close --json` emit one receipt with `case_number`, `comment_id`, `comment_posted`, `requested_status`, `status_confirmed`, and `success`. Global `--format yaml` emits the same receipt as YAML; command-level `--format` still controls comment content. Progress/errors go to stderr. Partial success emits a receipt with `success: false` and exits nonzero; unconfirmed posting emits no success receipt.
+
 ```bash
 # Add comment from file and transition status to Waiting on Red Hat:
 rh-support-cli comment -c 12345678 -f update.txt -s redhat

@@ -1844,7 +1844,7 @@ class SupportApp(App):
                     raw_body,
                     target_status,
                     generation,
-                    str(e),
+                    e,
                 )
                 return
             self._safe_call(
@@ -1877,20 +1877,27 @@ class SupportApp(App):
     def _finish_comment_submission(
         self, case_id, raw_body, target_status, generation, error
     ) -> None:
+        from rh_support_lib.errors import PartialCommentError
+
         self._pending_comments.discard(generation)
+        posted = isinstance(error, PartialCommentError)
         if self.selected_case_id != case_id or self._comment_generation != generation:
+            if posted:
+                self.show_error(f"Case #{case_id}: {error}")
             return
         with contextlib.suppress(Exception):
             self.query_one("#tui-comment-post-btn").disabled = False
             editor = self.query_one("#tui-comment-textarea", TextArea)
-            if error:
-                self.show_error(error)
+            if error and not posted:
+                self.show_error(str(error))
                 return
-            status = self.query_one("#tui-comment-status-select", Select).value
-            if editor.text == raw_body and status == target_status:
+            if editor.text == raw_body:
                 self.screen.remove_class("commenting")
                 editor.text = ""
                 self._comment_generation += 1
+            if posted:
+                self.show_error(str(error))
+                self._request_case_details(case_id, True)
 
     def action_exit_commenting(self) -> None:
         """Hides the comment pane, checking for unsaved changes if needed."""
