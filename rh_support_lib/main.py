@@ -27,7 +27,7 @@ from rh_support_lib.commands.watchers import (
     cmd_following,
     cmd_unfollow,
 )
-from rh_support_lib.config import load_config
+from rh_support_lib.config import ConfigError, load_config, resolve_bookmarks
 from rh_support_lib.tui.app import cmd_tui
 
 try:
@@ -36,62 +36,36 @@ except ImportError:
     argcomplete = None
 
 
+def _start_mock(corpus_dir=None):
+    import http.server
+    import threading
+
+    from rh_support_lib.synthetic_corpus.server import StatefulMockHandler
+
+    StatefulMockHandler.corpus_dir = corpus_dir
+    server = http.server.HTTPServer(("127.0.0.1", 0), StatefulMockHandler)
+    port = server.server_port
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    mock_api_url = f"http://127.0.0.1:{port}"
+    replacements = {
+        "API_URL": mock_api_url,
+        "SSO_URL": f"{mock_api_url}/auth/token",
+        "GRAPHQL_URL": f"{mock_api_url}/graphql",
+        "ATTACHMENT_API_URL": mock_api_url,
+    }
+    for key, value in replacements.items():
+        os.environ[f"RH_{key}"] = value
+    os.environ.setdefault("REDHAT_SUPPORT_OFFLINE_TOKEN", "cli_token")
+    os.environ.setdefault("REDHAT_SUPPORT_USERNAME", "jdeveloper")
+    for name, module in list(sys.modules.items()):
+        if name.startswith("rh_support_lib.") or name == "rh_support_lib":
+            for key, value in replacements.items():
+                if hasattr(module, key):
+                    setattr(module, key, value)
+
+
 def _main():
-    if "--mock" in sys.argv:
-        import http.server
-        import threading
-
-        import rh_support_lib.constants
-
-        # Check if a custom mock-corpus is provided
-        corpus_dir = None
-        if "--mock-corpus" in sys.argv:
-            try:
-                idx = sys.argv.index("--mock-corpus")
-                if idx + 1 < len(sys.argv):
-                    corpus_dir = sys.argv[idx + 1]
-            except ValueError:
-                pass
-
-        # Start loopback mock server
-        from rh_support_lib.synthetic_corpus.server import StatefulMockHandler
-
-        StatefulMockHandler.corpus_dir = corpus_dir
-
-        server = http.server.HTTPServer(("127.0.0.1", 0), StatefulMockHandler)
-        port = server.server_port
-
-        server_thread = threading.Thread(target=server.serve_forever)
-        server_thread.daemon = True
-        server_thread.start()
-
-        mock_api_url = f"http://127.0.0.1:{port}"
-        mock_sso_url = f"http://127.0.0.1:{port}/auth/token"
-        mock_graphql_url = f"http://127.0.0.1:{port}/graphql"
-        mock_attachment_url = f"http://127.0.0.1:{port}"
-
-        os.environ["RH_API_URL"] = mock_api_url
-        os.environ["RH_SSO_URL"] = mock_sso_url
-        os.environ["RH_GRAPHQL_URL"] = mock_graphql_url
-        os.environ["RH_ATTACHMENT_API_URL"] = mock_attachment_url
-        os.environ.setdefault("REDHAT_SUPPORT_OFFLINE_TOKEN", "cli_token")
-        os.environ.setdefault("REDHAT_SUPPORT_USERNAME", "jdeveloper")
-
-        # Update bound variables in any loaded modules
-        rh_support_lib.constants.API_URL = mock_api_url
-        rh_support_lib.constants.SSO_URL = mock_sso_url
-        rh_support_lib.constants.GRAPHQL_URL = mock_graphql_url
-        rh_support_lib.constants.ATTACHMENT_API_URL = mock_attachment_url
-        for mod_name, mod in list(sys.modules.items()):
-            if mod_name.startswith("rh_support_lib.") or mod_name == "rh_support_lib":
-                if hasattr(mod, "API_URL"):
-                    mod.API_URL = mock_api_url
-                if hasattr(mod, "SSO_URL"):
-                    mod.SSO_URL = mock_sso_url
-                if hasattr(mod, "GRAPHQL_URL"):
-                    mod.GRAPHQL_URL = mock_graphql_url
-                if hasattr(mod, "ATTACHMENT_API_URL"):
-                    mod.ATTACHMENT_API_URL = mock_attachment_url
     parser = argparse.ArgumentParser(
         description="Red Hat Support Case CLI Tool",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -890,6 +864,17 @@ Authentication:
         args.json = args.format == "json"
 
     config = load_config(args.config_file)
+    if args.command in ("list", "following", "search", "tui"):
+        selected = getattr(args, "bookmark", None)
+        resolve_bookmarks(
+            config,
+            selected,
+            getattr(args, "no_default_bookmark", False)
+            or (args.command == "tui" and bool(selected)),
+            clear=args.command == "tui" and selected == "none",
+        )
+    if args.mock:
+        _start_mock(args.mock_corpus)
     cache_cfg = config.get("cache") or {}
     no_cache = (
         getattr(args, "no_cache", False)
@@ -980,7 +965,7 @@ Authentication:
 def main():
     try:
         return _main()
-    except (AuthenticationError, RequestReplayError) as error:
+    except (AuthenticationError, RequestReplayError, ConfigError) as error:
         sys.exit(f"Error: {error}")
 
 

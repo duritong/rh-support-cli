@@ -10,6 +10,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
+from rh_support_lib.config import resolve_bookmarks
 from rh_support_lib.constants import SEVERITY_MAP, STATUS_FILTER_MAP
 from rh_support_lib.models import Case, KCSSearchResult
 from rh_support_lib.services.search import SearchService
@@ -20,20 +21,11 @@ def cmd_search(args, api_client, config: dict[str, Any] | None = None) -> None:
     config = config or {}
 
     # 1. Gather Bookmark Filters
-    filters: dict[str, Any] = {}
-    default_bk = config.get("default_bookmark")
-    if default_bk and not getattr(args, "no_default_bookmark", False):
-        bks = default_bk if isinstance(default_bk, list) else [default_bk]
-        for bk_name in bks:
-            bk_data = config.get("bookmarks", {}).get(bk_name)
-            if bk_data:
-                filters.update(bk_data)
-
-    if getattr(args, "bookmark", None):
-        for bk_name in args.bookmark:
-            bk_data = config.get("bookmarks", {}).get(bk_name)
-            if bk_data:
-                filters.update(bk_data)
+    filters = resolve_bookmarks(
+        config,
+        getattr(args, "bookmark", None),
+        getattr(args, "no_default_bookmark", False),
+    )
 
     query = getattr(args, "query", "") or ""
     search_type = getattr(args, "type", "cases") or "cases"

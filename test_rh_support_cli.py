@@ -7435,6 +7435,7 @@ def load_tests(loader, standard_tests, pattern):
                 "test_p2_read_failures",
                 "test_p2_tui_read_errors",
                 "test_p2_isolation",
+                "test_p2_strict_config",
             ]
         )
     )

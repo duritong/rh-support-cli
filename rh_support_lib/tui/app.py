@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import math
 import os
 import pathlib
 import re
@@ -31,6 +32,7 @@ from textual.widgets import (
     TextArea,
 )
 
+from rh_support_lib.config import resolve_bookmarks
 from rh_support_lib.constants import (
     API_URL,
     SEVERITY_MAP,
@@ -62,22 +64,12 @@ def build_filter_payload(
     if not config:
         return {}
 
-    filters = {}
-
-    selected_bk = None
-    if bookmark == "none":
-        selected_bk = None
-    elif bookmark:
-        selected_bk = bookmark
-    elif not no_default_bookmark:
-        selected_bk = config.get("default_bookmark")
-
-    if selected_bk:
-        bks = selected_bk if isinstance(selected_bk, list) else [selected_bk]
-        for bk_name in bks:
-            bk_data = config.get("bookmarks", {}).get(bk_name)
-            if bk_data:
-                filters.update(bk_data)
+    filters = resolve_bookmarks(
+        config,
+        bookmark or None,
+        no_default_bookmark or bool(bookmark),
+        clear=bookmark == "none",
+    )
 
     payload: dict = {}
     acc = filters.get("account") or filters.get("accountNumber")
@@ -663,11 +655,13 @@ class SupportApp(App):
         cache_cfg = (config.get("cache") or {}) if config else {}
         tui_cfg = (config.get("tui") or {}) if config else {}
         try:
-            self.poll_interval = int(
+            self.poll_interval = float(
                 tui_cfg.get("poll_interval")
                 if "poll_interval" in tui_cfg
                 else cache_cfg.get("tui_poll_interval", 60)
             )
+            if not math.isfinite(self.poll_interval) or self.poll_interval < 0:
+                raise ValueError("Invalid poll interval")
         except (ValueError, TypeError):
             self.poll_interval = 60
         # Resolve initial layout: explicit CLI arg > config > state.yaml > default ('vertical')

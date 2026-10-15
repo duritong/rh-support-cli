@@ -6,6 +6,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
+from rh_support_lib.config import resolve_bookmarks
 from rh_support_lib.constants import SEVERITY_MAP, STATUS_FILTER_MAP
 from rh_support_lib.services.cases import CaseService
 
@@ -15,27 +16,11 @@ def cmd_list(args, api_client, config=None):
         config = {}
 
     # 1. Gather Filters (Bookmarks + CLI)
-    filters = {}
-
-    # Default Bookmark
-    default_bk = config.get("default_bookmark")
-    if default_bk and not getattr(args, "no_default_bookmark", False):
-        bks = default_bk if isinstance(default_bk, list) else [default_bk]
-        for bk_name in bks:
-            bk_data = config.get("bookmarks", {}).get(bk_name)
-            if bk_data:
-                filters.update(bk_data)
-            else:
-                print(f"Warning: Default bookmark '{bk_name}' not found.")
-
-    # Explicit Bookmarks
-    if getattr(args, "bookmark", None):
-        for bk_name in args.bookmark:
-            bk_data = config.get("bookmarks", {}).get(bk_name)
-            if bk_data:
-                filters.update(bk_data)
-            else:
-                print(f"Warning: Bookmark '{bk_name}' not found.")
+    filters = resolve_bookmarks(
+        config,
+        getattr(args, "bookmark", None),
+        getattr(args, "no_default_bookmark", False),
+    )
     # CLI Overrides (only if explicitly provided)
     if getattr(args, "account", None):
         filters["account"] = args.account

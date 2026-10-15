@@ -86,6 +86,10 @@ bookmarks:
 ```
 
 ### Custom Configuration File (`--config-file` / `RH_SUPPORT_CONFIG`)
+An explicitly selected missing file, an unreadable existing file, invalid YAML/known field types, or an unknown selected bookmark stops the command with a nonzero diagnostic before API activity. An absent optional default config is still valid. Selected paths expand `~`. Empty bookmarks are valid mappings; use `{}` for an empty configuration rather than a null or nonmapping YAML root.
+
+CLI explicit bookmarks overlay default fields unless `--no-default-bookmark` is set. Selecting a TUI bookmark replaces its default selection, and the TUI clear option remains unfiltered. These selection rules are unchanged; misspelled names no longer silently broaden scope.
+
 You can specify an alternate configuration file using `--config-file` or the `RH_SUPPORT_CONFIG` environment variable:
 ```bash
 rh-support-cli --config-file /path/to/custom_config.yaml list
