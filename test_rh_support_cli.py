@@ -14,6 +14,8 @@ import unittest
 from typing import ClassVar
 from unittest import mock
 
+from rich.text import Text
+
 # Configuration for the mock server
 MOCK_HOST = "localhost"
 MOCK_PORT = 0  # 0 means let the OS choose a free port
@@ -2587,9 +2589,10 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             # 2. Default Rich mode (verifies Panel rendering without AttributeError)
             result_rich = self.run_cli(["list-templates"])
             self.assertEqual(result_rich.returncode, 0)
-            self.assertIn("Found 2 template(s)", result_rich.stdout)
-            self.assertIn("Template: tmpl_a", result_rich.stdout)
-            self.assertIn("Template: tmpl_b", result_rich.stdout)
+            visible_output = Text.from_ansi(result_rich.stdout).plain
+            self.assertIn("Found 2 template(s)", visible_output)
+            self.assertIn("Template: tmpl_a", visible_output)
+            self.assertIn("Template: tmpl_b", visible_output)
 
             # 3. Structured JSON output mode
             result_json = self.run_cli(["list-templates", "--json"])
@@ -5792,7 +5795,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                     )
                     self.assertIn(
                         expected_str,
-                        res.stdout,
+                        Text.from_ansi(res.stdout).plain,
                         f"Expected string '{expected_str}' not in output for command: {' '.join(cmd_args)}\nSTDOUT: {res.stdout}",
                     )
         finally:
@@ -5821,10 +5824,20 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         )
 
         temp_dir = tempfile.mkdtemp()
-        orig_home = os.environ.get("HOME")
-        orig_cache = os.environ.get("XDG_CACHE_HOME")
-        os.environ["HOME"] = temp_dir
-        os.environ["XDG_CACHE_HOME"] = os.path.join(temp_dir, ".cache")
+        config_dir = os.path.join(temp_dir, ".config", "rh-support-cli")
+        state_dir = os.path.join(temp_dir, ".local", "state", "rh-support-cli")
+        env_patch = mock.patch.dict(
+            os.environ,
+            {
+                "HOME": temp_dir,
+                "XDG_CACHE_HOME": os.path.join(temp_dir, ".cache"),
+                "XDG_STATE_HOME": os.path.dirname(state_dir),
+                "RH_SUPPORT_STATE": os.path.join(state_dir, "state.yaml"),
+                "RH_SUPPORT_CONFIG": os.path.join(config_dir, "config.yaml"),
+                "RH_SUPPORT_TEMPLATES": os.path.join(config_dir, "templates"),
+            },
+        )
+        env_patch.start()
         try:
             # 1. Product Completer with fallback defaults
             prods = product_completer("Red Hat Open")
@@ -5866,7 +5879,6 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             self.assertIn("Urgent", sevs)
 
             # 4. Bookmark Completer
-            config_dir = os.path.join(temp_dir, ".config", "rh-support-cli")
             os.makedirs(config_dir, exist_ok=True)
             with open(os.path.join(config_dir, "config.yaml"), "w") as f:
                 yaml.safe_dump(
@@ -5884,7 +5896,6 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             self.assertIn("custom_issue", tmpls)
 
             # 6. Case Completer
-            state_dir = os.path.join(temp_dir, ".local", "state", "rh-support-cli")
             os.makedirs(state_dir, exist_ok=True)
             with open(os.path.join(state_dir, "state.yaml"), "w") as f:
                 yaml.safe_dump(
@@ -5925,14 +5936,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             self.assertIsNone(getattr(type_act, "completer", None))
             self.assertEqual(type_act.choices, ["cases", "kcs", "all"])
         finally:
-            if orig_home is not None:
-                os.environ["HOME"] = orig_home
-            else:
-                os.environ.pop("HOME", None)
-            if orig_cache is not None:
-                os.environ["XDG_CACHE_HOME"] = orig_cache
-            else:
-                os.environ.pop("XDG_CACHE_HOME", None)
+            env_patch.stop()
             shutil.rmtree(temp_dir)
 
     def test_update_catalog_script(self):

@@ -214,6 +214,12 @@ Starts a local loopback `http.server.HTTPServer` mocking:
 * Attachment Service v3 (`/v3/cases/attachments/upload`, `/upload/complete`, `/upload/abort`, `/downloadFile`).
 * Hydra KCS REST search API (`/search/kcs`) supporting language codes and documentation results.
 
+### Output Assertions and Completion Fixtures
+
+Human-readable Rich output is compared using `Text.from_ansi(stdout).plain` so ANSI style transitions do not split expected labels. Structured-output tests continue to parse the original stdout as JSON or YAML.
+
+The direct dynamic-completer test temporarily overrides HOME, cache/state locations, and explicit configuration/template/state paths with its own fixtures, restoring the environment afterward. It must not depend on the developer's inherited XDG or `RH_SUPPORT_*` paths.
+
 ### Running Tests and Linting
 
 ```bash
