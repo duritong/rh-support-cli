@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import getpass
+import hashlib
 import json
 import os
 import pathlib
@@ -206,6 +207,16 @@ def get_access_token(token_file_arg=None):
 
     # 5. Check Cache
     token_cache_dir, token_cache_file = _get_token_cache_file()
+    credential_context = hashlib.sha256(
+        json.dumps(
+            {
+                "offline_token": offline_token,
+                "sso_url": SSO_URL,
+                "client_id": "rhsm-api",
+            },
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
 
     if os.path.exists(token_cache_file):
         try:
@@ -214,7 +225,9 @@ def get_access_token(token_file_arg=None):
 
             expiry = cache_data.get("expires_at", 0)
             # Check if token is valid (with 30s buffer)
-            if time.time() < (expiry - 30):
+            if cache_data.get(
+                "credential_context"
+            ) == credential_context and time.time() < (expiry - 30):
                 # cache hit
                 access_token = cache_data.get("access_token")
                 # Ensure the cached token is valid (contains 2 periods for real OIDC JWT, or we are in mock/custom SSO mode)
@@ -250,6 +263,7 @@ def get_access_token(token_file_arg=None):
             os.chmod(token_cache_dir, 0o700)
 
             cache_data = {
+                "credential_context": credential_context,
                 "access_token": access_token,
                 "refresh_token": refresh_token,
                 "expires_at": time.time() + expires_in,

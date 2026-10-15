@@ -6093,6 +6093,84 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             shutil.rmtree(temp_dir)
 
 
+class TestTokenCacheIdentity(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+
+        self.cache = tempfile.TemporaryDirectory()
+        self.addCleanup(self.cache.cleanup)
+        patcher = mock.patch.dict(
+            os.environ,
+            {
+                "XDG_CACHE_HOME": self.cache.name,
+                "RH_SSO_URL": "https://sso.example/a",
+                "REDHAT_SUPPORT_OFFLINE_TOKEN": "credential-A",
+            },
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        post = mock.patch("rh_support_lib.api.requests.post")
+        self.post = post.start()
+        self.addCleanup(post.stop)
+        self.post.return_value.json.return_value = {
+            "access_token": "header.identity-A.signature",
+            "expires_in": 3600,
+        }
+
+    def test_warm_cache_does_not_override_explicit_credentials(self):
+        from pathlib import Path
+
+        from rh_support_lib.api import get_access_token
+
+        self.assertEqual(get_access_token(), "header.identity-A.signature")
+        token_file = Path(self.cache.name) / "credential-b"
+        token_file.write_text("credential-B")
+        self.post.return_value.json.return_value["access_token"] = (
+            "header.identity-B.signature"
+        )
+        self.assertEqual(
+            get_access_token(str(token_file)), "header.identity-B.signature"
+        )
+        self.assertEqual(self.post.call_count, 2)
+        self.assertEqual(
+            get_access_token(str(token_file)), "header.identity-B.signature"
+        )
+        self.assertEqual(self.post.call_count, 2)
+        self.assertEqual(
+            self.post.call_args.kwargs["data"]["refresh_token"], "credential-B"
+        )
+
+    def test_cache_is_bound_to_actual_sso_endpoint(self):
+        from rh_support_lib.api import get_access_token
+
+        with mock.patch("rh_support_lib.api.SSO_URL", "https://sso.example/a"):
+            get_access_token()
+        self.post.return_value.json.return_value["access_token"] = (
+            "header.backend-B.signature"
+        )
+        with mock.patch("rh_support_lib.api.SSO_URL", "https://sso.example/b"):
+            self.assertEqual(get_access_token(), "header.backend-B.signature")
+        self.assertEqual(self.post.call_count, 2)
+
+    def test_unbound_legacy_cache_is_not_reused(self):
+        from pathlib import Path
+
+        from rh_support_lib.api import _get_token_cache_file, get_access_token
+
+        directory, cache_file = _get_token_cache_file()
+        Path(directory).mkdir(parents=True)
+        Path(cache_file).write_text(
+            json.dumps(
+                {
+                    "access_token": "header.legacy.signature",
+                    "expires_at": time.time() + 3600,
+                }
+            )
+        )
+        self.assertEqual(get_access_token(), "header.identity-A.signature")
+        self.post.assert_called_once()
+
+
 class TestTuiDraftSafety(unittest.TestCase):
     def setUp(self):
         import tempfile

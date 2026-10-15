@@ -62,6 +62,8 @@ rh-support-cli/
 
 HTTP debug logging recursively redacts credential fields, cookies, and presigned upload/download URLs in JSON and headers. Signed request URLs have their query values redacted. Streamed response bodies are never consumed for logging; only their status and headers are recorded. File logging retains complete redacted non-streamed responses, while console logging truncates long bodies. Non-JSON request bodies are omitted rather than inspecting file streams or opaque credential-bearing payloads.
 
+Access-token cache entries carry an opaque SHA-256 fingerprint of the resolved offline credential, actual SSO endpoint, and OAuth client ID. A valid expiry alone is not sufficient for reuse: the fingerprint must match the current authentication context. Legacy entries without a binding are cache misses and are replaced on the next exchange. The existing cache filenames and credential precedence remain unchanged; the cache stores one context per file, not a profile registry. This token binding does not yet isolate case-content caches.
+
 The CLI communicates with three backend endpoints:
 
 | Service | Protocol | Default URL | Purpose |
