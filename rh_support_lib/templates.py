@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import sys
 
 import yaml
 
@@ -42,19 +41,26 @@ class TemplateEngine:
         return value
 
     def _load_raw_template(self, name):
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("Template names must be nonempty strings.")
         path = os.path.join(self.templates_dir, f"{name}.yaml")
         if not os.path.isfile(path):
             if os.path.isfile(name):
                 path = name
             else:
-                return None
+                raise ValueError(f"Template '{name}' not found.")
 
         try:
             with open(path, "r") as f:
-                return yaml.safe_load(f) or {}
-        except (OSError, yaml.YAMLError) as e:
-            print(f"Warning: Failed to load template {path}: {e}")
-            return None
+                data = yaml.safe_load(f)
+        except (OSError, yaml.YAMLError, UnicodeError) as e:
+            raise ValueError(f"Failed to load template '{path}': {e}") from e
+        data = {} if data is None else data
+        if not isinstance(data, dict) or any(not isinstance(key, str) for key in data):
+            raise ValueError(
+                f"Template '{path}' must contain a mapping with string field names."
+            )
+        return data
 
     def _merge_dicts(self, base, update):
         for k, v in update.items():
@@ -66,8 +72,20 @@ class TemplateEngine:
 
     def process(self, template_names, template_vars):
         if not jinja2:
-            sys.exit(
-                "Error: 'jinja2' is required for templates. Please install it: pip install jinja2"
+            raise ValueError(
+                "Template rendering requires 'jinja2'. Please install it: pip install jinja2"
+            )
+        if isinstance(template_names, str):
+            template_names = [template_names]
+        if (
+            not isinstance(template_names, (list, tuple))
+            or not isinstance(template_vars, dict)
+            or any(
+                not isinstance(name, str) or not name.strip() for name in template_names
+            )
+        ):
+            raise ValueError(
+                "Template names must be a list and template variables a mapping."
             )
 
         merged_data = {}
@@ -78,47 +96,61 @@ class TemplateEngine:
         context.update(template_vars)
         context["currentDoc"] = merged_data
 
-        return self._render_recursive(merged_data, context)
+        try:
+            return self._render_recursive(merged_data, context)
+        except RecursionError as e:
+            raise ValueError("Template data is recursive or nested too deeply.") from e
 
     def _merge_recursive(self, base, template_name, seen=None):
         if seen is None:
             seen = set()
 
         if template_name in seen:
-            print(
-                f"Warning: Circular dependency detected for template '{template_name}'. Skipping."
+            raise ValueError(
+                f"Circular template dependency detected for '{template_name}'."
             )
-            return base
+        if len(seen) >= 100:
+            raise ValueError("Template include nesting exceeds 100 levels.")
 
         seen.add(template_name)
 
         raw = self._load_raw_template(template_name)
-        if not raw:
-            print(f"Warning: Template '{template_name}' not found.")
-            return base
 
         includes = raw.pop("include_templates", [])
         if isinstance(includes, str):
             includes = [includes]
+        if not isinstance(includes, list) or any(
+            not isinstance(name, str) or not name.strip() for name in includes
+        ):
+            raise ValueError(
+                f"Template '{template_name}' include_templates must be a name or list of names."
+            )
 
         for inc in includes:
             base = self._merge_recursive(base, inc, seen.copy())
 
         return self._merge_dicts(base, raw)
 
-    def _render_recursive(self, data, context):
+    def _render_recursive(self, data, context, path="root"):
         if isinstance(data, dict):
-            return {k: self._render_recursive(v, context) for k, v in data.items()}
+            return {
+                k: self._render_recursive(v, context, f"{path}.{k}")
+                for k, v in data.items()
+            }
         elif isinstance(data, list):
-            return [self._render_recursive(i, context) for i in data]
+            return [
+                self._render_recursive(item, context, f"{path}[{index}]")
+                for index, item in enumerate(data)
+            ]
         elif isinstance(data, str):
             try:
-                env = jinja2.Environment()
+                env = jinja2.Environment(undefined=jinja2.StrictUndefined)
                 env.filters["parse_date"] = self._parse_date
                 tmpl = env.from_string(data)
                 return tmpl.render(**context)
-            except Exception:  # noqa: BLE001
-                # print(f"Warning: Failed to render '{data}': {e}") # formatting noise
-                return data
+            except Exception as e:
+                raise ValueError(
+                    f"Failed to render template field '{path}': {e}"
+                ) from e
         else:
             return data

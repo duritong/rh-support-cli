@@ -1642,7 +1642,6 @@ class TestRhSupportCli(unittest.TestCase):
         """Test template engine circular dependency detection"""
         import shutil
         import tempfile
-        from unittest.mock import patch
 
         from rh_support_lib.templates import TemplateEngine
 
@@ -1656,15 +1655,8 @@ class TestRhSupportCli(unittest.TestCase):
                 f.write("include_templates: [tmpl_a]\nkey_c: value_c\n")
 
             engine = TemplateEngine(temp_dir)
-            with patch("builtins.print"):
-                result = engine.process(["tmpl_a"], {})
-
-            self.assertEqual(result.get("key_a"), "value_a")
-            self.assertEqual(result.get("key_b"), "value_b")
-            self.assertEqual(result.get("key_c"), "value_c")
-
-            # Check that processing didn't loop infinitely
-            self.assertIn("key_a", result)
+            with self.assertRaisesRegex(ValueError, "Circular template dependency"):
+                engine.process(["tmpl_a"], {})
 
         finally:
             shutil.rmtree(temp_dir)
@@ -6137,6 +6129,135 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             if orig_config:
                 self.env["XDG_CONFIG_HOME"] = orig_config
             shutil.rmtree(temp_dir)
+
+
+class TestTemplateFailureSafety(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.root = Path(self.directory.name)
+        for name, body in {
+            "missing-include": "include_templates: [absent]\nseverity: Low",
+            "cycle": "include_templates: [cycle]\nseverity: Low",
+            "undefined": 'comment: "{{ required_variable }}"',
+            "syntax": 'comment: "{{ broken"',
+            "wrong-root": "- not-a-mapping",
+            "wrong-includes": "include_templates: 42",
+            "invalid-yaml": "comment: [",
+            "optional": "comment: \"{{ optional_variable | default('fallback') }}\"",
+        }.items():
+            (self.root / f"{name}.yaml").write_text(body)
+
+    def test_engine_rejects_invalid_templates_instead_of_returning_partial_data(self):
+        from rh_support_lib.templates import TemplateEngine
+
+        engine = TemplateEngine(str(self.root))
+        for name in (
+            "absent",
+            "missing-include",
+            "cycle",
+            "undefined",
+            "syntax",
+            "wrong-root",
+            "wrong-includes",
+            "invalid-yaml",
+        ):
+            with (
+                self.subTest(template=name),
+                self.assertRaisesRegex(ValueError, "template|Template"),
+            ):
+                engine.process([name], {})
+        self.assertEqual(engine.process(["optional"], {}), {"comment": "fallback"})
+
+    def test_mutating_commands_stop_on_template_failure(self):
+        from types import SimpleNamespace
+
+        from rh_support_lib.commands.actions import cmd_close, cmd_comment
+        from rh_support_lib.commands.apply_template import cmd_apply
+        from rh_support_lib.commands.create_case import cmd_create
+        from rh_support_lib.models import Case, CaseDetails
+
+        args = SimpleNamespace(
+            case="100",
+            template=["absent"],
+            template_var=[],
+            no_default_template=True,
+            file=None,
+            edit=False,
+            status=None,
+            include_previous_comments=0,
+            product="RHEL",
+            version="9.0",
+            summary="summary",
+            severity="Low",
+            type="Standard",
+            description_file=str(self.root / "description.txt"),
+            attachment=[],
+            dry_run=False,
+            simple_output=True,
+        )
+        (self.root / "description.txt").write_text("description")
+        for command, module in (
+            (cmd_comment, "actions"),
+            (cmd_close, "actions"),
+            (cmd_create, "create_case"),
+            (cmd_apply, "apply_template"),
+        ):
+            for template in ("absent", "undefined", "syntax"):
+                with self.subTest(command=command.__name__, template=template):
+                    args.template = [template]
+                    with (
+                        mock.patch.dict(
+                            os.environ, {"RH_SUPPORT_TEMPLATES": str(self.root)}
+                        ),
+                        mock.patch(
+                            f"rh_support_lib.commands.{module}.CaseService"
+                        ) as service,
+                        mock.patch("builtins.input", return_value="y"),
+                        mock.patch("sys.stdout", new_callable=io.StringIO),
+                    ):
+                        service.return_value.get_case_details.return_value = (
+                            CaseDetails(
+                                Case("100", "old", "Open", "High"), "description"
+                            )
+                        )
+                        with self.assertRaisesRegex(SystemExit, "Template Error"):
+                            if command in (cmd_create, cmd_apply):
+                                command(args, mock.Mock(), {})
+                            else:
+                                command(args, mock.Mock())
+                        for mutation in ("add_comment", "create_case", "update_case"):
+                            getattr(service.return_value, mutation).assert_not_called()
+
+    def test_empty_rendered_comment_cannot_change_status(self):
+        from types import SimpleNamespace
+
+        from rh_support_lib.commands.actions import cmd_close, cmd_comment
+
+        (self.root / "empty.yaml").write_text(
+            "comment: \"{{ optional | default('') }}\""
+        )
+        for command in (cmd_comment, cmd_close):
+            with self.subTest(command=command.__name__):
+                args = SimpleNamespace(
+                    template=["empty"], template_var=[], file=None, edit=False
+                )
+                with (
+                    mock.patch.dict(
+                        os.environ, {"RH_SUPPORT_TEMPLATES": str(self.root)}
+                    ),
+                    mock.patch(
+                        "rh_support_lib.commands.actions.CaseService"
+                    ) as service,
+                    self.assertRaisesRegex(
+                        SystemExit, "Template Error: Rendered comment is empty"
+                    ),
+                ):
+                    command(args, mock.Mock())
+                service.assert_not_called()
 
 
 class TestCaseCreationLookupSafety(unittest.TestCase):

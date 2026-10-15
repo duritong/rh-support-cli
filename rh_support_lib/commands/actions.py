@@ -40,7 +40,10 @@ def cmd_comment(args, api_client):
 
         templates_dir = resolve_templates_dir()
         engine = TemplateEngine(templates_dir)
-        template_data = engine.process(args.template, template_vars)
+        try:
+            template_data = engine.process(args.template, template_vars)
+        except ValueError as e:
+            sys.exit(f"Template Error: {e}")
 
         # Look for comment text in standard fields
         template_content = (
@@ -51,6 +54,10 @@ def cmd_comment(args, api_client):
         )
         template_content = str(template_content).strip()
         template_status = template_data.get("status")
+        if not template_content and not args.file and not args.edit:
+            sys.exit(
+                "Template Error: Rendered comment is empty. No comment or status change submitted."
+            )
 
     # Determine status label
     no_status_change = getattr(args, "no_status_change", False) or getattr(

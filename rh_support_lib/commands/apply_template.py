@@ -48,7 +48,10 @@ def cmd_apply(args, api_client, config):
 
     templates_dir = resolve_templates_dir(config)
     engine = TemplateEngine(templates_dir)
-    template_data = engine.process(templates_to_process, template_vars)
+    try:
+        template_data = engine.process(templates_to_process, template_vars)
+    except ValueError as e:
+        sys.exit(f"Template Error: {e}")
     template_data = {k: v for k, v in template_data.items() if not k.startswith("_")}
     unsupported = sorted(template_data.keys() - APPLY_FIELDS)
     if unsupported:

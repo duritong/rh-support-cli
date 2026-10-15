@@ -39,7 +39,10 @@ def cmd_create(args, api_client, config):
 
         templates_dir = resolve_templates_dir(config)
         engine = TemplateEngine(templates_dir)
-        defaults = engine.process(templates_to_process, template_vars)
+        try:
+            defaults = engine.process(templates_to_process, template_vars)
+        except ValueError as e:
+            sys.exit(f"Template Error: {e}")
         # Ignore fields starting with '_' across all actions
         defaults = {k: v for k, v in defaults.items() if not k.startswith("_")}
 

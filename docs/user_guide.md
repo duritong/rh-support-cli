@@ -136,6 +136,8 @@ rh-support-cli show -c 12345678 --no-cache
 
 Templates are Jinja2-compatible YAML files stored in `~/.config/rh-support-cli/templates/`. They allow pre-filling case values during creation (`create`) or updating existing cases into compliance (`apply`).
 
+Explicit template requests fail closed: missing files/includes, circular includes, invalid YAML structure, undefined variables, or rendering errors produce a nonzero exit before any case mutation. Template roots must be mappings with string field names; `include_templates` must be a name or list of names. Provide required values with `--template-var name=value`. For optional values, use an explicit default such as `{{ optional_value | default('fallback') }}`. A comment/close template rendering an empty body cannot submit a status change by itself; provide comment text, a content file, or use `--edit`.
+
 ### Template Metadata and Underscore (`_`) Fields
 Keys starting with an underscore (`_`) are treated as private metadata for the template itself. They are ignored when submitting payloads to the API:
 
