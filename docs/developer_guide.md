@@ -96,7 +96,7 @@ The attachment subsystem (`AttachmentService` in `rh_support_lib/services/attach
                             File Upload Request
                                      │
                                      ▼
-                    File Size > MULTIPART_THRESHOLD (5 GB)?
+                    File Size > MULTIPART_THRESHOLD (5 GiB)?
                                      │
                     ┌────────────────┴────────────────┐
                     │ YES                             │ NO
@@ -105,8 +105,8 @@ The attachment subsystem (`AttachmentService` in `rh_support_lib/services/attach
            (totalChunks calculated)           (presignedUrl returned)
                     │                                 │
                     ▼                                 ▼
-         Stream 5 GB Parts via                Stream Entire File
-           FilePartStream (8 MB blocks)         (FilePartStream)
+         Stream 5 GiB Parts via               Stream Entire File
+           FilePartStream (8 MiB blocks)        (FilePartStream)
                     │                                 │
                     ▼                                 ▼
          Collect Part ETags                   Complete Upload
@@ -118,15 +118,17 @@ The attachment subsystem (`AttachmentService` in `rh_support_lib/services/attach
 
 ### Low-Memory Streaming (`FilePartStream`)
 To prevent `MemoryError` exceptions when handling multi-gigabyte files, `FilePartStream` streams slices of files without reading entire chunks into RAM:
-* Implements `read(size)` reading in small 8 MB memory blocks (`block_size = 8 * 1024 * 1024`).
+* Positive-sized `read(size)` calls are bounded by `block_size` (default 8 MiB), including Requests' normal transport reads. Explicit `read(-1)`/`read()` retains file-like read-all semantics and is not memory-bounded.
 * Implements `__len__` returning the part's exact slice length, enabling `requests.put` to set the HTTP `Content-Length` header automatically.
 * Closes file handles safely via context manager (`__enter__` / `__exit__`).
-* Memory usage remains bounded under 50 MB regardless of total file size.
+* Normal transfer reads are independent of total file size; no measured process-wide peak-memory bound is asserted.
 
 ### Part Boundary Sizing
 For a file of size $S$ divided into $N$ parts of chunk size $C$:
 $$\text{start\_offset} = i \times C, \quad \text{part\_length} = \min(C, S - \text{start\_offset})$$
 This ensures the final chunk accounts for all remainder bytes and eliminates file corruption.
+
+Upload initiation requires a supported strategy and nonempty attachment ID. Multipart manifests are validated before any PUT: positive unique contiguous part numbers, URLs, and exact byte coverage. Shuffled valid manifests are sorted by part number before assigning slices. Each PUT must consume its entire expected slice, the last slice must reach source EOF, and multipart ETags must be present before completion. Usable multipart sessions are aborted on validation/transfer failure or interruption. These checks do not replace cryptographic integrity checks and cannot detect same-size concurrent edits. Existing small-file multipart sizing and ETag conventions are retained pending remote-contract verification.
 
 ### Abort Lifecycle on Interruption
 If an upload is aborted, cancelled (`Ctrl+C`), or encounters a connection drop during multipart transfer, `AttachmentService.upload_attachment` traps the exception and calls `DELETE /v3/cases/attachments/upload/abort` to release storage session resources on the server.

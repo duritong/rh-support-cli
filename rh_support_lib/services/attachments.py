@@ -14,7 +14,7 @@ from rh_support_lib.models import Attachment
 
 
 class FilePartStream:
-    """Streams a byte slice of a file in small blocks without reading the entire part into memory."""
+    """Streams a file slice with bounded sized reads; read(-1) returns the remainder."""
 
     def __init__(
         self,
@@ -24,6 +24,8 @@ class FilePartStream:
         block_size: int = 8 * 1024 * 1024,
         on_bytes_read: Callable[[int], None] | None = None,
     ):
+        if block_size <= 0:
+            raise ValueError("block_size must be positive.")
         self.file_path = file_path
         self.start_offset = start_offset
         self.length = length
@@ -40,13 +42,22 @@ class FilePartStream:
         if self._bytes_sent >= self.length:
             return b""
         remaining = self.length - self._bytes_sent
-        to_read = remaining if size < 0 else min(size, remaining)
+        to_read = remaining if size < 0 else min(size, remaining, self.block_size)
         data = self._file.read(to_read)
+        if to_read and not data:
+            raise OSError("Upload source ended before the expected byte count.")
         if data:
             self._bytes_sent += len(data)
             if self.on_bytes_read:
                 self.on_bytes_read(len(data))
         return data
+
+    def verify_complete(self, *, check_eof: bool = False) -> None:
+        """Reject unconsumed slices and, for the last slice, unexpected source bytes."""
+        if self._bytes_sent != self.length:
+            raise OSError("Upload did not consume the expected source byte count.")
+        if check_eof and self._file.read(1):
+            raise OSError("Upload source exceeds the expected byte count.")
 
     def close(self) -> None:
         if self._file and not self._file.closed:
@@ -62,7 +73,7 @@ class FilePartStream:
 class AttachmentService:
     """Service to handle all support case file attachment operations via the v3 Attachment API."""
 
-    MULTIPART_THRESHOLD: ClassVar[int] = 5368709120  # 5 GB
+    MULTIPART_THRESHOLD: ClassVar[int] = 5368709120  # 5 GiB
 
     def __init__(
         self,
@@ -280,7 +291,7 @@ class AttachmentService:
             "clientId": client_id,
             "description": description,
         }
-        if file_size > self.MULTIPART_THRESHOLD:  # > 5 GB
+        if file_size > self.MULTIPART_THRESHOLD:  # > 5 GiB
             chunk_size = self.MULTIPART_THRESHOLD
             total_chunks = (file_size + chunk_size - 1) // chunk_size
             payload["totalChunks"] = total_chunks
@@ -289,13 +300,19 @@ class AttachmentService:
         init_resp.raise_for_status()
         init_data = init_resp.json()
 
-        attachment_id = init_data.get("attachmentId", "")
-        strategy = init_data.get("uploadStrategy", "SINGLE_PUT")
+        if not isinstance(init_data, dict):
+            raise TypeError("Invalid upload initiation response.")
+        attachment_id = init_data.get("attachmentId")
+        strategy = init_data.get("uploadStrategy")
+        if not isinstance(attachment_id, str) or not attachment_id.strip():
+            raise RuntimeError("Upload initiation response missing attachmentId.")
+        if strategy not in ("SINGLE_PUT", "MULTIPART"):
+            raise RuntimeError("Unsupported uploadStrategy returned by server.")
 
         # 2. Upload file data
         if strategy == "SINGLE_PUT":
             presigned_url = init_data.get("presignedUrl")
-            if not presigned_url:
+            if not isinstance(presigned_url, str) or not presigned_url.strip():
                 raise RuntimeError(
                     "SINGLE_PUT strategy specified but presignedUrl missing."
                 )
@@ -325,22 +342,13 @@ class AttachmentService:
                     timeout=(30, 3600),
                 )
                 put_resp.raise_for_status()
+                stream.verify_complete(check_eof=True)
 
         elif strategy == "MULTIPART":
             upload_id = init_data.get("uploadId")
             parts = init_data.get("parts", [])
-            if not upload_id or not parts:
-                raise RuntimeError(
-                    "MULTIPART strategy specified but uploadId/parts missing."
-                )
 
             parts_result = []
-            num_parts = len(parts)
-            chunk_size = (
-                self.MULTIPART_THRESHOLD
-                if num_parts > 1 and file_size > self.MULTIPART_THRESHOLD
-                else (file_size + num_parts - 1) // num_parts
-            )
             uploaded_bytes = 0
 
             def handle_chunk_progress(n: int) -> None:
@@ -350,16 +358,55 @@ class AttachmentService:
                     progress_callback(uploaded_bytes, file_size)
 
             try:
-                for idx, part in enumerate(parts):
-                    part_num = part.get("partNumber", idx + 1)
+                if not isinstance(upload_id, str) or not upload_id.strip():
+                    raise RuntimeError(
+                        "MULTIPART strategy specified but uploadId missing."
+                    )
+                if not isinstance(parts, list) or not parts:
+                    raise RuntimeError(
+                        "MULTIPART strategy specified but parts missing."
+                    )
+                for part in parts:
+                    if (
+                        not isinstance(part, dict)
+                        or type(part.get("partNumber")) is not int
+                        or part["partNumber"] < 1
+                    ):
+                        raise RuntimeError("Invalid multipart partNumber.")
                     part_url = part.get("presignedUrl")
-                    if not part_url:
-                        raise RuntimeError(f"Missing presignedUrl for part {part_num}")
+                    if not isinstance(part_url, str) or not part_url.strip():
+                        raise RuntimeError(
+                            f"Missing presignedUrl for part {part['partNumber']}"
+                        )
+                parts = sorted(parts, key=lambda part: part["partNumber"])
+                num_parts = len(parts)
+                if [part["partNumber"] for part in parts] != list(
+                    range(1, num_parts + 1)
+                ):
+                    raise RuntimeError(
+                        "Multipart part numbers must be contiguous from 1."
+                    )
+                # Keep 5 GiB boundaries for large files and the existing equal-ceiling
+                # slices for small multipart responses; every listed part must be used.
+                chunk_size = (
+                    self.MULTIPART_THRESHOLD
+                    if file_size > self.MULTIPART_THRESHOLD
+                    else (file_size + num_parts - 1) // num_parts
+                )
+                if (
+                    chunk_size <= 0
+                    or (file_size + chunk_size - 1) // chunk_size != num_parts
+                ):
+                    raise RuntimeError(
+                        "Multipart manifest does not cover the source bytes."
+                    )
+
+                for idx, part in enumerate(parts):
+                    part_num = part["partNumber"]
+                    part_url = part["presignedUrl"]
 
                     start_offset = idx * chunk_size
-                    part_length = min(chunk_size, max(0, file_size - start_offset))
-                    if part_length <= 0:
-                        break
+                    part_length = min(chunk_size, file_size - start_offset)
 
                     with FilePartStream(
                         file_path=file_path,
@@ -378,8 +425,15 @@ class AttachmentService:
                             timeout=(30, 3600),
                         )
                         put_resp.raise_for_status()
+                        part_stream.verify_complete(check_eof=idx == num_parts - 1)
 
-                        etag = put_resp.headers.get("ETag", "").strip('"')
+                        etag = put_resp.headers.get("ETag")
+                        if (
+                            not isinstance(etag, str)
+                            or not etag.strip().strip('"').strip()
+                        ):
+                            raise RuntimeError(f"Missing ETag for part {part_num}.")
+                        etag = etag.strip().strip('"')
                         parts_result.append({"partNumber": part_num, "eTag": etag})
 
                 # 3. Complete multipart upload
@@ -393,8 +447,9 @@ class AttachmentService:
                 comp_resp = self.api_client.post(complete_url, json=comp_payload)
                 comp_resp.raise_for_status()
             except (Exception, KeyboardInterrupt):
-                with contextlib.suppress(Exception):
-                    self.abort_upload(case_number, attachment_id, upload_id)
+                if isinstance(upload_id, str) and upload_id.strip():
+                    with contextlib.suppress(Exception):
+                        self.abort_upload(case_number, attachment_id, upload_id)
                 raise
         size_kb = round(file_size / 1024.0, 1)
         return Attachment(

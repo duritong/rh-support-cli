@@ -7377,6 +7377,7 @@ def load_tests(loader, standard_tests, pattern):
                 "test_p2_state",
                 "test_p2_polling",
                 "test_p2_pagination",
+                "test_p2_attachments",
             ]
         )
     )

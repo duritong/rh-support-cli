@@ -10,7 +10,7 @@ The `rh-support-cli` tool bridges the gap between local system operations and th
 
 * **Case Management**: Create, view, list, comment on, and close support tickets directly from the terminal.
 * **Unified Search**: Search across your account's support cases and the Red Hat Knowledgebase (KCS) technical solutions and articles, with clickable browser links.
-* **Large File Attachments**: Upload diagnostic bundles and log archives up to 5 TB with **automated multipart streaming** (<50 MB RAM usage) and live progress bars. No manual file splitting needed.
+* **Large File Attachments**: Upload diagnostic bundles and log archives up to 5 TB with **automated multipart streaming**, bounded transfer reads, and live progress bars. No manual file splitting needed.
 * **Local Case Tracking & Background Sync**: Follow tickets locally, track read checkpoints, and receive desktop notifications on new comments or status transitions via background timers.
 * **Rich Text / Markdown Formatting**: Author comments and descriptions in natural Markdown; the CLI automatically formats them into portal-compliant rich text (HTML) to preserve line breaks and code formatting in the Customer Portal web UI.
 * **Interactive Terminal User Interface (TUI)**: A responsive, split-pane dashboard (`tui`) featuring instant Stale-While-Revalidate (SWR) case rendering, auto-scrolling to unread comments, and full keyboard navigation.
