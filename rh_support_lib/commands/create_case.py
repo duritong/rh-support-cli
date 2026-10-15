@@ -211,7 +211,10 @@ def cmd_create(args, api_client, config):
     except Exception as e:  # noqa: BLE001
         if temp_desc_path:
             print(f"Draft description preserved at: {temp_desc_path}")
-        sys.exit(f"Network Error: {e}")
+        label = (
+            "Case validation failed" if isinstance(e, ValueError) else "Network Error"
+        )
+        sys.exit(f"{label}: {e}")
 
     # 4. Upload Attachments
     if attachments and case_number:

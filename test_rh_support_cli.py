@@ -22,6 +22,7 @@ MOCK_PORT = 0  # 0 means let the OS choose a free port
 
 
 class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
+    lookup_product_version = "9.0"
     last_case_payload = None
     last_comment_payload = None
     last_update_payload = None
@@ -272,8 +273,14 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                                         {
                                             "node": {
                                                 "Id": "01tMockProduct",
-                                                "Name": {"value": "RHEL"},
-                                                "VersionName__c": {"value": "9.0"},
+                                                "Name": {
+                                                    "value": variables.get(
+                                                        "productName"
+                                                    )
+                                                },
+                                                "VersionName__c": {
+                                                    "value": MockRedHatHandler.lookup_product_version
+                                                },
                                             }
                                         }
                                     ]
@@ -1095,6 +1102,7 @@ class TestRhSupportCli(unittest.TestCase):
 
     def setUp(self):
         # Set up environment variables for the CLI to use the mock server
+        MockRedHatHandler.lookup_product_version = "9.0"
         MockRedHatHandler.details_query_count = 0
         MockRedHatHandler.probe_query_count = 0
         MockRedHatHandler.list_query_count = 0
@@ -1106,6 +1114,7 @@ class TestRhSupportCli(unittest.TestCase):
         self.env["RH_GRAPHQL_URL"] = f"{self.base_url}/graphql"
         self.env["RH_ATTACHMENT_API_URL"] = self.base_url
         self.env["REDHAT_SUPPORT_OFFLINE_TOKEN"] = "mock_offline_token"
+        self.env["REDHAT_SUPPORT_USERNAME"] = "jdeveloper"
         self.env["FORCE_COLOR"] = "1"
         self.env["RH_KCS_SEARCH_URL"] = f"{self.base_url}/search/kcs"
 
@@ -1464,6 +1473,7 @@ class TestRhSupportCli(unittest.TestCase):
 
     def test_create_case(self):
         """Test creating a new case with flags and attachments"""
+        MockRedHatHandler.lookup_product_version = "8.0"
         # Create dummy files
         with open("desc.txt", "w") as f:
             f.write("My Issue Description")
@@ -1519,8 +1529,40 @@ class TestRhSupportCli(unittest.TestCase):
                 if os.path.exists(f):
                     os.remove(f)
 
+    def test_create_lookup_failure_does_not_mutate(self):
+        from pathlib import Path
+
+        description = Path(self.test_cache_dir) / "description.txt"
+        description.write_text("Retain this diagnostic description")
+        MockRedHatHandler.last_case_payload = None
+        result = self.run_cli(
+            [
+                "create",
+                "--product",
+                "RHEL",
+                "--version",
+                "8.0",
+                "--summary",
+                "lookup failure",
+                "--severity",
+                "Low",
+                "--type",
+                "Standard",
+                "--description-file",
+                str(description),
+            ],
+            input="y\n",
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Case validation failed", result.stderr)
+        self.assertIn("version", result.stderr)
+        self.assertNotIn("Success: Case", result.stdout)
+        self.assertIsNone(MockRedHatHandler.last_case_payload)
+        self.assertEqual(description.read_text(), "Retain this diagnostic description")
+
     def test_create_case_default_template(self):
         """Test creating a case using default_create_template"""
+        MockRedHatHandler.lookup_product_version = "8.0"
         import shutil
         import tempfile
 
@@ -1819,6 +1861,7 @@ bookmarks:
 
     def test_templates(self):
         """Test template functionality"""
+        MockRedHatHandler.lookup_product_version = "4.12"
         # Check if jinja2 is available, else skip
         try:
             import jinja2  # noqa: F401
@@ -1913,6 +1956,7 @@ description: |
 
     def test_templates_advanced(self):
         """Test advanced template features: overrides, currentDoc, parse_date"""
+        MockRedHatHandler.lookup_product_version = "4.12"
         try:
             import jinja2  # noqa: F401
         except ImportError:
@@ -2655,6 +2699,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
     def test_template_fields_starting_with_underscore_ignored(self):
         """Test that any template fields starting with an underscore are completely ignored in create and apply"""
+        MockRedHatHandler.lookup_product_version = "8.0"
         import shutil
         import tempfile
 
@@ -6092,6 +6137,174 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             if orig_config:
                 self.env["XDG_CONFIG_HOME"] = orig_config
             shutil.rmtree(temp_dir)
+
+
+class TestCaseCreationLookupSafety(unittest.TestCase):
+    def setUp(self):
+        from rh_support_lib.services.cases import CaseService
+
+        self.client = mock.Mock()
+        self.service = CaseService(self.client, state_service=mock.Mock())
+        self.lookups = {
+            "redhat_support_uiapi": {
+                "Contact": {
+                    "RedHatSupportContact": {
+                        "edges": [
+                            {
+                                "node": {
+                                    "Id": "contact",
+                                    "AccountId": {"value": "account"},
+                                }
+                            }
+                        ]
+                    }
+                },
+                "Account": {
+                    "RedHatSupportAccount": {"edges": [{"node": {"Id": "account"}}]}
+                },
+                "RecordType": {
+                    "RedHatSupportRecordType": {
+                        "edges": [{"node": {"Id": "record-type"}}]
+                    }
+                },
+                "Product": {
+                    "RedHatSupportProduct2": {
+                        "edges": [
+                            {
+                                "node": {
+                                    "Id": "product",
+                                    "Name": {"value": "RHEL"},
+                                    "VersionName__c": {"value": "9.0"},
+                                }
+                            }
+                        ]
+                    }
+                },
+            }
+        }
+
+        def execute(query, variables, **kwargs):
+            if "ResolveCaseLookupData" in query:
+                return self.lookups
+            if "CreateNewCase" in query:
+                return {
+                    "redhat_support_uiapi": {
+                        "CaseCreate": {
+                            "RedHatSupportRecord": {"CaseNumber__c": {"value": "100"}}
+                        }
+                    }
+                }
+            raise AssertionError("Unexpected query")
+
+        self.client.execute_graphql.side_effect = execute
+
+    def create(self, **kwargs):
+        return self.service.create_case(
+            "summary", "description", product_name="RHEL", sso_user="operator", **kwargs
+        )
+
+    def assert_no_creation(self):
+        self.assertFalse(
+            any(
+                "CreateNewCase" in call.args[0]
+                for call in self.client.execute_graphql.call_args_list
+            )
+        )
+
+    def test_missing_malformed_or_ambiguous_entities_prevent_creation(self):
+        from copy import deepcopy
+
+        original = deepcopy(self.lookups)
+        for alias, field in (
+            ("Contact", "RedHatSupportContact"),
+            ("Account", "RedHatSupportAccount"),
+            ("RecordType", "RedHatSupportRecordType"),
+            ("Product", "RedHatSupportProduct2"),
+        ):
+            for edges in (
+                [],
+                None,
+                [{"node": None}],
+                [{"node": {"Id": ""}}],
+                [{"node": {"Id": "a"}}, {"node": {"Id": "b"}}],
+            ):
+                with self.subTest(alias=alias, edges=edges):
+                    self.lookups = deepcopy(original)
+                    self.lookups["redhat_support_uiapi"][alias][field]["edges"] = edges
+                    self.client.execute_graphql.reset_mock()
+                    with self.assertRaisesRegex(ValueError, "lookup"):
+                        self.create(account_number="123")
+                    self.assert_no_creation()
+
+    def test_conflicting_or_missing_contact_account_prevents_creation(self):
+        node = self.lookups["redhat_support_uiapi"]["Contact"]["RedHatSupportContact"][
+            "edges"
+        ][0]["node"]
+        for account in ("other-account", ""):
+            with self.subTest(account=account):
+                node["AccountId"]["value"] = account
+                self.client.execute_graphql.reset_mock()
+                with self.assertRaisesRegex(ValueError, "account"):
+                    self.create(account_number="123")
+                self.assert_no_creation()
+
+    def test_version_mismatch_prevents_creation(self):
+        with self.assertRaisesRegex(ValueError, "version"):
+            self.create(version_name="8.0")
+        self.assert_no_creation()
+
+    def test_omitted_account_uses_only_resolved_contact_account(self):
+        self.assertEqual(
+            self.create(extra_fields={"accountNumber": "ignored-routing-key"}), "100"
+        )
+        calls = self.client.execute_graphql.call_args_list
+        self.assertEqual(calls[0].args[1]["ssoUser"], "operator")
+        payload = calls[-1].args[1]["input"]["RedHatSupportCase"]
+        self.assertEqual(payload["AccountId"], "account")
+        self.assertEqual(payload["ContactId"], "contact")
+        self.assertEqual(payload["ProductId"], "product")
+        self.assertNotIn("accountNumber", payload)
+
+    def test_missing_identity_never_falls_back_to_os_user(self):
+        self.client.get_token.return_value = "opaque-access-token"
+        with (
+            mock.patch.dict(
+                os.environ,
+                {
+                    "REDHAT_SUPPORT_USERNAME": "",
+                    "RH_SSO_USERNAME": "",
+                    "RH_USERNAME": "",
+                    "USER": "unrelated-user",
+                },
+            ),
+            self.assertRaisesRegex(ValueError, "SSO"),
+        ):
+            self.service.create_case("summary", "description", product_name="RHEL")
+        self.client.execute_graphql.assert_not_called()
+
+    def test_identity_claim_and_explicit_account_are_checked(self):
+        import base64
+
+        claims = (
+            base64.urlsafe_b64encode(
+                json.dumps({"preferred_username": "authenticated-user"}).encode()
+            )
+            .decode()
+            .rstrip("=")
+        )
+        self.client.get_token.return_value = f"header.{claims}.signature"
+        with mock.patch.dict(
+            os.environ,
+            {"REDHAT_SUPPORT_USERNAME": "", "RH_SSO_USERNAME": "", "RH_USERNAME": ""},
+        ):
+            self.service.create_case(
+                "summary", "description", product_name="RHEL", account_number="123"
+            )
+        lookup = self.client.execute_graphql.call_args_list[0]
+        self.assertEqual(lookup.args[1]["ssoUser"], "authenticated-user")
+        self.assertEqual(lookup.args[1]["accountNumber"], "123")
+        self.assertTrue(lookup.args[1]["resolveAccount"])
+        self.assertEqual(lookup.args[0].count("first: 2"), 4)
 
 
 class TestTemplateApplicationSafety(unittest.TestCase):

@@ -310,7 +310,7 @@ def get_json(url, token):
         return []
 
 
-def extract_jwt_username(token: str | None) -> str | None:
+def extract_jwt_username(token: str | None, sso_only: bool = False) -> str | None:
     if not token or token.count(".") < 2:
         return None
     import base64
@@ -324,11 +324,9 @@ def extract_jwt_username(token: str | None) -> str | None:
             base64.urlsafe_b64decode(padded.encode("utf-8")).decode("utf-8")
         )
         if isinstance(claims, dict):
-            return (
-                claims.get("preferred_username")
-                or claims.get("username")
-                or claims.get("email")
-                or claims.get("sub")
+            username = claims.get("preferred_username") or claims.get("username")
+            return username or (
+                None if sso_only else claims.get("email") or claims.get("sub")
             )
     return None
 

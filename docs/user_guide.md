@@ -222,6 +222,10 @@ rh-support-cli link -c 12345678
 ```
 
 ### 5.4 Creating Cases (`create`)
+Creation stops before mutation if contact, account, record-type, or product lookups are missing, malformed, or ambiguous. An explicit account must match the resolved contact's account; no account or entity IDs are guessed. If the access token does not provide an SSO username, set `REDHAT_SUPPORT_USERNAME` to your Red Hat SSO login (library callers can pass `sso_user`). Your OS username is not used for creation.
+
+Until the production version-filter contract is verified, the name lookup must return one product whose reported name and version exactly match the request. Other results fail with a validation error rather than creating a case under a potentially wrong version. Lookup failure preserves editor-generated descriptions and does not start attachment uploads.
+
 Creates a new support ticket interactively or via command-line flags:
 
 ```bash

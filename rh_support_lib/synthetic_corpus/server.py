@@ -66,7 +66,9 @@ class StatefulMockHandler(http.server.BaseHTTPRequestHandler):
         variables = payload.get("variables") or {}
 
         # 1. GetActiveProducts
-        if "GetActiveProducts" in query or "RedHatSupportProduct2" in query:
+        if "ResolveCaseLookupData" not in query and (
+            "GetActiveProducts" in query or "RedHatSupportProduct2" in query
+        ):
             products_file = corpus_path / "metadata" / "products.json"
             products = []
             if products_file.exists():

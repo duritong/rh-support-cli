@@ -268,10 +268,10 @@ query GetActiveProducts($first: Int, $after: String) {
 """
 
 GQL_RESOLVE_CASE_LOOKUP_DATA = """
-query ResolveCaseLookupData($ssoUser: String, $accountNumber: String, $productName: String) {
+query ResolveCaseLookupData($ssoUser: String, $accountNumber: String, $productName: String, $resolveAccount: Boolean!) {
   redhat_support_uiapi {
     Contact: query {
-      RedHatSupportContact(where: { SSOUserName__c: { eq: $ssoUser } }, first: 1) {
+      RedHatSupportContact(where: { SSOUserName__c: { eq: $ssoUser } }, first: 2) {
         edges {
           node {
             Id
@@ -280,8 +280,8 @@ query ResolveCaseLookupData($ssoUser: String, $accountNumber: String, $productNa
         }
       }
     }
-    Account: query {
-      RedHatSupportAccount(where: { AccountNumber: { eq: $accountNumber } }, first: 1) {
+    Account: query @include(if: $resolveAccount) {
+      RedHatSupportAccount(where: { AccountNumber: { eq: $accountNumber } }, first: 2) {
         edges {
           node {
             Id
@@ -292,7 +292,7 @@ query ResolveCaseLookupData($ssoUser: String, $accountNumber: String, $productNa
     RecordType: query {
       RedHatSupportRecordType(
         where: { SobjectType: { eq: "Case" }, DeveloperName: { eq: "Technical_Support" } }
-        first: 1
+        first: 2
       ) {
         edges {
           node {
@@ -308,7 +308,7 @@ query ResolveCaseLookupData($ssoUser: String, $accountNumber: String, $productNa
             { Name: { eq: $productName } }
           ]
         }
-        first: 1
+        first: 2
       ) {
         edges {
           node {
@@ -1340,66 +1340,92 @@ class CaseService:
 
     def resolve_case_lookups(
         self,
-        sso_user: str | None = "jdeveloper",
-        account_number: str | None = "123456",
+        sso_user: str | None = None,
+        account_number: str | None = None,
         product_name: str | None = "Red Hat Enterprise Linux",
         version_name: str | None = "9.0",
     ) -> dict[str, str]:
         """Resolves required Salesforce Entity IDs for case creation."""
+        if isinstance(version_name, (int, float)) and not isinstance(
+            version_name, bool
+        ):
+            version_name = str(version_name)
+        if isinstance(account_number, int) and not isinstance(account_number, bool):
+            account_number = str(account_number)
+        if sso_user is None:
+            sso_user = self.get_current_user(require_sso=True)
+        for label, value in (
+            ("SSO user", sso_user),
+            ("product", product_name),
+            ("version", version_name),
+        ):
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"Invalid {label} for case creation lookup.")
+        if account_number is not None and (
+            not isinstance(account_number, str) or not account_number.strip()
+        ):
+            raise ValueError("Invalid account number for case creation lookup.")
         variables = {
-            "ssoUser": sso_user,
+            "ssoUser": sso_user.strip(),
             "accountNumber": account_number,
-            "productName": product_name,
+            "productName": product_name.strip(),
+            "resolveAccount": account_number is not None,
         }
         data = self.api_client.execute_graphql(
             GQL_RESOLVE_CASE_LOOKUP_DATA, variables, url=self.graphql_url
         )
-        uiapi = data.get("redhat_support_uiapi") or {}
+        uiapi = data.get("redhat_support_uiapi") if isinstance(data, dict) else None
 
-        contact_id = ""
-        account_id = ""
-        contact_edges = (
-            uiapi.get("Contact", {}).get("RedHatSupportContact", {}).get("edges", [])
+        def unique_node(alias, field):
+            group = uiapi.get(alias) if isinstance(uiapi, dict) else None
+            connection = group.get(field) if isinstance(group, dict) else None
+            edges = connection.get("edges") if isinstance(connection, dict) else None
+            if not isinstance(edges, list) or len(edges) != 1:
+                raise ValueError(
+                    f"Case creation lookup for {alias} must resolve exactly one record."
+                )
+            node = edges[0].get("node") if isinstance(edges[0], dict) else None
+            identifier = node.get("Id") if isinstance(node, dict) else None
+            if not isinstance(identifier, str) or not identifier.strip():
+                raise ValueError(
+                    f"Case creation lookup for {alias} returned no valid ID."
+                )
+            return node
+
+        contact = unique_node("Contact", "RedHatSupportContact")
+        relationship = contact.get("AccountId")
+        account_id = (
+            relationship.get("value") if isinstance(relationship, dict) else None
         )
-        if contact_edges:
-            c_node = contact_edges[0].get("node", {})
-            contact_id = c_node.get("Id", "")
-            account_id = (
-                c_node.get("AccountId", {}).get("value", "")
-                if isinstance(c_node.get("AccountId"), dict)
-                else ""
+        if not isinstance(account_id, str) or not account_id.strip():
+            raise ValueError(
+                "Contact account lookup did not return a valid account ID."
             )
-
-        if not account_id:
-            account_edges = (
-                uiapi.get("Account", {})
-                .get("RedHatSupportAccount", {})
-                .get("edges", [])
+        if account_number is not None:
+            account = unique_node("Account", "RedHatSupportAccount")
+            if account["Id"] != account_id:
+                raise ValueError(
+                    "Requested account conflicts with the resolved contact account; no case created."
+                )
+        record_type = unique_node("RecordType", "RedHatSupportRecordType")
+        product = unique_node("Product", "RedHatSupportProduct2")
+        product_label = product.get("Name")
+        version_label = product.get("VersionName__c")
+        if (
+            not isinstance(product_label, dict)
+            or product_label.get("value") != product_name.strip()
+            or not isinstance(version_label, dict)
+            or version_label.get("value") != version_name.strip()
+        ):
+            raise ValueError(
+                "Product/version lookup does not match the requested product and version; no case created."
             )
-            if account_edges:
-                account_id = account_edges[0].get("node", {}).get("Id", "")
-
-        record_type_id = ""
-        rt_edges = (
-            uiapi.get("RecordType", {})
-            .get("RedHatSupportRecordType", {})
-            .get("edges", [])
-        )
-        if rt_edges:
-            record_type_id = rt_edges[0].get("node", {}).get("Id", "")
-
-        product_id = ""
-        prod_edges = (
-            uiapi.get("Product", {}).get("RedHatSupportProduct2", {}).get("edges", [])
-        )
-        if prod_edges:
-            product_id = prod_edges[0].get("node", {}).get("Id", "")
 
         return {
-            "ContactId": contact_id or "003ContactMockId",
-            "AccountId": account_id or "001AccountMockId",
-            "RecordTypeId": record_type_id or "012RecordTypeMockId",
-            "ProductId": product_id or "01tProductMockId",
+            "ContactId": contact["Id"],
+            "AccountId": account_id,
+            "RecordTypeId": record_type["Id"],
+            "ProductId": product["Id"],
         }
 
     def create_case(
@@ -1442,6 +1468,10 @@ class CaseService:
         extra_fields: dict[str, Any] | None = None,
         body_format: str = "markdown",
     ) -> str:
+        if isinstance(version_name, (int, float)) and not isinstance(
+            version_name, bool
+        ):
+            version_name = str(version_name)
         mapped_severity = SEVERITY_MAP.get(severity.lower(), severity)
         lookups = self.resolve_case_lookups(
             sso_user=sso_user,
@@ -1468,7 +1498,11 @@ class CaseService:
         }
         if extra_fields:
             for k, v in extra_fields.items():
-                if not k.startswith("_") and k not in case_input:
+                if (
+                    not k.startswith("_")
+                    and k not in case_input
+                    and k != "accountNumber"
+                ):
                     case_input[k] = v
 
         variables = {"input": {"RedHatSupportCase": case_input}}
@@ -1489,7 +1523,9 @@ class CaseService:
         self.cache_service.invalidate_case_lists()
         return str(case_num)
 
-    def get_current_user(self, local_only: bool = False) -> str:
+    def get_current_user(
+        self, local_only: bool = False, require_sso: bool = False
+    ) -> str:
         """Determines the current user's SSO username from config, env, JWT token, or system user."""
         for env_var in (
             "REDHAT_SUPPORT_USERNAME",
@@ -1507,9 +1543,15 @@ class CaseService:
             token = token if isinstance(token, str) else None
         else:
             token = self.api_client.get_token()
-        jwt_user = extract_jwt_username(token)
+        jwt_user = extract_jwt_username(token, sso_only=require_sso)
         if jwt_user:
             return jwt_user
+
+        if require_sso:
+            raise ValueError(
+                "Cannot resolve an SSO username for case creation. Set REDHAT_SUPPORT_USERNAME "
+                "or pass sso_user to the library; the OS username is not used."
+            )
 
         return os.environ.get("USER", "jdeveloper")
 

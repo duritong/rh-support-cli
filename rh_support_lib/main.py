@@ -71,6 +71,7 @@ def main():
         os.environ["RH_GRAPHQL_URL"] = mock_graphql_url
         os.environ["RH_ATTACHMENT_API_URL"] = mock_attachment_url
         os.environ.setdefault("REDHAT_SUPPORT_OFFLINE_TOKEN", "cli_token")
+        os.environ.setdefault("REDHAT_SUPPORT_USERNAME", "jdeveloper")
 
         # Update bound variables in any loaded modules
         rh_support_lib.constants.API_URL = mock_api_url
