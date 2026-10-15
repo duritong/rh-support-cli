@@ -650,6 +650,7 @@ class SupportApp(App):
         self._detail_generation = 0
         self._read_generation = 0
         self._read_timer = None
+        self._read_failed = False
         self._list_generation = 0
         self._poll_in_flight = False
         self._comment_generation = 0
@@ -830,7 +831,12 @@ class SupportApp(App):
         with self.track_job("Fetching cases..."):
 
             def show_loading():
-                if not self._list_request_current(snapshot) or self.selected_case_id:
+                if (
+                    not self._list_request_current(snapshot)
+                    or self.selected_case_id
+                    or self.current_details is not None
+                    or self.cases
+                ):
                     return
                 with contextlib.suppress(Exception):
                     container = self.query_one("#case-detail-container")
@@ -855,7 +861,7 @@ class SupportApp(App):
 
     def _case_list_error(self, snapshot, message):
         if self._list_request_current(snapshot) and self.current_details is snapshot[6]:
-            self._call_for_case(snapshot[4], snapshot[5], self.show_error, message)
+            self._call_for_case(snapshot[4], snapshot[5], self._read_warning, message)
 
     def _apply_case_list(self, snapshot, cases, poll=False):
         if not self._list_request_current(snapshot):
@@ -911,6 +917,7 @@ class SupportApp(App):
             latest.created_date if latest else "",
         )
         if probe and all(probe[:3]) and probe == metadata:
+            self._read_failed = False
             return None
         self._cancel_read_dwell()
         self._detail_generation += 1
@@ -958,7 +965,7 @@ class SupportApp(App):
                 key=num,
             )
 
-        if not self.selected_case_id:
+        if not self.selected_case_id and self.current_details is None:
             container = self.query_one("#case-detail-container")
             container.query("*").remove()
             container.mount(Static("Select a case from the list."))
@@ -997,10 +1004,12 @@ class SupportApp(App):
             self._safe_call(self._finish_poll)
 
     def _poll_case_results(self, snapshot):
-        with (
-            self.track_job("Syncing updates..."),
-            contextlib.suppress(Exception),
-        ):
+        with self.track_job("Syncing updates..."):
+            self._read_poll_results(snapshot)
+
+    def _read_poll_results(self, snapshot):
+        generation = None
+        try:
             params = snapshot[1]
             if params.get("following"):
                 fresh_cases = self.case_service.list_followed_cases(
@@ -1025,19 +1034,28 @@ class SupportApp(App):
             if generation is None:
                 return
             details = self.case_service.get_case_details(case_id, use_cache=False)
-            try:
-                atts = self.attachment_service.list_attachments(case_id)
-            except Exception:  # noqa: BLE001
-                atts = []
-            if details:
+            if not details or not details.case:
+                raise ValueError(f"Case {case_id} not found.")
+            atts = self.attachment_service.list_attachments(case_id)
+            self._safe_call(
+                self._apply_polled_details,
+                snapshot,
+                case_id,
+                generation,
+                details,
+                atts,
+            )
+        except Exception as e:  # noqa: BLE001
+            if generation is None:
+                self._safe_call(self._case_list_error, snapshot, f"Sync failed: {e}")
+            else:
                 self._safe_call(
-                    self._apply_polled_details,
-                    snapshot,
-                    case_id,
-                    generation,
-                    details,
-                    atts,
+                    self._polled_detail_error, snapshot, generation, f"Sync failed: {e}"
                 )
+
+    def _polled_detail_error(self, snapshot, generation, message):
+        if self._list_request_current(snapshot) and self.current_details is snapshot[6]:
+            self._call_for_case(snapshot[4], generation, self._read_warning, message)
 
     def update_table_rows_preserve_cursor(self) -> None:
         """Refreshes the DataTable with self.cases while preserving cursor row position."""
@@ -1138,6 +1156,35 @@ class SupportApp(App):
         clean_msg = re.sub(r"^(?:Error:\s*)+", "", str(msg).strip())
         container.mount(Static(f"[bold red]Error:[/] {clean_msg}"))
 
+    def _read_warning(self, message: str) -> None:
+        """Keep the last complete view and draft intact after a current read fails."""
+        self._cancel_read_dwell()
+        self.notify(message, title="Read failed", severity="warning")
+        self._read_failed = True
+        if self.current_details is None:
+            container = self.query_one("#case-detail-container")
+            container.query("*").remove()
+            container.mount(Static("Unable to load cases. Press R to retry."))
+
+    def _displayed_case_selected(self) -> bool:
+        details = self.current_details
+        return bool(
+            self.selected_case_id
+            and details
+            and details.case
+            and self.selected_case_id
+            in (str(details.case.case_number), str(details.case.id))
+        )
+
+    def _guard_detail_action(self) -> bool:
+        if self._displayed_case_selected():
+            return True
+        self.notify(
+            "Load the selected case details before acting. Press R to retry.",
+            severity="warning",
+        )
+        return False
+
     @on(DataTable.RowSelected)
     def on_row_selected(self, event: DataTable.RowSelected) -> None:
         next_case_id = str(event.row_key.value)
@@ -1196,6 +1243,8 @@ class SupportApp(App):
 
     @on(Button.Pressed, "#tui-comment-post-btn")
     def on_comment_post_click(self) -> None:
+        if not self._guard_detail_action():
+            return
         text_area = self.query_one("#tui-comment-textarea", TextArea)
         raw_body = text_area.text
         if not raw_body.strip():
@@ -1249,10 +1298,7 @@ class SupportApp(App):
         with self.track_job(f"Loading #{case_id}..."):
 
             def show_loading():
-                if self.current_details is not None and case_id in (
-                    str(self.current_details.case.case_number),
-                    str(self.current_details.case.id),
-                ):
+                if self.current_details is not None:
                     return
                 with contextlib.suppress(Exception):
                     container = self.query_one("#case-detail-container")
@@ -1267,23 +1313,21 @@ class SupportApp(App):
                     use_cache=not force,
                 )
                 if not details or not details.case:
-                    update(self.show_error, f"Case {case_id} not found.")
+                    update(self._read_warning, f"Case {case_id} not found.")
                     return
 
-                try:
-                    attachments = self.attachment_service.list_attachments(case_id)
-                except Exception:  # noqa: BLE001
-                    attachments = []
+                attachments = self.attachment_service.list_attachments(case_id)
 
                 update(self.render_case_details, details, attachments)
             except Exception as e:  # noqa: BLE001
-                update(self.show_error, f"Failed to fetch details: {e}")
+                update(self._read_warning, f"Failed to fetch details: {e}")
 
     def render_case_details(
         self, details: CaseDetails, attachments: list[Attachment]
     ) -> None:
         self._cancel_read_dwell()
         self.current_details = details
+        self._read_failed = False
         self.current_attachments = attachments
         detail_container = self.query_one("#case-detail-container")
         detail_container.query("*").remove()
@@ -1508,7 +1552,11 @@ class SupportApp(App):
 
             self.call_after_refresh(scroll_to_divider)
 
-        if tc and (status_changed or unread_indices):
+        if (
+            tc
+            and (status_changed or unread_indices)
+            and self._displayed_case_selected()
+        ):
             generation = self._read_generation
             self._read_timer = self.set_timer(
                 2.5,
@@ -1570,6 +1618,14 @@ class SupportApp(App):
         self.update_case_table_row(str(case_num))
 
     def action_mark_read(self) -> None:
+        if not self._guard_detail_action():
+            return
+        if self._read_failed:
+            self.notify(
+                "Refresh the selected case successfully before marking it read.",
+                severity="warning",
+            )
+            return
         case_id = self.selected_case_id
         if not case_id:
             with contextlib.suppress(Exception):
@@ -1685,6 +1741,8 @@ class SupportApp(App):
                 self._request_case_details(self.selected_case_id, force=True)
 
     def action_add_comment(self) -> None:
+        if not self._guard_detail_action():
+            return
         if not self.selected_case_id:
             self.show_error("Please select a case first.")
             return
@@ -1953,6 +2011,8 @@ class SupportApp(App):
         self.exit()
 
     def action_add_attachment(self) -> None:
+        if not self._guard_detail_action():
+            return
         if not self.selected_case_id:
             self.show_error("Please select a case first.")
             return
@@ -1961,6 +2021,8 @@ class SupportApp(App):
 
         def handle_file(file_path: str) -> None:
             if file_path:
+                if self.selected_case_id != case_id or not self._guard_detail_action():
+                    return
                 if not os.path.isfile(file_path):
                     self.show_error(f"Local file '{file_path}' does not exist.")
                     return
@@ -2003,6 +2065,8 @@ class SupportApp(App):
                 )
 
     def action_apply_template(self) -> None:
+        if not self._guard_detail_action():
+            return
         if not self.selected_case_id:
             self.show_error("Please select a case first.")
             return
@@ -2011,6 +2075,8 @@ class SupportApp(App):
 
         def handle_template(template_name: str) -> None:
             if template_name:
+                if self.selected_case_id != case_id or not self._guard_detail_action():
+                    return
                 self.run_worker(
                     lambda: self.execute_template(case_id, template_name), thread=True
                 )
@@ -2069,6 +2135,8 @@ class SupportApp(App):
                 )
 
     def action_download_attachment(self) -> None:
+        if not self._guard_detail_action():
+            return
         if not self.selected_case_id:
             self.show_error("Please select a case first.")
             return
@@ -2085,6 +2153,8 @@ class SupportApp(App):
 
         def handle_download(result: tuple[str, str] | None) -> None:
             if not result:
+                return
+            if self.selected_case_id != case_id or not self._guard_detail_action():
                 return
             att_uuid, dest_path = result
             self.run_worker(

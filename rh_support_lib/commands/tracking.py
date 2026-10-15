@@ -5,8 +5,10 @@ import shutil
 import subprocess
 import sys
 
+from rh_support_lib.api import AuthenticationError
 from rh_support_lib.commands.systemd import install_systemd_timer
 from rh_support_lib.constants import COLORS
+from rh_support_lib.errors import PartialSyncError, ReadError
 from rh_support_lib.services.cases import CaseService
 from rh_support_lib.utils import colorize, is_comment_newer
 
@@ -33,6 +35,10 @@ def cmd_sync(args, api_client, config=None):
         print(f"Syncing tracked cases for '{user}'...")
     try:
         res = case_service.sync_tracked_cases(username=user, account=acc)
+    except PartialSyncError as error:
+        sys.exit(
+            f"{error} Successful updates were preserved; unavailable cases were not changed."
+        )
     except Exception as e:  # noqa: BLE001
         sys.exit(f"Network Error during sync: {e}")
 
@@ -146,9 +152,9 @@ def cmd_updates(args, api_client, config=None):
             if full_output:
                 # Fetch live case details to render full unread comments
                 try:
-                    details = case_service.get_case_details(
-                        c_num, first_comments=200, all_comments=False
-                    )
+                    details = case_service.get_case_details(c_num)
+                    if details is None:
+                        raise ReadError("Tracked case was not found.")
                     if details and details.comments:
                         last_read_date = (
                             cp.last_read_comment_date or cp.marked_read_at or ""
@@ -170,8 +176,12 @@ def cmd_updates(args, api_client, config=None):
                                 for line in comm.body.splitlines():
                                     print(f"    │ {line}")
                                 print("    ╰────────────────────────────────")
-                except Exception as e:  # noqa: BLE001
-                    print(f"    (Failed to load full comments: {e})")
+                except AuthenticationError:
+                    raise
+                except Exception:  # noqa: BLE001 - stop before acknowledging unread data
+                    sys.exit(
+                        f"Error: Full comments for case {c_num} are unavailable; checkpoints not advanced."
+                    )
             else:
                 author = lk.latest_comment_author or "Author"
                 date_str = lk.latest_comment_date or "Recently"

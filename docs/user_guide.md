@@ -110,6 +110,13 @@ rh-support-cli --debug list
 rh-support-cli --debug-file /tmp/rh_debug.log show -c 12345678
 ```
 
+### Read Failures
+Unavailable case histories, KCS searches, and attachment lists produce nonzero errors rather than successful empty results. A missing case is reported separately from an unavailable read. Failed structured queries leave stdout empty and put diagnostics on stderr.
+
+The TUI retains its last complete view and draft and shows a warning. If a newly selected case cannot load, the retained view still identifies the old case; detail actions require a matching loaded selection. Failed refreshes cancel automatic read marking and prevent manual acknowledgement until data is successfully retrieved or revalidated. Optional editor context is omitted with a warning if history retrieval fails; authentication failures still stop submission.
+
+Sync preserves successful updates even when other tracked cases are unavailable, reports incomplete sync with a nonzero exit, and does not change failed cases or advance read checkpoints.
+
 ### Global Cache Control (`--no-cache`)
 Search honors an explicit zero limit as an empty result rather than replacing it with the default limit.
 

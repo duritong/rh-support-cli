@@ -4,6 +4,8 @@ import os
 import pydoc
 import sys
 
+from rh_support_lib.api import AuthenticationError
+from rh_support_lib.errors import ReadError
 from rh_support_lib.services.cases import CaseService
 from rh_support_lib.utils import is_comment_newer
 
@@ -16,11 +18,15 @@ def cmd_show(args, api_client, config: dict | None = None):
     service = CaseService(api_client, config=config)
     try:
         details = service.get_case_details(args.case)
-    except Exception:  # noqa: BLE001
-        details = None
+    except AuthenticationError:
+        raise
+    except ReadError as error:
+        sys.exit(f"Error reading case {args.case}: {error}")
+    except Exception:  # noqa: BLE001 - presentation boundary, hide raw transport details
+        sys.exit(f"Error: Case {args.case} is unavailable; retrieval failed.")
 
     if not details or not details.case:
-        sys.exit(f"Error: Case {args.case} not found or invalid response.")
+        sys.exit(f"Error: Case {args.case} not found.")
 
     case = details.case
     num = case.case_number or case.id
@@ -41,8 +47,12 @@ def cmd_show(args, api_client, config: dict | None = None):
 
     try:
         attachments = AttachmentService(api_client).list_attachments(str(num))
-    except Exception:  # noqa: BLE001
-        attachments = []
+    except AuthenticationError:
+        raise
+    except Exception:  # noqa: BLE001 - never turn an unavailable list into empty success
+        sys.exit(
+            f"Error: Attachments for case {num} are unavailable; no complete case view returned."
+        )
     user = service.get_current_user()
     tc = service.state_service.get_tracked_cases(user).get(str(num))
     if not tc and (

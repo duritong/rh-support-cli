@@ -242,6 +242,11 @@ class ConfigurationTests(unittest.TestCase):
             app = SupportApp(self.client, config=self.config)
         self.assert_cache_config(app.case_service)
         app.selected_case_id = "123"
+        from rh_support_lib.models import Case, CaseDetails
+
+        app.current_details = CaseDetails(
+            Case("123", "Case", "Open", "Low"), "description"
+        )
         with patch.object(app, "push_screen") as push:
             app.action_apply_template()
         modal = push.call_args.args[0]

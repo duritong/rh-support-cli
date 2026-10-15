@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import math
 import os
 import re
 import tempfile
@@ -9,7 +10,9 @@ from typing import ClassVar
 
 import requests
 
+from rh_support_lib.api import AuthenticationError
 from rh_support_lib.constants import ATTACHMENT_API_URL
+from rh_support_lib.errors import ReadError
 from rh_support_lib.models import Attachment
 
 
@@ -102,19 +105,35 @@ class AttachmentService:
         if sort_by:
             params["sortBy"] = sort_by
 
-        resp = self.api_client.get(url, params=params)
-        resp.raise_for_status()
-        raw_list = resp.json()
-        if not isinstance(raw_list, list):
-            return []
+        try:
+            resp = self.api_client.get(url, params=params)
+            resp.raise_for_status()
+            raw_list = resp.json()
+        except AuthenticationError:
+            raise
+        except Exception:  # noqa: BLE001 - normalize remote read failures without secrets
+            raise ReadError("Attachment listing is unavailable.") from None
+        if not isinstance(raw_list, list) or any(
+            not isinstance(item, dict) for item in raw_list
+        ):
+            raise ReadError("Attachment listing returned an invalid result container.")
 
         attachments = []
         for item in raw_list:
             uuid_val = (
                 item.get("uuid") or item.get("attachmentId") or item.get("id", "")
             )
-            size_val = item.get("size", 0)
-            size_kb = item.get("sizeKB", round(size_val / 1024.0, 1))
+            if not isinstance(uuid_val, str) or not uuid_val:
+                raise ReadError("Attachment listing returned an invalid identifier.")
+            try:
+                size_val = int(item.get("size", 0))
+                size_kb = float(item.get("sizeKB", round(size_val / 1024.0, 1)))
+            except (TypeError, ValueError, OverflowError):
+                raise ReadError(
+                    "Attachment listing returned invalid size metadata."
+                ) from None
+            if size_val < 0 or size_kb < 0 or not math.isfinite(size_kb):
+                raise ReadError("Attachment listing returned invalid size metadata.")
             attachments.append(
                 Attachment(
                     uuid=str(uuid_val),

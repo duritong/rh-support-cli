@@ -4,6 +4,7 @@ import unittest
 from dataclasses import asdict
 from unittest import mock
 
+from rh_support_lib.errors import IncompleteCaseHistoryError, ReadError
 from rh_support_lib.services.cache import CacheService
 from rh_support_lib.services.cases import CaseService
 from rh_support_lib.services.state import StateService
@@ -144,7 +145,10 @@ class PaginationTests(unittest.TestCase):
 
     def test_missing_page_info_is_not_complete(self):
         self.client.omit_page_info = True
-        self.fetch(first_comments=2)
+        with self.assertRaises(IncompleteCaseHistoryError):
+            self.fetch(first_comments=2)
+        self.assertIsNone(self.cache.get_case_record("123"))
+        self.fetch(first_comments=2, all_comments=False)
         self.assertEqual(
             self.cache.get_case_record("123")["_comment_coverage"],
             {"complete": False, "available_prefix": 2},
@@ -307,12 +311,11 @@ class PaginationTests(unittest.TestCase):
         self.assertEqual(len(self.fetch().comments), 7)
         self.assertTrue(any("GetCaseAndComments" in q for q, _ in self.client.calls))
 
-    def test_failed_middle_page_preserves_partial_return_but_not_full_coverage(self):
+    def test_failed_middle_page_raises_without_caching_partial_history(self):
         self.client.fail_after = "2"
-        details = self.fetch(first_comments=2)
-        self.assertEqual(len(details.comments), 2)
-        coverage = self.cache.get_case_record("123")["_comment_coverage"]
-        self.assertEqual(coverage, {"complete": False, "available_prefix": 2})
+        with self.assertRaises(IncompleteCaseHistoryError):
+            self.fetch(first_comments=2)
+        self.assertIsNone(self.cache.get_case_record("123"))
         self.client.fail_after = None
         self.service.check_case_last_modified = mock.Mock(
             return_value=("case-id", "unchanged", "Open", "", "")
@@ -329,7 +332,7 @@ class PaginationTests(unittest.TestCase):
 
     def test_nonadvancing_comment_cursor_raises(self):
         self.client.repeat_cursor = True
-        with self.assertRaisesRegex(ValueError, "cursor"):
+        with self.assertRaises(IncompleteCaseHistoryError):
             self.fetch(first_comments=1)
         self.assertIsNone(self.cache.get_case_record("123"))
 
@@ -338,7 +341,7 @@ class PaginationTests(unittest.TestCase):
         for method in (self.service.list_cases, self.service.get_active_products):
             with self.subTest(method=method.__name__):
                 self.client.calls.clear()
-                with self.assertRaisesRegex(ValueError, "cursor"):
+                with self.assertRaisesRegex(ReadError, "cursor"):
                     method(first=1, all_pages=True, use_cache=False)
 
     def test_multistep_comment_cursor_cycle_raises(self):
@@ -353,11 +356,11 @@ class PaginationTests(unittest.TestCase):
                 if "GetCaseAndComments" in query
                 else container["RedHatSupportCaseComment__c"]
             )
-            connection["pageInfo"]["endCursor"] = next(cursors)
+            connection["pageInfo"]["endCursor"] = next(cursors, "1")
             return data
 
         self.client.execute_graphql = cycle
-        with self.assertRaisesRegex(ValueError, "cursor"):
+        with self.assertRaises(IncompleteCaseHistoryError):
             self.fetch(first_comments=1)
 
 

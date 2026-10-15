@@ -3,6 +3,9 @@ import unittest
 from types import SimpleNamespace
 from unittest import mock
 
+from requests import ConnectionError
+
+from rh_support_lib.errors import ReadError
 from rh_support_lib.services.cases import CaseService
 from rh_support_lib.services.search import SearchService
 
@@ -19,9 +22,7 @@ class SearchResponseTests(unittest.TestCase):
             ({"response": {"docs": [document]}}, 1),
             ({"docs": [document]}, 1),
             ({"response": None, "docs": [document]}, 1),
-            ({"response": None}, 0),
-            (None, 0),
-            ({"response": {"docs": "malformed"}}, 0),
+            ({"response": {"docs": []}, "docs": [document]}, 0),
         ):
             with self.subTest(payload=payload):
                 self.client.get.return_value.json.return_value = payload
@@ -29,6 +30,21 @@ class SearchResponseTests(unittest.TestCase):
                 self.assertEqual(len(result), count)
                 if count:
                     self.assertEqual(result[0].id, "123")
+
+    def test_invalid_containers_and_transport_failures_are_not_empty_results(self):
+        for payload in (
+            None,
+            {"response": None},
+            {"response": {"docs": "malformed"}},
+            {"docs": [None]},
+        ):
+            with self.subTest(payload=payload):
+                self.client.get.return_value.json.return_value = payload
+                with self.assertRaises(ReadError):
+                    self.service.search_kcs("kernel")
+        self.client.get.side_effect = ConnectionError("private request details")
+        with self.assertRaisesRegex(ReadError, "Knowledgebase search is unavailable"):
+            self.service.search_kcs("kernel")
 
     def test_nonpositive_search_limits_never_issue_requests(self):
         for limit in (0, -1):

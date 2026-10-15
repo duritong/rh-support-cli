@@ -2827,7 +2827,11 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 app.on_row_selected(event)
 
                 # Let the pilot process events and background workers run
+                await app.workers.wait_for_complete()
                 await pilot.pause()
+                self.assertIsNotNone(app.current_details)
+                self.assertEqual(app.current_details.case.case_number, "12345")
+                loaded_details = app.current_details
 
                 # Verify that case was successfully selected
                 self.assertEqual(app.selected_case_id, "12345")
@@ -2901,7 +2905,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 self.assertEqual(textarea.text, "")
 
                 # Test activating comment pane when case status is 'Waiting on Customer Action Required'
-                from rh_support_lib.models import Case
+                from rh_support_lib.models import Case, CaseDetails
 
                 app.cases.append(
                     Case(
@@ -2921,6 +2925,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                     )
                 )
                 app.selected_case_id = "99999"
+                app.render_case_details(CaseDetails(app.cases[-1], "description"), [])
                 app.action_add_comment()
                 await pilot.pause()
                 self.assertTrue(app.screen.has_class("commenting"))
@@ -2961,6 +2966,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
                 # 7. Test TUI follow toggle and mark read actions
                 app.selected_case_id = "12345"
+                app.render_case_details(loaded_details, [])
                 app.action_toggle_follow()
                 u = app.case_service.get_current_user()
                 self.assertTrue(app.case_service.state_service.is_following("12345", u))
@@ -2969,9 +2975,19 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                     app.case_service.state_service.is_following("12345", u)
                 )
                 app.action_mark_read()
+                await app.workers.wait_for_complete()
 
         try:
-            asyncio.run(run_headless())
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "RH_GRAPHQL_URL": f"{self.base_url}/graphql",
+                    "RH_ATTACHMENT_API_URL": self.base_url,
+                    "XDG_CACHE_HOME": self.test_cache_dir,
+                    "XDG_STATE_HOME": self.test_state_dir,
+                },
+            ):
+                asyncio.run(run_headless())
         finally:
             rh_support_lib.constants.GRAPHQL_URL = orig_gql_url
             rh_support_lib.constants.API_URL = orig_api_url
@@ -3656,6 +3672,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                                     "CaseNumber__c": {"value": "998877"},
                                     "Subject": {"value": "GQL Comment Privacy Test"},
                                     "CaseComments__r": {
+                                        "pageInfo": {"hasNextPage": False},
                                         "edges": [
                                             {
                                                 "node": {
@@ -3717,7 +3734,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                                                     },
                                                 }
                                             },
-                                        ]
+                                        ],
                                     },
                                 }
                             }
@@ -6862,6 +6879,11 @@ class TestTuiDraftSafety(unittest.TestCase):
         self.app.fetch_cases = mock.Mock()
         self.app.fetch_case_details = mock.Mock()
         self.app.selected_case_id = "A"
+        from rh_support_lib.models import Case, CaseDetails
+
+        self.app.current_details = CaseDetails(
+            Case("A", "Case A", "Open", "Low"), "description"
+        )
 
     def test_failed_post_retains_exact_draft_and_prevents_duplicate_submission(self):
         import asyncio
@@ -6947,6 +6969,11 @@ class TestTuiDraftSafety(unittest.TestCase):
                     self.app.prompt_unsaved_changes_on_navigation("draft A", "B")
                     await pilot.pause()
                     await pilot.click("#discard-btn")
+                    from rh_support_lib.models import Case, CaseDetails
+
+                    self.app.current_details = CaseDetails(
+                        Case("B", "Case B", "Open", "Low"), "description"
+                    )
                     self.app.action_add_comment()
                     await pilot.pause()
                     self.app.query_one("#tui-comment-textarea").text = "new draft B"
@@ -7233,6 +7260,11 @@ class TestTuiOperationSafety(unittest.TestCase):
         self.app = SupportApp("test-token", config={"tui": {"poll_interval": 0}})
         self.app.selected_case_id = "A"
         self.app.track_job = lambda description: contextlib.nullcontext()
+        from rh_support_lib.models import Case, CaseDetails
+
+        self.app.current_details = CaseDetails(
+            Case("A", "Case A", "Open", "Low"), "description"
+        )
         self.app._safe_call = lambda fn, *args, **kwargs: fn(*args, **kwargs)
         self.app.call_from_thread = self.app._safe_call
         self.app.show_error = mock.Mock()
@@ -7398,6 +7430,8 @@ def load_tests(loader, standard_tests, pattern):
                 "test_p2_search",
                 "test_p2_auth_errors",
                 "test_p2_editor",
+                "test_p2_read_failures",
+                "test_p2_tui_read_errors",
             ]
         )
     )

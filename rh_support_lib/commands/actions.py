@@ -114,8 +114,7 @@ def cmd_comment(args, api_client, config=None):
                 comments = details.comments if details else []
 
                 if comments:
-                    # Sort by date (ascending) to get correct "last N"
-                    comments.sort(key=lambda x: x.created_date)
+                    # The service returns comments in ascending server date order.
                     n = args.include_previous_comments
                     subset = comments[-n:]
 
@@ -132,8 +131,11 @@ def cmd_comment(args, api_client, config=None):
 
             except AuthenticationError:
                 raise
-            except Exception as e:  # noqa: BLE001
-                print(f"Warning: Failed to fetch previous comments: {e}")
+            except Exception:  # noqa: BLE001
+                print(
+                    "Warning: Previous comments are unavailable; editor context omitted.",
+                    file=sys.stderr,
+                )
 
         # Open Editor (using file_content as initial body if provided)
         try:

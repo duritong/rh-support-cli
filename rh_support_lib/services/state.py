@@ -313,16 +313,13 @@ class StateService:
             ),
             "source": source
             or (existing.get("source", "cli") if isinstance(existing, dict) else "cli"),
-            "read_checkpoint": {
-                "status": status or existing_cp.get("status", ""),
-                "severity": severity or existing_cp.get("severity", ""),
-                "last_read_comment_id": (
-                    last_comment_id or existing_cp.get("last_read_comment_id", "")
-                ),
-                "last_read_comment_date": (
-                    last_comment_date or existing_cp.get("last_read_comment_date", "")
-                ),
-                "marked_read_at": existing_cp.get("marked_read_at") or now_str,
+            "read_checkpoint": existing_cp
+            or {
+                "status": status,
+                "severity": severity,
+                "last_read_comment_id": last_comment_id,
+                "last_read_comment_date": last_comment_date,
+                "marked_read_at": now_str,
             },
             "latest_known": existing_lk
             or {

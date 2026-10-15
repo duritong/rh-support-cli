@@ -6,11 +6,18 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from typing import Any
 
-from rh_support_lib.api import extract_jwt_username
+from requests import RequestException
+
+from rh_support_lib.api import AuthenticationError, extract_jwt_username
 from rh_support_lib.constants import (
     GRAPHQL_URL,
     SEVERITY_MAP,
     STATUS_MAP,
+)
+from rh_support_lib.errors import (
+    IncompleteCaseHistoryError,
+    PartialSyncError,
+    ReadError,
 )
 from rh_support_lib.models import (
     Case,
@@ -445,10 +452,58 @@ class CaseService:
                     else ""
                 )
             return c_id, lmd, status, latest_c_id, latest_c_date
+        except AuthenticationError:
+            raise
         except Exception:  # noqa: BLE001
             return None
 
     # --- NORMALIZATION HELPERS ---
+
+    def _read_query(self, query, variables):
+        try:
+            return self.api_client.execute_graphql(
+                query, variables, url=self.graphql_url
+            )
+        except AuthenticationError:
+            raise
+        except (RuntimeError, RequestException):
+            raise ReadError("Remote case data is unavailable.") from None
+
+    @staticmethod
+    def _read_connection(data, field):
+        try:
+            container = data["redhat_support_uiapi"]["query"][field]
+            CaseService._read_nodes(container)
+            return container
+        except (KeyError, TypeError):
+            raise ReadError("Malformed remote case data.") from None
+
+    @staticmethod
+    def _read_nodes(container):
+        if not isinstance(container, dict) or not isinstance(
+            container.get("edges"), list
+        ):
+            raise ReadError("Malformed remote connection.")
+        nodes = []
+        for edge in container["edges"]:
+            node = edge.get("node") if isinstance(edge, dict) else None
+            if not isinstance(node, dict) or not node:
+                raise ReadError("Malformed remote record.")
+            nodes.append(node)
+        return nodes
+
+    @staticmethod
+    def _next_cursor(container, seen_cursors):
+        info = container.get("pageInfo")
+        if not isinstance(info, dict) or type(info.get("hasNextPage")) is not bool:
+            raise ReadError("Remote pagination completion is unavailable.")
+        if info["hasNextPage"] is False:
+            return None
+        cursor = info.get("endCursor")
+        if not isinstance(cursor, str) or not cursor or cursor in seen_cursors:
+            raise ReadError("Remote pagination cursor did not advance.")
+        seen_cursors.add(cursor)
+        return cursor
 
     def _normalize_comment_node(self, c_node: dict[str, Any]) -> CaseComment:
         """Converts a GraphQL RedHatSupportCaseComment__c node to a CaseComment domain model."""
@@ -749,21 +804,18 @@ class CaseService:
                 "after": current_after,
             }
 
-            data = self.api_client.execute_graphql(
-                GQL_GET_CASES_BY_FILTERS, variables, url=self.graphql_url
-            )
-            uiapi = data.get("redhat_support_uiapi") or {}
-            query_data = uiapi.get("query") or {}
-            case_container = query_data.get("RedHatSupportCase") or {}
-            edges = case_container.get("edges") or []
+            data = self._read_query(GQL_GET_CASES_BY_FILTERS, variables)
+            case_container = self._read_connection(data, "RedHatSupportCase")
+            try:
+                page = [
+                    self._normalize_case_node(node)
+                    for node in self._read_nodes(case_container)
+                ]
+            except (AttributeError, TypeError, ValueError):
+                raise ReadError("Malformed remote case page.") from None
 
-            if not edges:
-                break
-
-            for edge in edges:
-                node = edge.get("node")
-                if node:
-                    c = self._normalize_case_node(node)
+            for c in page:
+                if c:
                     # Auto-track owned cases (Option B)
                     if (c.contact_sso and c.contact_sso.lower() == user.lower()) or (
                         c.owner and c.owner.lower() == user.lower()
@@ -792,21 +844,15 @@ class CaseService:
                             c.old_status = tc.read_checkpoint.status
                     cases.append(c)
 
-            page_info = case_container.get("pageInfo") or {}
-            has_next = page_info.get("hasNextPage", False)
-            end_cursor = page_info.get("endCursor")
-
-            if not has_next or not end_cursor:
-                break
             if not all_pages and (limit is None or len(cases) >= limit):
                 break
             if limit is not None and len(cases) >= limit:
                 break
-            if end_cursor in seen_cursors:
-                raise ValueError("Case pagination cursor did not advance.")
-            seen_cursors.add(end_cursor)
-
-            current_after = end_cursor
+            current_after = self._next_cursor(case_container, seen_cursors)
+            if current_after is None:
+                break
+            if not page:
+                raise ReadError("Remote case pagination made no progress.")
 
         return (
             cases[:limit]
@@ -949,19 +995,16 @@ class CaseService:
                 owner=owner,
             )[:limit]
 
-        try:
-            remote_cases = self.list_cases(
-                account=account,
-                status=status,
-                severity=severity,
-                owner=owner,
-                product=product,
-                query=query,
-                limit=limit,
-                use_cache=False,
-            )
-        except Exception:  # noqa: BLE001
-            remote_cases = []
+        remote_cases = self.list_cases(
+            account=account,
+            status=status,
+            severity=severity,
+            owner=owner,
+            product=product,
+            query=query,
+            limit=limit,
+            use_cache=False,
+        )
 
         # Also search local cache (which matches full description and comment bodies) and merge
         local_cases = (
@@ -1071,43 +1114,49 @@ class CaseService:
             "after": None,
         }
 
-        data = self.api_client.execute_graphql(
-            GQL_GET_CASE_AND_COMMENTS, variables, url=self.graphql_url
-        )
-        uiapi = data.get("redhat_support_uiapi") or {}
-        query_data = uiapi.get("query") or {}
-        case_container = query_data.get("RedHatSupportCase") or {}
-        edges = case_container.get("edges") or []
-
-        if not edges:
+        data = self._read_query(GQL_GET_CASE_AND_COMMENTS, variables)
+        case_container = self._read_connection(data, "RedHatSupportCase")
+        nodes = self._read_nodes(case_container)
+        if not nodes:
             return None
 
-        node = edges[0].get("node") or {}
-        case_obj = self._normalize_case_node(node)
+        node = nodes[0]
+        try:
+            case_obj = self._normalize_case_node(node)
+        except (AttributeError, TypeError, ValueError):
+            raise ReadError("Malformed remote case record.") from None
         description = (
             node.get("Description", {}).get("value", "")
             if isinstance(node.get("Description"), dict)
             else node.get("description", "")
         )
 
-        comments = []
-        comments_container = node.get("CaseComments__r") or {}
-        comment_edges = comments_container.get("edges") or []
+        def normalize_page(container, available):
+            try:
+                page = [
+                    self._normalize_comment_node(n) for n in self._read_nodes(container)
+                ]
+                # Validate the whole page before making any of it visible.
+                enough = (
+                    comment_limit is not None and available + len(page) >= comment_limit
+                )
+                cursor = None if enough else self._next_cursor(container, seen_cursors)
+                if cursor is not None and not page:
+                    raise ReadError("Remote comment pagination made no progress.")
+                return page, cursor
+            except (ReadError, AttributeError, TypeError, ValueError):
+                raise IncompleteCaseHistoryError(
+                    "Required case history is incomplete or unavailable."
+                ) from None
 
-        for c_edge in comment_edges:
-            c_node = c_edge.get("node") or {}
-            comments.append(self._normalize_comment_node(c_node))
-
-        # Paginate subsequent comments if hasNextPage is True
-        page_info = comments_container.get("pageInfo") or {}
-        has_next = page_info.get("hasNextPage", False)
-        end_cursor = page_info.get("endCursor")
         seen_cursors = set()
+        comments_container = node.get("CaseComments__r")
+        if comment_limit == 0:
+            comments, end_cursor = [], None
+        else:
+            comments, end_cursor = normalize_page(comments_container, 0)
 
-        while has_next and (comment_limit is None or len(comments) < comment_limit):
-            if not end_cursor or end_cursor in seen_cursors:
-                raise ValueError("Comment pagination cursor did not advance.")
-            seen_cursors.add(end_cursor)
+        while end_cursor is not None:
             batch_size = (
                 min(first_comments, comment_limit - len(comments))
                 if comment_limit is not None
@@ -1120,64 +1169,48 @@ class CaseService:
                 "first": batch_size,
                 "after": end_cursor,
             }
-            use_fallback = False
             try:
-                next_data = self.api_client.execute_graphql(
-                    GQL_GET_CASE_COMMENTS, c_vars, url=self.graphql_url
+                next_data = self._read_query(GQL_GET_CASE_COMMENTS, c_vars)
+                next_comments_container = self._read_connection(
+                    next_data, "RedHatSupportCaseComment__c"
                 )
-                next_uiapi = next_data.get("redhat_support_uiapi") or {}
-                next_query = next_uiapi.get("query") or {}
-                next_comments_container = (
-                    next_query.get("RedHatSupportCaseComment__c") or {}
+                # Some backends expose comments only through the case relation.
+                if not next_comments_container["edges"]:
+                    raise ReadError("Direct comment page unavailable.")
+                page, next_cursor = normalize_page(
+                    next_comments_container, len(comments)
                 )
-                next_comment_edges = next_comments_container.get("edges") or []
-                if not next_comment_edges:
-                    use_fallback = True
-                else:
-                    for c_edge in next_comment_edges:
-                        c_node = c_edge.get("node") or {}
-                        comments.append(self._normalize_comment_node(c_node))
-
-                    next_page_info = next_comments_container.get("pageInfo") or {}
-                    page_info = next_page_info
-                    has_next = next_page_info.get("hasNextPage", False)
-                    end_cursor = next_page_info.get("endCursor")
-            except Exception:  # noqa: BLE001
-                use_fallback = True
-
-            if use_fallback:
+            except ReadError:
                 try:
                     next_vars = {
                         "caseNumber": str(case_number),
                         "first": batch_size,
                         "after": end_cursor,
                     }
-                    next_data = self.api_client.execute_graphql(
-                        GQL_GET_CASE_AND_COMMENTS, next_vars, url=self.graphql_url
+                    next_data = self._read_query(GQL_GET_CASE_AND_COMMENTS, next_vars)
+                    next_cases = self._read_connection(next_data, "RedHatSupportCase")
+                    next_nodes = self._read_nodes(next_cases)
+                    if not next_nodes:
+                        raise ReadError("Case disappeared during history retrieval.")
+                    next_comments_container = next_nodes[0].get("CaseComments__r")
+                    page, next_cursor = normalize_page(
+                        next_comments_container, len(comments)
                     )
-                    next_uiapi = next_data.get("redhat_support_uiapi") or {}
-                    next_query = next_uiapi.get("query") or {}
-                    next_cases = next_query.get("RedHatSupportCase") or {}
-                    next_edges = next_cases.get("edges") or []
-                    if not next_edges:
-                        break
-                    next_node = next_edges[0].get("node") or {}
-                    next_comments_container = next_node.get("CaseComments__r") or {}
-                    next_comment_edges = next_comments_container.get("edges") or []
-                    if not next_comment_edges:
-                        break
-                    for c_edge in next_comment_edges:
-                        c_node = c_edge.get("node") or {}
-                        comments.append(self._normalize_comment_node(c_node))
-
-                    next_page_info = next_comments_container.get("pageInfo") or {}
-                    page_info = next_page_info
-                    has_next = next_page_info.get("hasNextPage", False)
-                    end_cursor = next_page_info.get("endCursor")
-                except Exception:  # noqa: BLE001
-                    break
+                except ReadError:
+                    raise IncompleteCaseHistoryError(
+                        "Required case history is incomplete or unavailable."
+                    ) from None
+            comments.extend(page)
+            comments_container = next_comments_container
+            end_cursor = next_cursor
         truncated = comment_limit is not None and len(comments) > comment_limit
         comments = comments[:comment_limit]
+        page_info = (
+            comments_container.get("pageInfo")
+            if isinstance(comments_container, dict)
+            else None
+        )
+        page_info = page_info if isinstance(page_info, dict) else {}
         if _coverage is not None:
             _coverage.update(
                 complete=page_info.get("hasNextPage") is False and not truncated,
@@ -1207,7 +1240,7 @@ class CaseService:
         details = self.get_case_details(c_num, first_comments=1, all_comments=False)
         if details and details.case.id:
             return details.case.id
-        return f"500{c_num}"
+        raise ReadError("Case internal ID could not be resolved.")
 
     def add_comment(
         self,
@@ -1367,20 +1400,10 @@ class CaseService:
 
         while True:
             variables = {"first": first, "after": current_after}
-            data = self.api_client.execute_graphql(
-                GQL_GET_ACTIVE_PRODUCTS, variables, url=self.graphql_url
-            )
-
-            container = (
-                data.get("redhat_support_uiapi", {})
-                .get("query", {})
-                .get("RedHatSupportProduct2", {})
-            )
-            edges = container.get("edges", [])
-            if not edges:
-                break
-            for edge in edges:
-                node = edge.get("node") or {}
+            data = self._read_query(GQL_GET_ACTIVE_PRODUCTS, variables)
+            container = self._read_connection(data, "RedHatSupportProduct2")
+            nodes = self._read_nodes(container)
+            for node in nodes:
                 p_id = node.get("Id", "")
                 p_name = (
                     node.get("Name", {}).get("value", "")
@@ -1413,17 +1436,13 @@ class CaseService:
                     )
                 )
 
-            page_info = container.get("pageInfo") or {}
-            has_next = page_info.get("hasNextPage", False)
-            end_cursor = page_info.get("endCursor")
-
-            if not all_pages or not has_next or not end_cursor:
+            if not all_pages:
                 break
-            if end_cursor in seen_cursors:
-                raise ValueError("Product pagination cursor did not advance.")
-            seen_cursors.add(end_cursor)
-
-            current_after = end_cursor
+            current_after = self._next_cursor(container, seen_cursors)
+            if current_after is None:
+                break
+            if not nodes:
+                raise ReadError("Remote product pagination made no progress.")
 
         return products
 
@@ -1747,7 +1766,7 @@ class CaseService:
                     c_num, first_comments=200, use_cache=False
                 )
                 if not details:
-                    return None, None
+                    raise ReadError("Tracked case is unavailable.")
 
                 status = details.case.status if details.case else ""
                 severity = details.case.severity if details.case else ""
@@ -1817,7 +1836,9 @@ class CaseService:
                         "latest_comment_snippet": latest_comm_snippet,
                     }
                 return case_update, updated_info
-            except Exception:  # noqa: BLE001
+            except AuthenticationError:
+                raise
+            except (ReadError, RuntimeError, RequestException):
                 return None, None
 
         with ThreadPoolExecutor(max_workers=min(10, max(1, len(tracked)))) as executor:
@@ -1830,11 +1851,15 @@ class CaseService:
 
         updated = [r[1] for r in results if r and r[1]]
         total_new_comments = sum(r["new_comment_count"] for r in updated)
-        return {
-            "synced_count": len(tracked),
+        report = {
+            "synced_count": len(case_updates),
             "updated_cases": updated,
             "new_comments": total_new_comments,
         }
+        failures = [c_num for c_num, result in zip(tracked, results) if not result[0]]
+        if failures:
+            raise PartialSyncError(report, failures)
+        return report
 
     def sync_followed_cases(
         self, username: str | None = None, account: str | None = None
@@ -1896,7 +1921,7 @@ class CaseService:
             ]
 
         def fetch_one(c_num: str) -> Case | None:
-            with contextlib.suppress(Exception):
+            try:
                 details = self.get_case_details(
                     c_num, first_comments=1, all_comments=False
                 )
@@ -1913,15 +1938,11 @@ class CaseService:
                         c.status_changed = tc.latest_known.status_changed
                         c.old_status = tc.read_checkpoint.status
                     return c
-            f_info = followed_map.get(c_num)
-            return Case(
-                case_number=c_num,
-                summary=f_info.summary if f_info else "Followed Case",
-                status="Unknown",
-                severity="",
-                account_number=f_info.account_number if f_info else "",
-                is_followed=True,
-            )
+            except AuthenticationError:
+                raise
+            except (RuntimeError, RequestException):
+                raise ReadError("Live followed case data is unavailable.") from None
+            raise ReadError("Live followed case data is unavailable.")
 
         with ThreadPoolExecutor(max_workers=min(10, len(case_numbers))) as executor:
             cases = list(executor.map(fetch_one, case_numbers))

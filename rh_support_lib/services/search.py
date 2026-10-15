@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from rh_support_lib.api import AuthenticationError
 from rh_support_lib.constants import KCS_SEARCH_URL
+from rh_support_lib.errors import ReadError
 from rh_support_lib.models import Case, KCSSearchResult
 from rh_support_lib.services.cases import CaseService
 
@@ -74,25 +76,31 @@ class SearchService:
             resp = self.api_client.get(KCS_SEARCH_URL, params=params)
             resp.raise_for_status()
             data = resp.json()
-        except Exception:  # noqa: BLE001
-            return []
+        except AuthenticationError:
+            raise
+        except Exception:  # noqa: BLE001 - normalize remote read failures without secrets
+            raise ReadError("Knowledgebase search is unavailable.") from None
 
         results: list[KCSSearchResult] = []
         if isinstance(data, list):
             docs = data
         elif isinstance(data, dict):
             response = data.get("response")
-            docs = (
-                (response.get("docs") if isinstance(response, dict) else None)
-                or data.get("docs")
-                or []
-            )
+            if isinstance(response, dict) and "docs" in response:
+                docs = response["docs"]
+            elif "docs" in data:
+                docs = data["docs"]
+            else:
+                raise ReadError(
+                    "Knowledgebase search returned an invalid result container."
+                )
         else:
-            docs = []
-        docs = docs if isinstance(docs, list) else []
+            raise ReadError(
+                "Knowledgebase search returned an invalid result container."
+            )
+        if not isinstance(docs, list) or any(not isinstance(doc, dict) for doc in docs):
+            raise ReadError("Knowledgebase search returned an invalid document list.")
         for doc in docs:
-            if not isinstance(doc, dict):
-                continue
             doc_id = str(
                 doc.get("id") or doc.get("documentId") or doc.get("solution_id") or ""
             ).strip()
@@ -104,6 +112,10 @@ class SearchService:
             view_uri = str(
                 doc.get("view_uri") or doc.get("uri") or doc.get("url") or ""
             ).strip()
+            if not title or not (doc_id or view_uri):
+                raise ReadError(
+                    "Knowledgebase search returned invalid document metadata."
+                )
 
             # If doc_id is a URL or documentation path, migrate to view_uri and clear doc_id
             if doc_id.startswith(("http://", "https://", "/", "www.")) or "/" in doc_id:
