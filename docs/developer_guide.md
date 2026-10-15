@@ -68,6 +68,8 @@ HTTP debug logging recursively redacts credential fields, cookies, and presigned
 
 Access-token cache entries carry an opaque SHA-256 fingerprint of the resolved offline credential, actual SSO endpoint, and OAuth client ID. A valid expiry alone is not sufficient for reuse: the fingerprint must match the current authentication context. Legacy entries without a binding are cache misses and are replaced on the next exchange. The existing cache filenames and credential precedence remain unchanged; the cache stores one context per file, not a profile registry.
 
+Each `RedHatAPIClient` serializes credential pinning/acquisition/refresh with an `RLock`. Requests capture a token generation, so late concurrent 401s reuse an already refreshed generation even if the issuer returns the same token string. Only one retry is made, discarded 401 responses are closed, and caller headers are copied. Token-cache publication atomically replaces a complete 0600 temporary file in the 0700 cache directory, preventing mixed credential/token JSON from concurrent writers. Separate clients/processes may still independently exchange tokens. Existing authentication exit behavior and consumed-body replay semantics remain unchanged pending their error-contract decision.
+
 The CLI communicates with three backend endpoints:
 
 | Service | Protocol | Default URL | Purpose |

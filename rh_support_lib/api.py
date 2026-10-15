@@ -6,6 +6,8 @@ import json
 import os
 import pathlib
 import sys
+import tempfile
+import threading
 import time
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -269,6 +271,7 @@ def get_access_token(token_file_arg=None, offline_token=None):
         refresh_token = data.get("refresh_token")
 
         # Save to cache
+        temporary_path = None
         try:
             pathlib.Path(token_cache_dir).mkdir(parents=True, exist_ok=True)
             # Ensure private permissions
@@ -281,14 +284,24 @@ def get_access_token(token_file_arg=None, offline_token=None):
                 "expires_at": time.time() + expires_in,
             }
 
-            with open(token_cache_file, "w") as f:
-                # Set file permissions before writing if possible, or after
+            # Publish a complete credential/token pair, never an in-place update.
+            with tempfile.NamedTemporaryFile(
+                mode="w", dir=token_cache_dir, prefix=".token_cache-", delete=False
+            ) as f:
+                temporary_path = f.name
                 os.fchmod(f.fileno(), 0o600)
                 json.dump(cache_data, f)
+            os.replace(temporary_path, token_cache_file)
         except (OSError, TypeError):
             # warn but don't fail
             # print(f"Warning: Failed to write token cache: {e}")
             pass
+        finally:
+            if temporary_path is not None:
+                try:
+                    os.unlink(temporary_path)
+                except OSError:
+                    pass
 
         return access_token
 
@@ -340,41 +353,48 @@ class RedHatAPIClient:
         self.token_file_arg = token_file or token_file_arg
         self._token = None
         self._offline_token = None
+        self._auth_lock = threading.RLock()
+        self._token_generation = 0
 
     def get_cache_scope(self, backend: str) -> str | None:
         """Select private content locally, without prompting or authenticating."""
-        if self._offline_token is None:
-            self._offline_token = _get_offline_token(
-                self.token_file_arg, interactive=False
-            )
-        if not self._offline_token:
-            return None
-        return hashlib.sha256(
-            json.dumps(
-                ["offline", self._offline_token, SSO_URL, backend],
-                separators=(",", ":"),
-            ).encode("utf-8")
-        ).hexdigest()
+        with self._auth_lock:
+            if self._offline_token is None:
+                self._offline_token = _get_offline_token(
+                    self.token_file_arg, interactive=False
+                )
+            if not self._offline_token:
+                return None
+            return hashlib.sha256(
+                json.dumps(
+                    ["offline", self._offline_token, SSO_URL, backend],
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            ).hexdigest()
 
     def get_token(self, force_refresh=False):
-        if force_refresh:
-            _, token_cache_file = _get_token_cache_file()
-            if os.path.exists(token_cache_file):
-                try:
-                    os.remove(token_cache_file)
-                except OSError:
-                    pass
-            self._token = None
+        with self._auth_lock:
+            if force_refresh:
+                _, token_cache_file = _get_token_cache_file()
+                if os.path.exists(token_cache_file):
+                    try:
+                        os.remove(token_cache_file)
+                    except OSError:
+                        pass
+                self._token = None
 
-        if not self._token:
-            if self._offline_token is None:
-                self._offline_token = _get_offline_token(self.token_file_arg)
-            self._token = get_access_token(self.token_file_arg, self._offline_token)
-        return self._token
+            if not self._token:
+                if self._offline_token is None:
+                    self._offline_token = _get_offline_token(self.token_file_arg)
+                self._token = get_access_token(self.token_file_arg, self._offline_token)
+                self._token_generation += 1
+            return self._token
 
     def request(self, method, url, **kwargs):
-        headers = kwargs.get("headers", {})
-        token = self.get_token()
+        headers = dict(kwargs.get("headers") or {})
+        with self._auth_lock:
+            token = self.get_token()
+            generation = self._token_generation
         headers["Authorization"] = f"Bearer {token}"
         headers.setdefault("Accept", "application/json")
         kwargs["headers"] = headers
@@ -382,8 +402,12 @@ class RedHatAPIClient:
 
         resp = requests.request(method, url, **kwargs)
         if resp.status_code == 401:
-            # Force refresh OIDC token and retry once
-            token = self.get_token(force_refresh=True)
+            resp.close()
+            # Another in-flight request may already have refreshed this token.
+            with self._auth_lock:
+                token = self.get_token(
+                    force_refresh=self._token_generation == generation
+                )
             headers["Authorization"] = f"Bearer {token}"
             resp = requests.request(method, url, **kwargs)
         return resp
@@ -448,7 +472,7 @@ class LegacyAPIClient:
         return self.token
 
     def request(self, method, url, **kwargs):
-        headers = kwargs.get("headers", {})
+        headers = dict(kwargs.get("headers") or {})
         headers["Authorization"] = f"Bearer {self.token}"
         headers.setdefault("Accept", "application/json")
         kwargs["headers"] = headers
