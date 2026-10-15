@@ -433,6 +433,8 @@ rh-support-cli search "storage" --no-default-bookmark
 All search results include full browser URLs (`https://access.redhat.com/support/cases/<num>` and `https://access.redhat.com/solutions/<id>`).
 
 ### 5.13 Template Commands (`apply` & `list-templates`)
+`apply` supports only `status`, `severity`, `summary`, and `description`. Other directives, including product/version and all watcher/notified-user fields, cause a nonzero exit before any mutation, even with `--dry-run`. Fields starting with `_` remain metadata. Non-null values must be nonempty text (numeric severity is also accepted); null values are left unchanged. Creation templates containing additional fields need a separate supported-fields-only template for `apply`. Following remains local tracking; this command does not manage portal watchers.
+
 ```bash
 # List local templates offline:
 rh-support-cli list-templates

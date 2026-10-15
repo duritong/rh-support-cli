@@ -5634,7 +5634,6 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 yaml.safe_dump(
                     {
                         "_template_description": "Sample test template",
-                        "product": "RHEL",
                         "severity": "Low",
                     },
                     f,
@@ -6093,6 +6092,98 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             if orig_config:
                 self.env["XDG_CONFIG_HOME"] = orig_config
             shutil.rmtree(temp_dir)
+
+
+class TestTemplateApplicationSafety(unittest.TestCase):
+    def setUp(self):
+        from types import SimpleNamespace
+
+        from rh_support_lib.models import Case, CaseDetails
+
+        self.args = SimpleNamespace(
+            case="100",
+            template=["policy"],
+            template_var=[],
+            dry_run=False,
+            simple_output=True,
+        )
+        engine = mock.patch("rh_support_lib.commands.apply_template.TemplateEngine")
+        self.engine = engine.start().return_value
+        self.addCleanup(engine.stop)
+        service = mock.patch("rh_support_lib.commands.apply_template.CaseService")
+        self.service = service.start().return_value
+        self.addCleanup(service.stop)
+        self.service.get_case_details.return_value = CaseDetails(
+            Case("100", "old", "Open", "High"), "old description"
+        )
+
+    def test_unsupported_fields_and_watchers_fail_before_mutation(self):
+        from rh_support_lib.commands.apply_template import cmd_apply
+
+        for field in (
+            "product",
+            "version",
+            "type",
+            "watchers",
+            "notified_users",
+            "notifiedUsers",
+            "unknown",
+        ):
+            for dry_run in (False, True):
+                with self.subTest(field=field, dry_run=dry_run):
+                    self.args.dry_run = dry_run
+                    self.engine.process.return_value = {
+                        "severity": "Low",
+                        field: ["oncall"]
+                        if "user" in field or field == "watchers"
+                        else "changed",
+                    }
+                    with (
+                        self.assertRaisesRegex(SystemExit, field),
+                        mock.patch("sys.stdout", new_callable=io.StringIO) as output,
+                    ):
+                        cmd_apply(self.args, mock.Mock(), {})
+                    self.assertNotIn("Success", output.getvalue())
+                    self.assertNotIn("already adheres", output.getvalue())
+                    self.service.update_case.assert_not_called()
+
+    def test_supported_plan_and_execution_use_the_same_fields(self):
+        from rh_support_lib.commands.apply_template import cmd_apply
+
+        fields = {
+            "status": "Closed",
+            "severity": "Low",
+            "summary": "new",
+            "description": "new description",
+        }
+        self.engine.process.return_value = {**fields, "_desc": "metadata"}
+        with mock.patch("sys.stdout", new_callable=io.StringIO):
+            self.args.dry_run = True
+            with self.assertRaises(SystemExit) as result:
+                cmd_apply(self.args, mock.Mock(), {})
+            self.assertEqual(result.exception.code, 0)
+            self.service.update_case.assert_not_called()
+            self.args.dry_run = False
+            cmd_apply(self.args, mock.Mock(), {})
+        self.service.update_case.assert_called_once_with("100", **fields)
+
+    def test_watcher_only_template_is_not_reported_compliant(self):
+        from rh_support_lib.commands.apply_template import cmd_apply
+
+        self.engine.process.return_value = {"watchers": ["oncall"]}
+        with self.assertRaisesRegex(SystemExit, "Unsupported.*watchers"):
+            cmd_apply(self.args, mock.Mock(), {})
+        self.service.update_case.assert_not_called()
+
+    def test_values_ignored_by_update_service_are_not_reported_as_applied(self):
+        from rh_support_lib.commands.apply_template import cmd_apply
+
+        for field, value in (("summary", ""), ("status", False), ("description", [])):
+            with self.subTest(field=field):
+                self.engine.process.return_value = {field: value}
+                with self.assertRaisesRegex(SystemExit, "Invalid value"):
+                    cmd_apply(self.args, mock.Mock(), {})
+                self.service.update_case.assert_not_called()
 
 
 class TestAttachmentDownloadSafety(unittest.TestCase):

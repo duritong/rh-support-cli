@@ -495,7 +495,7 @@ Authentication:
 
     # Apply Subcommand
     parser_apply = subparsers.add_parser(
-        "apply", help="Apply template values and watchers to a support case"
+        "apply", help="Apply supported template fields to a support case"
     )
     parser_apply.add_argument("-c", "--case", required=True, help="Case Number")
     parser_apply.add_argument(

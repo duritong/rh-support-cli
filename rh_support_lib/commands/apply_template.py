@@ -8,46 +8,7 @@ from rh_support_lib.services.cases import CaseService
 from rh_support_lib.templates import TemplateEngine, resolve_templates_dir
 from rh_support_lib.utils import colorize
 
-# Full set of valid fields in UpdateCaseRequest
-VALID_PUT_FIELDS = {
-    "summary",
-    "description",
-    "status",
-    "product",
-    "version",
-    "caseType",
-    "accountNumberRef",
-    "openshiftClusterID",
-    "openshiftClusterVersion",
-    "notes",
-    "customerEscalation",
-    "contactSSOName",
-    "name",
-    "clearPhoneNumber",
-    "phone",
-    "phoneCountryCode",
-    "phoneAreaCodePrefixLineNumber",
-    "suppliedPhoneNumberVerified",
-    "emailAddress",
-    "severity",
-    "hostname",
-    "enhancedSLA",
-    "groupNumber",
-    "entitlementSla",
-    "fts",
-    "caseLanguage",
-    "issue",
-    "environment",
-    "periodicityOfIssue",
-    "timeFramesAndUrgency",
-    "cep",
-    "alternateId",
-    "noClusterIdReason",
-    "noClusterIdReasonExplanation",
-    "contactInfo24x7",
-    "screenSessionRequested",
-    "reopenedReason",
-}
+APPLY_FIELDS = {"summary", "description", "status", "severity"}
 
 
 def cmd_apply(args, api_client, config):
@@ -89,40 +50,38 @@ def cmd_apply(args, api_client, config):
     engine = TemplateEngine(templates_dir)
     template_data = engine.process(templates_to_process, template_vars)
     template_data = {k: v for k, v in template_data.items() if not k.startswith("_")}
+    unsupported = sorted(template_data.keys() - APPLY_FIELDS)
+    if unsupported:
+        sys.exit(
+            f"Error: Unsupported fields for apply: {', '.join(unsupported)}. "
+            f"Supported fields: {', '.join(sorted(APPLY_FIELDS))}. No changes made."
+        )
+    for key, value in template_data.items():
+        if value is None:
+            continue
+        if key == "severity" and isinstance(value, int) and not isinstance(value, bool):
+            template_data[key] = str(value)
+        elif not isinstance(value, str) or not value.strip():
+            sys.exit(
+                f"Error: Invalid value for apply field '{key}'; expected nonempty text. No changes made."
+            )
 
     # 3. Compute field differences
     updates = {}
-    for k, v in template_data.items():
-        # Map template field 'type' to Case API field 'caseType'
-        target_key = "caseType" if k == "type" else k
-
-        if target_key in VALID_PUT_FIELDS:
-            current_val = case.get(target_key)
-            if target_key == "caseType" and current_val is None:
-                current_val = case.get("type")
-
-            # Check if value differs
-            if isinstance(v, bool):
-                current_bool = (
-                    current_val
-                    if isinstance(current_val, bool)
-                    else str(current_val).lower() in ("true", "1", "yes")
-                )
-                if current_bool != v:
-                    updates[target_key] = v
-            elif target_key == "severity" and v is not None:
-                cur_s = SEVERITY_MAP.get(str(current_val).lower(), str(current_val))
-                tgt_s = SEVERITY_MAP.get(str(v).lower(), str(v))
-                if cur_s != tgt_s:
-                    updates[target_key] = v
-            elif target_key == "status" and v is not None:
-                cur_st = STATUS_MAP.get(str(current_val).lower(), str(current_val))
-                tgt_st = STATUS_MAP.get(str(v).lower(), str(v))
-                if cur_st != tgt_st:
-                    updates[target_key] = v
-            elif v is not None:
-                if str(current_val).strip() != str(v).strip():
-                    updates[target_key] = v
+    for key, value in template_data.items():
+        if value is None:
+            continue
+        current_val = case.get(key)
+        if key == "severity":
+            current_val = SEVERITY_MAP.get(str(current_val).lower(), str(current_val))
+            target_val = SEVERITY_MAP.get(value.lower(), value)
+        elif key == "status":
+            current_val = STATUS_MAP.get(str(current_val).lower(), str(current_val))
+            target_val = STATUS_MAP.get(value.lower(), value)
+        else:
+            target_val = value
+        if str(current_val).strip() != target_val.strip():
+            updates[key] = value
     # 4. Output comparison and update plan
     if not updates:
         print(
@@ -149,13 +108,7 @@ def cmd_apply(args, api_client, config):
     if updates:
         print("\nUpdating case fields...")
         try:
-            case_service.update_case(
-                args.case,
-                status=updates.get("status"),
-                severity=updates.get("severity"),
-                summary=updates.get("summary"),
-                description=updates.get("description"),
-            )
+            case_service.update_case(args.case, **updates)
             print("Success: Case fields updated.")
         except Exception as e:  # noqa: BLE001
             sys.exit(f"Network Error updating fields: {e}")
