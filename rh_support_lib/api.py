@@ -6,6 +6,7 @@ import os
 import pathlib
 import sys
 import time
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 try:
     import requests
@@ -21,6 +22,54 @@ import requests.sessions
 from rh_support_lib.constants import SSO_URL
 
 
+def _redact_debug_value(value):
+    sensitive = {
+        "authorization",
+        "proxyauthorization",
+        "cookie",
+        "setcookie",
+        "accesstoken",
+        "refreshtoken",
+        "idtoken",
+        "password",
+        "clientsecret",
+        "presignedurl",
+        "downloadurl",
+    }
+    if isinstance(value, dict):
+        return {
+            key: "Bearer <HIDDEN>"
+            if str(key).lower() == "authorization"
+            else "<HIDDEN>"
+            if str(key).lower().replace("_", "").replace("-", "") in sensitive
+            else _redact_debug_value(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_redact_debug_value(item) for item in value]
+    if isinstance(value, str) and value.startswith(("https://", "http://")):
+        try:
+            parsed = urlsplit(value)
+            query = parse_qsl(parsed.query, keep_blank_values=True)
+            if any(
+                key.lower().startswith("x-amz-")
+                or any(
+                    word in key.lower()
+                    for word in ("signature", "token", "credential", "accesskey")
+                )
+                for key, _ in query
+            ):
+                parsed = parsed._replace(
+                    query=urlencode([(key, "<HIDDEN>") for key, _ in query])
+                )
+            if parsed.username is not None:
+                parsed = parsed._replace(netloc=parsed.netloc.rsplit("@", 1)[-1])
+            return urlunsplit(parsed)
+        except ValueError:
+            return "<HIDDEN URL>"
+    return value
+
+
 def enable_debug_logging(log_file=None):
     if log_file:
         logging.basicConfig(
@@ -32,40 +81,41 @@ def enable_debug_logging(log_file=None):
         truncate_response = True
 
     logger = logging.getLogger("rh-support-cli.debug")
+    # urllib3's DEBUG request lines include unredacted signed query strings.
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
 
     # Store the original request method
     original_request = requests.sessions.Session.request
 
     def debug_request(self, method, url, *args, **kwargs):
-        logger.debug(f"Request: {method} {url}")
+        logger.debug("Request: %s %s", method, _redact_debug_value(url))
 
         # Log Headers
         headers = kwargs.get("headers", {})
-        # Mask authorization header if present
-        log_headers = headers.copy()
-        if "Authorization" in log_headers:
-            log_headers["Authorization"] = "Bearer <HIDDEN>"
-        logger.debug(f"Request Headers: {log_headers}")
+        logger.debug("Request Headers: %s", _redact_debug_value(dict(headers)))
 
         # Log Body
         if "json" in kwargs:
-            logger.debug(f"Request Body (JSON): {kwargs['json']}")
+            logger.debug("Request Body (JSON): %s", _redact_debug_value(kwargs["json"]))
         elif "data" in kwargs:
-            # Mask refresh token in body
-            log_data = (
-                kwargs["data"].copy()
+            logger.debug(
+                "Request Body (Data): %s",
+                _redact_debug_value(kwargs["data"])
                 if isinstance(kwargs["data"], dict)
-                else kwargs["data"]
+                else "<non-JSON request body omitted>",
             )
-            if isinstance(log_data, dict) and "refresh_token" in log_data:
-                log_data["refresh_token"] = "<HIDDEN>"
-            logger.debug(f"Request Body (Data): {log_data}")
 
         try:
             response = original_request(self, method, url, *args, **kwargs)
 
             logger.debug(f"Response Status: {response.status_code}")
-            logger.debug(f"Response Headers: {dict(response.headers)}")
+            logger.debug(
+                "Response Headers: %s", _redact_debug_value(dict(response.headers))
+            )
+
+            if kwargs.get("stream"):
+                logger.debug("Response Body: <streamed response body omitted>")
+                return response
 
             # Log Response Body
             try:
@@ -76,23 +126,14 @@ def enable_debug_logging(log_file=None):
                     if response.headers.get("Content-Type", "").startswith(
                         "application/json"
                     ):
-                        resp_json = response.json()
-                        if isinstance(resp_json, dict) and (
-                            "access_token" in resp_json or "refresh_token" in resp_json
-                        ):
-                            masked_json = resp_json.copy()
-                            if "access_token" in masked_json:
-                                masked_json["access_token"] = "<HIDDEN>"
-                            if "refresh_token" in masked_json:
-                                masked_json["refresh_token"] = "<HIDDEN>"
-                            content = json.dumps(masked_json)
+                        content = json.dumps(_redact_debug_value(response.json()))
                 except (json.JSONDecodeError, TypeError):
                     pass
 
                 if content is None:
                     content = response.text
-                    if truncate_response and len(content) > 1000:
-                        content = content[:1000] + "... (truncated)"
+                if truncate_response and len(content) > 1000:
+                    content = content[:1000] + "... (truncated)"
 
                 logger.debug(f"Response Body: {content}")
             except Exception:  # noqa: BLE001
@@ -102,7 +143,7 @@ def enable_debug_logging(log_file=None):
             return response
 
         except Exception as e:
-            logger.error(f"Request Failed: {e}")
+            logger.error("Request Failed: %s", type(e).__name__)
             raise
 
     # Patch the method

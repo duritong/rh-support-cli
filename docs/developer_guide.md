@@ -60,6 +60,8 @@ rh-support-cli/
 
 ## 3. API Protocols & Backend Communication
 
+HTTP debug logging recursively redacts credential fields, cookies, and presigned upload/download URLs in JSON and headers. Signed request URLs have their query values redacted. Streamed response bodies are never consumed for logging; only their status and headers are recorded. File logging retains complete redacted non-streamed responses, while console logging truncates long bodies. Non-JSON request bodies are omitted rather than inspecting file streams or opaque credential-bearing payloads.
+
 The CLI communicates with three backend endpoints:
 
 | Service | Protocol | Default URL | Purpose |

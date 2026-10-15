@@ -6090,6 +6090,103 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             shutil.rmtree(temp_dir)
 
 
+class TestDebugLoggingSafety(unittest.TestCase):
+    def test_transport_debug_logs_do_not_bypass_redaction(self):
+        import logging
+
+        import requests
+
+        from rh_support_lib.api import enable_debug_logging
+
+        response = mock.Mock(status_code=200, headers={}, text="OK")
+
+        def transport(*args, **kwargs):
+            logging.getLogger("urllib3.connectionpool").debug(
+                "GET /?token=transport-secret"
+            )
+            return response
+
+        with (
+            mock.patch("requests.sessions.Session.request", side_effect=transport),
+            mock.patch("logging.basicConfig"),
+            mock.patch.object(logging.getLogger("urllib3"), "level", logging.DEBUG),
+            self.assertLogs(level="DEBUG") as logs,
+        ):
+            enable_debug_logging()
+            requests.Session().get("https://storage.example/")
+        self.assertNotIn("transport-secret", "\n".join(logs.output))
+
+    def test_streamed_response_body_is_never_consumed(self):
+        import requests
+
+        from rh_support_lib.api import enable_debug_logging
+
+        for log_file in (None, "debug.log"):
+            with self.subTest(log_file=log_file):
+                response = mock.Mock(
+                    status_code=200,
+                    headers={"Content-Type": "application/octet-stream"},
+                )
+                text = mock.PropertyMock(
+                    side_effect=AssertionError("Consumed streamed body")
+                )
+                type(response).text = text
+                with (
+                    mock.patch(
+                        "requests.sessions.Session.request", return_value=response
+                    ),
+                    mock.patch("logging.basicConfig"),
+                    self.assertLogs("rh-support-cli.debug", level="DEBUG") as logs,
+                ):
+                    enable_debug_logging(log_file)
+                    result = requests.Session().get(
+                        "https://storage.example/bundle", stream=True
+                    )
+                self.assertIs(result, response)
+                text.assert_not_called()
+                response.json.assert_not_called()
+                self.assertIn("200", "\n".join(logs.output))
+
+    def test_nested_credentials_and_presigned_urls_are_redacted(self):
+        import requests
+
+        from rh_support_lib.api import enable_debug_logging
+
+        signed_url = "https://storage.example/bundle?X-Amz-Signature=storage-secret&X-Amz-Credential=credential-secret"
+        response = mock.Mock(
+            status_code=200,
+            headers={"Content-Type": "application/json", "Set-Cookie": "cookie-secret"},
+        )
+        response.json.return_value = {
+            "parts": [{"presignedUrl": signed_url}],
+            "downloadUrl": signed_url,
+            "nested": {"access_token": "access-secret"},
+            "message": "retained-message-" + "x" * 1500,
+        }
+        with (
+            mock.patch("requests.sessions.Session.request", return_value=response),
+            mock.patch("logging.basicConfig"),
+            self.assertLogs("rh-support-cli.debug", level="DEBUG") as logs,
+        ):
+            enable_debug_logging("debug.log")
+            requests.Session().post(
+                signed_url,
+                headers={"authorization": "Bearer header-secret"},
+                json={"nested": [{"refresh_token": "refresh-secret"}]},
+            )
+        output = "\n".join(logs.output)
+        for secret in (
+            "storage-secret",
+            "credential-secret",
+            "cookie-secret",
+            "access-secret",
+            "header-secret",
+            "refresh-secret",
+        ):
+            self.assertNotIn(secret, output)
+        self.assertIn("retained-message-" + "x" * 1500, output)
+
+
 class TestCommentContentFidelity(unittest.TestCase):
     def test_literal_markup_and_entities_in_html(self):
         from rh_support_lib.utils import clean_comment_body

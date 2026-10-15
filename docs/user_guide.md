@@ -94,7 +94,8 @@ rh-support-cli --config-file /path/to/custom_config.yaml list
 ### Debugging & HTTP Logging (`--debug` / `--debug-file`)
 Inspect network communication and API payloads:
 * `--debug`: Prints redacted HTTP requests and responses directly to `stderr`.
-* `--debug-file <path>`: Logs full, untruncated requests and responses to the specified file while keeping console output clean.
+* `--debug-file <path>`: Logs full, untruncated redacted JSON requests and non-streamed responses to the specified file while keeping console output clean.
+* Streamed downloads are logged as status and headers only, without reading the downloaded body. Credentials, cookies, and signed URLs are redacted; opaque non-JSON request bodies are omitted. Logs can still contain case descriptions and other diagnostic content, so handle them as sensitive files.
 
 ```bash
 # Output debug logs to terminal:
