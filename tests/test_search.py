@@ -89,7 +89,3 @@ class SearchResponseTests(unittest.TestCase):
                     ],
                 )
                 self.assertEqual(method.call_args.kwargs["limit"], 0)
-
-
-if __name__ == "__main__":
-    unittest.main()

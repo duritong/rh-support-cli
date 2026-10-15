@@ -407,7 +407,3 @@ class CreationCLITests(unittest.TestCase):
                     self.cases.create_case.call_args.kwargs["body_format"], "plain"
                 )
         self.prompt_text.assert_not_called()
-
-
-if __name__ == "__main__":
-    unittest.main()

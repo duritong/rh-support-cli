@@ -23,7 +23,7 @@ from rh_support_lib.services.search import SearchService
 from rh_support_lib.tui.app import SupportApp, TemplateModal
 
 
-class ConfigurationTests(unittest.TestCase):
+class ConfigurationTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
@@ -237,7 +237,7 @@ class ConfigurationTests(unittest.TestCase):
         follow.assert_called_once_with("123", username="offline")
         unfollow.assert_called_once_with("123", username="offline")
 
-    def test_tui_constructor_and_action_propagate_config(self):
+    async def test_tui_constructor_and_action_propagate_config(self):
         with patch.object(CaseService, "get_current_user", return_value="offline"):
             app = SupportApp(self.client, config=self.config)
         self.assert_cache_config(app.case_service)
@@ -267,7 +267,3 @@ class TemplateSelectorTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(
                     app.screen.query_one("#template-select", Select).value, "custom"
                 )
-
-
-if __name__ == "__main__":
-    unittest.main()

@@ -355,7 +355,3 @@ class ReadPresentationTests(unittest.IsolatedAsyncioTestCase):
             self.service.add_comment.assert_not_called()
             self.attachments.upload_attachment.assert_not_called()
             self.attachments.download_attachment.assert_not_called()
-
-
-if __name__ == "__main__":
-    unittest.main()

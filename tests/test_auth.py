@@ -353,7 +353,3 @@ class AtomicTokenCacheTests(unittest.TestCase):
         self.assertEqual(output.getvalue(), "")
         self.assertEqual(str(caught.exception), "Failed to authenticate with SSO.")
         self.assertTrue(caught.exception.__suppress_context__)
-
-
-if __name__ == "__main__":
-    unittest.main()

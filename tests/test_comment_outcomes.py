@@ -217,7 +217,3 @@ class CommentOutcomeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.service.add_comment("12345", " \n", status="closed")
         self.client.execute_graphql.assert_not_called()
-
-
-if __name__ == "__main__":
-    unittest.main()

@@ -335,7 +335,3 @@ class StrictConfigurationCliTests(unittest.TestCase):
             main()
         backend.assert_not_called()
         self.assertEqual(search.call_args.args[0].query, "--mock")
-
-
-if __name__ == "__main__":
-    unittest.main()

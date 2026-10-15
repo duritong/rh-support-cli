@@ -362,7 +362,3 @@ class PaginationTests(unittest.TestCase):
         self.client.execute_graphql = cycle
         with self.assertRaises(IncompleteCaseHistoryError):
             self.fetch(first_comments=1)
-
-
-if __name__ == "__main__":
-    unittest.main()

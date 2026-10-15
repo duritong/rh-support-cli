@@ -393,7 +393,3 @@ class TuiActionTests(unittest.IsolatedAsyncioTestCase):
                 self.app.current_details = current
                 callback()
             self.service.state_service.mark_case_read.assert_not_called()
-
-
-if __name__ == "__main__":
-    unittest.main()

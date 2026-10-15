@@ -371,7 +371,3 @@ class FilePartStreamTests(unittest.TestCase):
                 self.assertEqual(stream.read(0), b"")
                 self.assertEqual(stream.read(), content[13:75])
                 self.assertEqual(stream.read(), b"")
-
-
-if __name__ == "__main__":
-    unittest.main()

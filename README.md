@@ -86,12 +86,14 @@ The project includes an extensive test suite simulating Red Hat SSO, CRM GraphQL
 
 ```bash
 # Run unit tests:
-python3 test_rh_support_cli.py
+python -m tests
 
 # Run Ruff linter and code formatting validation:
 ruff check .
 ruff format --check .
 ```
+
+See the [Developer Guide](docs/developer_guide.md#9-test-suite--mock-architecture) for focused test runs, sandbox isolation, and Python 3.9 validation.
 
 ---
 

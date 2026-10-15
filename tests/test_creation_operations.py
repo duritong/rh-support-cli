@@ -212,7 +212,3 @@ class CreationOperationsTests(unittest.TestCase):
         self.assertNotIn("secret", json.dumps(receipt) + str(caught.exception))
         self.assertEqual(self.attachments.upload_attachment.call_count, 2)
         self.cases.create_case.assert_called_once_with(**self.fields)
-
-
-if __name__ == "__main__":
-    unittest.main()

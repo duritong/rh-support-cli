@@ -288,7 +288,3 @@ class StructuredOutputTests(unittest.TestCase):
         ):
             cmd_updates(self.args(), self.client, self.config)
         self.assertEqual(output.getvalue(), "")
-
-
-if __name__ == "__main__":
-    unittest.main()

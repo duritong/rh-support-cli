@@ -1,5 +1,6 @@
 """Scoped process-global isolation for serial unittest execution on Linux."""
 
+import logging
 import os
 import sys
 import tempfile
@@ -7,16 +8,33 @@ import threading
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
+from unittest import mock
 
 from .network_guard import network_guard
 
 _state = threading.local()
 
 
+class _BufferedLogHandler(logging.Handler):
+    def __init__(self, result):
+        super().__init__()
+        self.result = result
+
+    def emit(self, record):
+        # Textual forwards stderr to sys.__stderr__, bypassing unittest's capture.
+        stream = (
+            getattr(self.result, "_stderr_buffer", None)
+            if self.result is not None and self.result.buffer
+            else None
+        )
+        logging.StreamHandler(stream if stream is not None else sys.stderr).emit(record)
+
+
 @contextmanager
-def _sandbox():
+def _sandbox(result=None):
     environment = os.environ.copy()
     path = sys.path[:]
+    cwd = os.getcwd()
     tempdir = tempfile.tempdir
     active = getattr(_state, "active", False)
     try:
@@ -65,12 +83,25 @@ def _sandbox():
                     PYTHONDONTWRITEBYTECODE="1",
                 )
                 tempfile.tempdir = root
-                sys.path.insert(0, str(Path(__file__).resolve().parent))
+                support = Path(__file__).resolve().parent
+                sys.path[:] = [str(support), str(support.parent.parent)] + [
+                    os.path.abspath(entry) for entry in path
+                ]
                 os.environ["PYTHONPATH"] = os.pathsep.join(sys.path)
+                os.chdir(root)
                 _state.active = True
-                with network_guard():
+                with (
+                    mock.patch.object(
+                        logging.getLogger("asyncio"),
+                        "handlers",
+                        [_BufferedLogHandler(result)],
+                    ),
+                    mock.patch.object(logging.getLogger("asyncio"), "propagate", False),
+                    network_guard(),
+                ):
                     yield
             finally:
+                os.chdir(cwd)
                 tempfile.tempdir = tempdir
                 sys.path[:] = path
                 os.environ.clear()
@@ -86,5 +117,5 @@ class SandboxSuite(unittest.TestSuite):
     def run(self, result, debug=False):
         if getattr(_state, "active", False):
             return super().run(result, debug)
-        with _sandbox():
+        with _sandbox(result):
             return super().run(result, debug)

@@ -6,7 +6,7 @@ setup(
     description="Red Hat Support Case CLI Tool",
     author="Your Name",
     author_email="your.email@example.com",
-    packages=find_packages(exclude=("test_support", "test_support.*")),
+    packages=find_packages(exclude=("tests", "tests.*")),
     install_requires=[
         "requests",
         "requests-toolbelt",

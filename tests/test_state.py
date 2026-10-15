@@ -366,7 +366,3 @@ class StateTransactionTests(unittest.TestCase):
         self.assertFalse(
             os.path.exists(os.path.join(state, "rh-support-cli", "state.yaml"))
         )
-
-
-if __name__ == "__main__":
-    unittest.main()

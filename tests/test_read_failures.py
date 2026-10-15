@@ -12,7 +12,7 @@ from rh_support_lib.errors import (
 )
 from rh_support_lib.models import Case, CaseDetails, TrackedCase
 from rh_support_lib.services.cases import CaseService
-from test_p2_pagination import PaginationClient
+from tests.test_pagination import PaginationClient
 
 
 class ReadFailureTests(unittest.TestCase):
@@ -350,7 +350,3 @@ class ReadPresentationTests(unittest.TestCase):
             )
             cmd_sync(SimpleNamespace(format="json", user="user"), mock.Mock())
         self.assertEqual(output.getvalue(), "")
-
-
-if __name__ == "__main__":
-    unittest.main()

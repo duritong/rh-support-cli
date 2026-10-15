@@ -1,20 +1,25 @@
 """Focused checks for the canonical offline unittest harness."""
 
+import io
+import logging
 import multiprocessing
 import os
+import runpy
 import socket
 import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from types import ModuleType
 from unittest import mock
 
 import requests
 
-from test_support import SandboxSuite
-from test_support.network_guard import _loopback, network_guard
-from test_support.sandbox import _sandbox, _state
+from tests.support import SandboxSuite
+from tests.support.network_guard import _loopback, network_guard
+from tests.support.sandbox import _sandbox, _state
 
 
 def _spawn_probe(queue):
@@ -46,15 +51,130 @@ def _multiprocessing_probe():
 
 
 class IsolationTests(unittest.TestCase):
+    def test_package_discovery_collects_each_test_once(self):
+        def identifiers(suite):
+            for test in suite:
+                if isinstance(test, unittest.TestSuite):
+                    yield from identifiers(test)
+                else:
+                    yield test.id()
+
+        root = Path(__file__).resolve().parents[1]
+        package = list(identifiers(unittest.TestLoader().loadTestsFromName("tests")))
+        discovered = list(
+            identifiers(
+                unittest.TestLoader().discover(str(root), top_level_dir=str(root))
+            )
+        )
+        self.assertTrue(package)
+        self.assertEqual(len(package), len(set(package)))
+        self.assertEqual(sorted(package), sorted(discovered))
+        self.assertTrue(all(name.startswith("tests.test_") for name in package))
+
+    def test_focused_runner_uses_sandbox_and_buffering(self):
+        process = subprocess.run(
+            [
+                sys.executable,
+                "-B",
+                "-m",
+                "tests",
+                "tests.test_isolation.IsolationTests.test_restore_and_cleanup_on_exception",
+                "-q",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=True,
+        )
+        self.assertEqual(process.stdout, "")
+        self.assertIn("Ran 1 test", process.stderr)
+        self.assertIn("OK", process.stderr)
+
+    def test_asyncio_logging_uses_result_buffer_despite_stderr_redirection(self):
+        result = unittest.TestResult()
+        result.buffer = True
+        # Initialize unittest's per-test buffers as a real runner does.
+        result.startTest(unittest.FunctionTestCase(lambda: None))
+        try:
+            redirected = io.StringIO()
+            with _sandbox(result), redirect_stderr(redirected):
+                logging.getLogger("asyncio").warning("buffered asyncio warning")
+            self.assertEqual(redirected.getvalue(), "")
+            self.assertIn("buffered asyncio warning", result._stderr_buffer.getvalue())
+        finally:
+            result.stopTest(unittest.FunctionTestCase(lambda: None))
+
+    def test_canonical_runner_buffers_noise_but_keeps_failure_diagnostics(self):
+        original_main = unittest.main
+        for outcome in ("pass", "failure", "error", "subtest"):
+            with self.subTest(outcome=outcome):
+                module = ModuleType("output_probe")
+
+                class Probe(unittest.TestCase):
+                    def test_output(probe, outcome=outcome):
+                        print("probe stdout")
+                        print("probe stderr", file=sys.stderr)
+                        logging.getLogger("asyncio").warning("probe asyncio warning")
+                        if outcome == "failure":
+                            probe.fail("probe assertion")
+                        elif outcome == "error":
+                            raise RuntimeError("probe exception")
+                        elif outcome == "subtest":
+                            with probe.subTest(stage="probe"):
+                                probe.fail("probe subtest assertion")
+
+                module.Probe = Probe
+                stdout, stderr = io.StringIO(), io.StringIO()
+
+                def run_probe(probe_module=module, **kwargs):
+                    kwargs.update(module=probe_module, defaultTest=None)
+                    return original_main(argv=["output_probe"], exit=False, **kwargs)
+
+                with (
+                    _sandbox(),
+                    redirect_stdout(stdout),
+                    redirect_stderr(stderr),
+                    mock.patch.object(
+                        logging.getLogger(), "handlers", [logging.StreamHandler(stderr)]
+                    ),
+                    mock.patch("unittest.main", side_effect=run_probe) as main,
+                ):
+                    runpy.run_path(
+                        str(Path(__file__).with_name("__main__.py")),
+                        run_name="__main__",
+                    )
+                self.assertTrue(main.call_args.kwargs["buffer"])
+                self.assertIs(
+                    main.call_args.kwargs["testLoader"].suiteClass, SandboxSuite
+                )
+                output = stdout.getvalue() + stderr.getvalue()
+                self.assertIn("Ran 1 test", output)
+                if outcome == "pass":
+                    self.assertIn("OK", output)
+                    self.assertNotIn("probe stdout", output)
+                    self.assertNotIn("probe stderr", output)
+                    self.assertNotIn("probe asyncio warning", output)
+                else:
+                    self.assertIn("FAILED", output)
+                    self.assertIn("Traceback", output)
+                    self.assertIn("probe stdout", output)
+                    self.assertIn("probe stderr", output)
+                    self.assertIn("probe asyncio warning", output)
+
     def test_restore_and_cleanup_on_exception(self):
         with mock.patch.dict(os.environ, {"RH_OFFLINE_TOKEN": "dummy-only-secret"}):
             original_path = sys.path[:]
+            original_cwd = os.getcwd()
             original_tempdir = tempfile.tempdir
             original_connect = socket.socket.connect
+            logger = logging.getLogger("asyncio")
+            original_handlers = logger.handlers
+            original_propagate = logger.propagate
             with self.assertRaisesRegex(ValueError, "probe"), _sandbox():
                 root = os.environ["HOME"]
                 self.assertNotIn("RH_OFFLINE_TOKEN", os.environ)
                 self.assertEqual(tempfile.gettempdir(), root)
+                self.assertEqual(os.getcwd(), root)
                 self.assertEqual(os.environ["XDG_CONFIG_HOME"], root + "/config")
                 self.assertFalse(Path(root, ".netrc").exists())
                 os.environ["RH_NEW_VALUE"] = "dummy"
@@ -63,8 +183,11 @@ class IsolationTests(unittest.TestCase):
             self.assertTrue(os.environ.get("RH_OFFLINE_TOKEN") == "dummy-only-secret")
             self.assertNotIn("RH_NEW_VALUE", os.environ)
             self.assertEqual(sys.path, original_path)
+            self.assertEqual(os.getcwd(), original_cwd)
             self.assertEqual(tempfile.tempdir, original_tempdir)
             self.assertIs(socket.socket.connect, original_connect)
+            self.assertIs(logger.handlers, original_handlers)
+            self.assertEqual(logger.propagate, original_propagate)
             self.assertFalse(Path(root).exists())
 
     def test_blocks_before_original_functions(self):
@@ -139,7 +262,7 @@ class IsolationTests(unittest.TestCase):
                 sys.executable,
                 "-B",
                 "-c",
-                "from test_p2_isolation import _multiprocessing_probe; _multiprocessing_probe()",
+                "from tests.test_isolation import _multiprocessing_probe; _multiprocessing_probe()",
             ],
             capture_output=True,
             text=True,
@@ -159,7 +282,7 @@ class IsolationTests(unittest.TestCase):
                 "-c",
                 (
                     "import socket; original = socket.getaddrinfo; "
-                    "import test_support, test_support.sitecustomize; "
+                    "import tests.support, tests.support.sitecustomize; "
                     "print(socket.getaddrinfo is original)"
                 ),
             ],

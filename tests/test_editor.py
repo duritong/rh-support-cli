@@ -283,7 +283,3 @@ class EditorCommandTests(unittest.TestCase):
             with self.subTest(summary=summary), self.assertRaises(ValueError):
                 service.create_case(summary, description)
         client.execute_graphql.assert_not_called()
-
-
-if __name__ == "__main__":
-    unittest.main()

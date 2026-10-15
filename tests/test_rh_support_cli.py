@@ -1134,7 +1134,10 @@ class TestRhSupportCli(unittest.TestCase):
         self.test_state_dir = tempfile.mkdtemp()
         self.env["XDG_STATE_HOME"] = self.test_state_dir
 
-        self.cli_path = os.path.abspath("rh-support-cli.py")
+        self.cli_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "rh-support-cli.py",
+        )
 
     def tearDown(self):
         import shutil
@@ -6035,7 +6038,9 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         temp_dir = tempfile.mkdtemp()
         out_file = os.path.join(temp_dir, "test_products.json")
         script_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "scripts", "update_catalog.py"
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "scripts",
+            "update_catalog.py",
         )
         try:
             res = subprocess.run(
@@ -7253,7 +7258,7 @@ class TestCommentContentFidelity(unittest.TestCase):
             source = html.escape(source)
 
 
-class TestTuiOperationSafety(unittest.TestCase):
+class TestTuiOperationSafety(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         import contextlib
 
@@ -7299,7 +7304,7 @@ class TestTuiOperationSafety(unittest.TestCase):
             "A", "Draft for A", is_public=True, status="In Progress"
         )
 
-    def test_modal_operations_keep_original_case(self):
+    async def test_modal_operations_keep_original_case(self):
         for action, result in (
             ("action_add_attachment", "diagnostics.tar"),
             ("action_apply_template", "incident"),
@@ -7421,40 +7426,3 @@ class TestTuiOperationSafety(unittest.TestCase):
         for callback in callbacks:
             callback()
         self.app.render_case_details.assert_not_called()
-
-
-def load_tests(loader, standard_tests, pattern):
-    from test_support import SandboxSuite
-
-    standard_tests.addTests(
-        loader.loadTestsFromNames(
-            [
-                "test_p2_filters",
-                "test_p2_state",
-                "test_p2_polling",
-                "test_p2_pagination",
-                "test_p2_attachments",
-                "test_p2_parser",
-                "test_p2_tui_actions",
-                "test_p2_configuration",
-                "test_p2_auth",
-                "test_p2_search",
-                "test_p2_auth_errors",
-                "test_p2_editor",
-                "test_p2_read_failures",
-                "test_p2_tui_read_errors",
-                "test_p2_isolation",
-                "test_p2_strict_config",
-                "test_p2_structured",
-                "test_p2_comment_outcomes",
-                "test_p2_comment_presenters",
-                "test_p2_creation_operations",
-                "test_p2_creation_cli",
-            ]
-        )
-    )
-    return SandboxSuite(standard_tests)
-
-
-if __name__ == "__main__":
-    unittest.main()

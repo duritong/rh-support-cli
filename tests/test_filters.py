@@ -218,7 +218,3 @@ class FilterContractTests(unittest.TestCase):
         for call in app.case_service.list_followed_cases.call_args_list:
             self.assertEqual(call.kwargs["product"], "OCP")
             self.assertEqual(call.kwargs["owner"], "team-a")
-
-
-if __name__ == "__main__":
-    unittest.main()

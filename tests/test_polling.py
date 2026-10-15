@@ -301,7 +301,7 @@ class PollingTests(unittest.IsolatedAsyncioTestCase):
         async with self.app.run_test():
             self.ui_thread = threading.get_ident()
             returned_thread = await self.start(
-                lambda: self.app._safe_call(threading.get_ident)
+                lambda: self.app._safe_call(lambda: threading.get_ident())
             )
             self.assertEqual(returned_thread, self.ui_thread)
             self.service.list_cases.side_effect = RuntimeError("offline")
@@ -465,7 +465,3 @@ class PollingTests(unittest.IsolatedAsyncioTestCase):
             await task
             self.assertIs(self.app.current_details, newer)
             self.service.get_case_details.assert_not_called()
-
-
-if __name__ == "__main__":
-    unittest.main()

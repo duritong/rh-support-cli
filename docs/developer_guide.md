@@ -12,7 +12,12 @@ The project is structured as a decoupled Python application where presentation l
 rh-support-cli/
 ├── rh-support-cli.py           # Global CLI entry-point script
 ├── setup.py                    # Package installation configuration
-├── test_rh_support_cli.py      # Comprehensive end-to-end unit test suite
+├── tests/                     # Offline test package (excluded from installation)
+│   ├── __init__.py            # Sandboxed discovery via load_tests
+│   ├── __main__.py            # Canonical buffered test runner
+│   ├── test_rh_support_cli.py # Comprehensive end-to-end tests
+│   ├── test_*.py              # Focused regression tests
+│   └── support/              # Shared sandbox and test helpers
 ├── scripts/
 │   └── update_catalog.py       # Script to refresh repository products.json from API
 └── rh_support_lib/             # Core application library
@@ -63,13 +68,13 @@ rh-support-cli/
 * **Configuration Validation**: `load_config` raises safe `ConfigError` exceptions for selected-path/read/YAML/known-schema failures, while only an absent optional default returns `{}`. Numeric cache strings normalize to integers; finite nonnegative poll intervals can be fractional. `resolve_bookmarks` centralizes validation and merging before client or mock-backend startup. Presenters preserve CLI default-overlay and TUI replace/clear behavior. Mock activation uses parsed arguments after validation, never content-string scans. Unknown future configuration keys remain allowed.
 * **Editor Approval Boundary**: `edit_file` executes the shlex-parsed editor argv without a shell. `EditorError` carries a safe reason and recovery path; neither it nor `open_editor` deletes failed drafts. CLI presenters reject empty content uniformly and preserve generated files on editing/read/submission failure. Core creation/comment methods also reject empty input before entity lookups. Leading-header stripping remains unchanged.
 
-* **Creation Presenter**: `commands/create_case.py` delegates mutation and attachment preflight to `operations.create_case_with_attachments`. Full success returns a receipt; `PartialCaseCreationError.receipt` records confirmed creation plus every upload outcome, including cancellation. The presenter emits exactly one structured receipt on success/partial success, exits nonzero for partial success, and routes interactive/progress output to stderr. Serialization uses `args.json` / `args.output_format`, never the content `args.format`. Only explicit `create --yes` bypasses confirmation, after required flag/template values are checked without interactive fallback. Numeric YAML versions and integer severity codes 1-4 are normalized to strings before that check. Generated descriptions are preserved on creation failure or unknown outcome, but cleaned after confirmed creation even on attachment failure; cleanup warnings describe them as submitted copies. Creation validation currently uses untyped `ValueError`, so the presenter supplies fixed actionable validation guidance rather than exposing potentially remote exception text. A dedicated trusted validation type would be required to expose specific core failure reasons safely. Focused offline coverage lives in `test_p2_creation_cli.py` and `test_p2_creation_operations.py`.
+* **Creation Presenter**: `commands/create_case.py` delegates mutation and attachment preflight to `operations.create_case_with_attachments`. Full success returns a receipt; `PartialCaseCreationError.receipt` records confirmed creation plus every upload outcome, including cancellation. The presenter emits exactly one structured receipt on success/partial success, exits nonzero for partial success, and routes interactive/progress output to stderr. Serialization uses `args.json` / `args.output_format`, never the content `args.format`. Only explicit `create --yes` bypasses confirmation, after required flag/template values are checked without interactive fallback. Numeric YAML versions and integer severity codes 1-4 are normalized to strings before that check. Generated descriptions are preserved on creation failure or unknown outcome, but cleaned after confirmed creation even on attachment failure; cleanup warnings describe them as submitted copies. Creation validation currently uses untyped `ValueError`, so the presenter supplies fixed actionable validation guidance rather than exposing potentially remote exception text. A dedicated trusted validation type would be required to expose specific core failure reasons safely. Focused offline coverage lives in `tests/test_creation_cli.py` and `tests/test_creation_operations.py`.
 
 ---
 
 ## 3. API Protocols & Backend Communication
 
-`CaseService.add_comment` returns a `CaseComment` on success. A confirmed post followed by an unconfirmed status change or cache invalidation raises `PartialCommentError`, carrying `comment`, `case_number`, `requested_status`, `status_confirmed`, and `cache_invalidation_failed`. The case cache is invalidated even when the status stage fails; no mutation is retried. A malformed confirmation raises `CommentOutcomeUnknownError` before any status mutation. CLI comment/close presenters serialize receipts independently of content format and exit nonzero for partial outcomes. TUI completion clears only the submitted body, preserves newer drafts, and displays recovery guidance. Focused coverage lives in `test_p2_comment_outcomes.py` and `test_p2_comment_presenters.py`.
+`CaseService.add_comment` returns a `CaseComment` on success. A confirmed post followed by an unconfirmed status change or cache invalidation raises `PartialCommentError`, carrying `comment`, `case_number`, `requested_status`, `status_confirmed`, and `cache_invalidation_failed`. The case cache is invalidated even when the status stage fails; no mutation is retried. A malformed confirmation raises `CommentOutcomeUnknownError` before any status mutation. CLI comment/close presenters serialize receipts independently of content format and exit nonzero for partial outcomes. TUI completion clears only the submitted body, preserves newer drafts, and displays recovery guidance. Focused coverage lives in `tests/test_comment_outcomes.py` and `tests/test_comment_presenters.py`.
 
 HTTP debug logging recursively redacts credential fields, cookies, and presigned upload/download URLs in JSON and headers. Signed request URLs have their query values redacted. Streamed response bodies are never consumed for logging; only their status and headers are recorded. File logging retains complete redacted non-streamed responses, while console logging truncates long bodies. Non-JSON request bodies are omitted rather than inspecting file streams or opaque credential-bearing payloads.
 
@@ -256,11 +261,11 @@ The interactive dashboard (`rh_support_lib/tui/app.py`) is implemented using Tex
 
 ## 9. Test Suite & Mock Architecture
 
-Focused P2 regressions live in `test_p2_*.py`; the main test module's `load_tests` hook explicitly includes the integrated modules so the existing CI/test command runs them as well. Each module can also run directly with `python -m unittest <module>`.
+All tests live in the `tests/` package: focused regressions use `tests/test_*.py`, and the main end-to-end module is `tests/test_rh_support_cli.py`. The package's `tests/__init__.py` exposes a `load_tests` hook that discovers all tests with the repository as the top-level directory. There is no explicit focused-module list in the main test module to maintain.
 
-The canonical whole-suite entry point wraps all collected cases in `test_support.SandboxSuite`. It uses a temporary HOME/XDG/TMP tree, clears credential/path/proxy/session overrides, and blocks non-loopback DNS and socket connections. Python CLI subprocesses inherit the network guard through a test-only `sitecustomize` path; normal application imports do not activate it. Real Requests serialization with a mocked transport remains testable. Spawn/forkserver children must finish before cleanup. This is serial process-global test isolation, not an OS sandbox for native/non-Python networking. Use the canonical command below for whole-suite verification rather than unguarded discovery. Test-support helpers are excluded from installed packages.
+The canonical entry point wraps collected cases in `tests.support.SandboxSuite`. It uses a temporary working directory as well as a temporary HOME/XDG/TMP tree, clears credential/path/proxy/session overrides, and blocks non-loopback DNS and socket connections. Relative-path fixtures are created in the temporary working directory, not the repository root. Python CLI subprocesses inherit the network guard through a test-only `sitecustomize` path; normal application imports do not activate it. Real Requests serialization with a mocked transport remains testable. Spawn/forkserver children must finish before cleanup. This is serial process-global test isolation, not an OS sandbox for native/non-Python networking. Standard package discovery with `python -m unittest discover -b` also activates the sandbox through the package hook. For focused modules or classes, use the canonical runner rather than unguarded focused unittest invocations that bypass that hook. The entire `tests` package, including `tests/support/`, is excluded from installed packages.
 
-The test suite (`test_rh_support_cli.py`) runs fully offline without requiring network connectivity or real credentials.
+The test suite runs fully offline without requiring network connectivity or real credentials.
 
 ### Mock Server (`MockRedHatHandler`)
 Starts a local loopback `http.server.HTTPServer` mocking:
@@ -278,8 +283,19 @@ The direct dynamic-completer test temporarily overrides HOME, cache/state locati
 ### Running Tests and Linting
 
 ```bash
-# Run unit test suite
-python3 test_rh_support_cli.py
+# Run unit test suite (passing-test output is buffered)
+python -m tests
+
+# Adjust unittest progress verbosity
+python -m tests -v
+python -m tests -q
+
+# Run a focused module or class inside the same buffered sandbox
+python -m tests tests.test_pagination
+python -m tests tests.test_pagination.PaginationTests
+
+# Standard package discovery (sandboxed by the package load_tests hook)
+python -m unittest discover -b
 
 # Run Ruff linter
 ruff check .
@@ -289,6 +305,24 @@ ruff format --check .
 
 # Auto-format codebase
 ruff format .
+```
+
+The canonical runner buffers test stdout and stderr by default, including focused runs. Passing runs show only unittest progress and the final summary; failures, errors, and failing subtests retain tracebacks and their captured output. Inside the sandbox, asyncio logging writes directly to unittest's active stderr buffer, bypassing Textual's headless forwarding to the original terminal stream. This captures slow-callback warnings without disabling asyncio debug checks. Unbuffered runners retain normal stderr logging; the original asyncio handlers and propagation setting are restored afterward. Use `python -m tests -v` for test names or `python -m tests -q` for a quiet summary.
+
+### Local Python 3.9 Validation
+
+Use an actual Python 3.9 runtime, not just a syntax check under a newer interpreter. With `uv` installed, create a separate environment without replacing the project's normal virtualenv:
+
+```bash
+uv python install 3.9
+uv venv --python 3.9 /tmp/rh-support-py39
+uv pip install --python /tmp/rh-support-py39/bin/python -e .
+/tmp/rh-support-py39/bin/python -B -m tests
+```
+
+Runtime and dependency installation require network access; the canonical test command activates the same offline sandbox on every supported Python version. Allow at least ten minutes for the full suite on slower runtimes. Keep the environment until validation is complete so failures can be reproduced with the same resolved dependencies.
+
+TUI tests that construct modal widgets must run inside an active event loop, using `unittest.IsolatedAsyncioTestCase` and an async test method. On Python 3.9, asyncio locks bind to a loop during construction. Callbacks passed to Textual must also have introspectable Python signatures; wrap built-ins such as `threading.get_ident` in a Python function or lambda when testing UI-thread dispatch.
 
 ---
 
@@ -312,5 +346,4 @@ After running the script, review and commit the updated data file:
 ```bash
 git add rh_support_lib/data/products.json
 git commit -m "Update Red Hat product catalog"
-```
 ```
