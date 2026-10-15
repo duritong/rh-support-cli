@@ -106,6 +106,10 @@ rh-support-cli --debug-file /tmp/rh_debug.log show -c 12345678
 ```
 
 ### Global Cache Control (`--no-cache`)
+Private case lists and threads are isolated by the selected credential and backend. Older unscoped case caches are not reused; fetch cases again to populate the isolated cache. Changing an offline token selects a new cache, even if it belongs to the same user.
+
+`search --local` performs no authentication or network requests. It requires a locally readable offline credential (via `--token-file`, `REDHAT_SUPPORT_OFFLINE_TOKEN`, or the standard token file) to select its cache. Without one, it exits with an actionable error instead of searching unrelated cached data. A valid cached access token is not required.
+
 To bypass reading from or writing to the local disk cache, pass `--no-cache` or set `export RH_NO_CACHE=1`:
 ```bash
 rh-support-cli list --no-cache

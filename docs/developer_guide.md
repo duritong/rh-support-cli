@@ -62,7 +62,7 @@ rh-support-cli/
 
 HTTP debug logging recursively redacts credential fields, cookies, and presigned upload/download URLs in JSON and headers. Signed request URLs have their query values redacted. Streamed response bodies are never consumed for logging; only their status and headers are recorded. File logging retains complete redacted non-streamed responses, while console logging truncates long bodies. Non-JSON request bodies are omitted rather than inspecting file streams or opaque credential-bearing payloads.
 
-Access-token cache entries carry an opaque SHA-256 fingerprint of the resolved offline credential, actual SSO endpoint, and OAuth client ID. A valid expiry alone is not sufficient for reuse: the fingerprint must match the current authentication context. Legacy entries without a binding are cache misses and are replaced on the next exchange. The existing cache filenames and credential precedence remain unchanged; the cache stores one context per file, not a profile registry. This token binding does not yet isolate case-content caches.
+Access-token cache entries carry an opaque SHA-256 fingerprint of the resolved offline credential, actual SSO endpoint, and OAuth client ID. A valid expiry alone is not sufficient for reuse: the fingerprint must match the current authentication context. Legacy entries without a binding are cache misses and are replaced on the next exchange. The existing cache filenames and credential precedence remain unchanged; the cache stores one context per file, not a profile registry.
 
 The CLI communicates with three backend endpoints:
 
@@ -187,6 +187,10 @@ When `sync_tracked_cases` checks multiple cases in parallel using `ThreadPoolExe
 ## 7. Thread-Safe Local Caching & SWR Layer
 
 Encapsulated in `CacheService` (`rh_support_lib/services/cache.py`) under `$XDG_CACHE_HOME/rh-support-cli/`:
+
+Private lists and case records live under `private/<opaque-context-hash>/{lists,cases}/`. Context combines a locally resolved credential, the actual SSO endpoint, and the effective GraphQL URL; legacy access-token clients use their supplied token and backend. Clients pin the offline credential used for authentication and cache selection together. Access-token refresh does not change the offline-credential namespace. No credentials are stored in directory names. Legacy unscoped private records are ignored, never migrated automatically. Case identifiers cannot traverse namespace directories.
+
+`CacheService(scope=...)` requires an explicit nonempty scope to enable persistence. `CaseService` derives it without network access; injected caches must match the client/backend context. Unknown clients without a string-valued `get_cache_scope(backend)` contract have persistence disabled. Local search requires a scope and uses only locally available identity information for tracking annotations, never token exchange. The non-private product catalog remains in the shared `catalog/` directory for offline completion and the catalog updater.
 
 * **Case Lists**: Saved under `lists/` using deterministic SHA256 key hashing computed from sorted query parameters (`status`, `severity`, `account`, `owner`, `limit`). Controlled by `list_ttl` (default: 60s).
 * **Case Details**: Cached under `cases/<case_number>.json`. Validated against remote servers using lightweight GraphQL probes (`GQL_CHECK_CASE_LAST_MODIFIED`, ~250 bytes) checking `LastModifiedDate`, `Status`, and latest comment metadata before re-fetching full detail payloads.

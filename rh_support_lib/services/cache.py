@@ -29,6 +29,7 @@ class CacheService:
         cache_dir: str | None = None,
         config: dict | None = None,
         no_cache: bool = False,
+        scope: str | None = None,
     ):
         self.config = config or {}
         cache_cfg = self.config.get("cache") or {}
@@ -38,7 +39,13 @@ class CacheService:
             cache_cfg.get("enabled", True) if isinstance(cache_cfg, dict) else True
         )
         env_no_cache = os.environ.get("RH_NO_CACHE") in ("1", "true", "True")
-        self.enabled = not no_cache and not env_no_cache and bool(cfg_enabled)
+        self.scope = scope if isinstance(scope, str) and scope else None
+        self.enabled = (
+            not no_cache
+            and not env_no_cache
+            and bool(cfg_enabled)
+            and self.scope is not None
+        )
 
         # Default TTLs (seconds)
         self.list_ttl = (
@@ -54,11 +61,19 @@ class CacheService:
         )
         # Resolve directory
         self.root_dir = self._resolve_cache_dir(cache_dir)
-        self.cases_dir = os.path.join(self.root_dir, "cases")
-        self.lists_dir = os.path.join(self.root_dir, "lists")
+        namespace = (
+            hashlib.sha256(self.scope.encode("utf-8")).hexdigest()
+            if self.scope
+            else "unavailable"
+        )
+        private_dir = os.path.join(self.root_dir, "private", namespace)
+        self.cases_dir = os.path.join(private_dir, "cases")
+        self.lists_dir = os.path.join(private_dir, "lists")
         self.catalog_dir = os.path.join(self.root_dir, "catalog")
 
         if self.enabled:
+            os.makedirs(private_dir, mode=0o700, exist_ok=True)
+            os.chmod(private_dir, 0o700)
             os.makedirs(self.cases_dir, exist_ok=True)
             os.makedirs(self.lists_dir, exist_ok=True)
             os.makedirs(self.catalog_dir, exist_ok=True)
@@ -117,11 +132,21 @@ class CacheService:
 
     # --- CASE DETAILS & COMMENTS CACHE (CONDITIONAL VALIDATION) ---
 
+    def _case_path(self, case_number: str) -> str:
+        case_number = str(case_number).strip()
+        if (
+            not case_number
+            or case_number in (".", "..")
+            or any(char in case_number for char in ("/", "\\"))
+        ):
+            raise ValueError("Invalid case identifier for the private cache.")
+        return os.path.join(self.cases_dir, f"{case_number}.json")
+
     def get_case_record(self, case_number: str) -> dict[str, Any] | None:
         """Retrieves raw cached case record containing case, details, attachments, and last_modified_date."""
         if not self.enabled:
             return None
-        path = os.path.join(self.cases_dir, f"{str(case_number).strip()}.json")
+        path = self._case_path(case_number)
         data = self._read_json(path)
         return data if isinstance(data, dict) else None
 
@@ -233,7 +258,7 @@ class CacheService:
         if not self.enabled:
             return
         c_num = str(case_number).strip()
-        path = os.path.join(self.cases_dir, f"{c_num}.json")
+        path = self._case_path(c_num)
         lmd = (
             last_modified_date
             or (details.case.last_modified_date if details.case else "")
@@ -259,7 +284,7 @@ class CacheService:
         """Invalidates cached details for a specific case."""
         if not self.enabled:
             return
-        path = os.path.join(self.cases_dir, f"{str(case_number).strip()}.json")
+        path = self._case_path(case_number)
         if os.path.exists(path):
             with contextlib.suppress(OSError):
                 os.remove(path)
@@ -420,6 +445,8 @@ class CacheService:
 
     def clear(self) -> None:
         """Clears all cached cases, lists, and catalog files."""
+        if not self.enabled:
+            return
         if os.path.exists(self.cases_dir):
             with contextlib.suppress(OSError):
                 shutil.rmtree(self.cases_dir)

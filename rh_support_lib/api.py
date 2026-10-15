@@ -160,9 +160,9 @@ def _get_token_cache_file():
     return token_cache_dir, os.path.join(token_cache_dir, cache_filename)
 
 
-def get_access_token(token_file_arg=None):
+def _get_offline_token(token_file_arg=None, interactive=True):
     """
-    Retrieves the access token using the offline token.
+    Resolves an offline credential without exchanging it for an access token.
     Priority:
     1. CLI Argument (--token-file)
     2. Environment Variable (REDHAT_SUPPORT_OFFLINE_TOKEN)
@@ -174,11 +174,15 @@ def get_access_token(token_file_arg=None):
     # 1. CLI Argument
     if token_file_arg:
         if not os.path.isfile(token_file_arg):
+            if not interactive:
+                return None
             sys.exit(f"Error: Token file '{token_file_arg}' not found.")
         try:
             with open(token_file_arg, "r") as f:
                 offline_token = f.read().strip()
         except OSError as e:
+            if not interactive:
+                return None
             sys.exit(f"Error reading token file: {e}")
 
     # 2. Environment Variable
@@ -193,17 +197,25 @@ def get_access_token(token_file_arg=None):
                 with open(config_path, "r") as f:
                     offline_token = f.read().strip()
             except OSError as e:
-                print(f"Warning: Failed to read token from {config_path}: {e}")
+                if interactive:
+                    print(f"Warning: Failed to read token from {config_path}: {e}")
 
     # 4. Prompt
-    if not offline_token:
+    if not offline_token and interactive:
         if sys.stdin.isatty():
             offline_token = getpass.getpass("Please enter your Red Hat Offline Token: ")
         else:
             print("No 'REDHAT_SUPPORT_OFFLINE_TOKEN' environment variable found.")
 
-    if not offline_token:
+    if not offline_token and interactive:
         sys.exit("Error: Token cannot be empty.")
+
+    return offline_token
+
+
+def get_access_token(token_file_arg=None, offline_token=None):
+    """Exchanges the selected offline credential, reusing only its bound token cache."""
+    offline_token = offline_token or _get_offline_token(token_file_arg)
 
     # 5. Check Cache
     token_cache_dir, token_cache_file = _get_token_cache_file()
@@ -329,6 +341,22 @@ class RedHatAPIClient:
     ):
         self.token_file_arg = token_file or token_file_arg
         self._token = None
+        self._offline_token = None
+
+    def get_cache_scope(self, backend: str) -> str | None:
+        """Select private content locally, without prompting or authenticating."""
+        if self._offline_token is None:
+            self._offline_token = _get_offline_token(
+                self.token_file_arg, interactive=False
+            )
+        if not self._offline_token:
+            return None
+        return hashlib.sha256(
+            json.dumps(
+                ["offline", self._offline_token, SSO_URL, backend],
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
 
     def get_token(self, force_refresh=False):
         if force_refresh:
@@ -341,7 +369,9 @@ class RedHatAPIClient:
             self._token = None
 
         if not self._token:
-            self._token = get_access_token(self.token_file_arg)
+            if self._offline_token is None:
+                self._offline_token = _get_offline_token(self.token_file_arg)
+            self._token = get_access_token(self.token_file_arg, self._offline_token)
         return self._token
 
     def request(self, method, url, **kwargs):
@@ -408,6 +438,13 @@ class LegacyAPIClient:
 
     def __init__(self, token):
         self.token = token
+
+    def get_cache_scope(self, backend: str) -> str | None:
+        if not isinstance(self.token, str) or not self.token:
+            return None
+        return hashlib.sha256(
+            json.dumps(["access", self.token, backend]).encode("utf-8")
+        ).hexdigest()
 
     def get_token(self, force_refresh=False):
         return self.token

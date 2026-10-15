@@ -1149,6 +1149,16 @@ class TestRhSupportCli(unittest.TestCase):
             check=False,
         )
 
+    def case_cache(self):
+        from rh_support_lib.api import RedHatAPIClient
+        from rh_support_lib.services.cases import CaseService
+
+        with (
+            mock.patch.dict(os.environ, self.env),
+            mock.patch("rh_support_lib.api.SSO_URL", self.env["RH_SSO_URL"]),
+        ):
+            return CaseService(RedHatAPIClient()).cache_service
+
     def run_completion(
         self, comp_line: str, extra_env: dict | None = None
     ) -> list[str]:
@@ -4686,7 +4696,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         from rh_support_lib.models import Case
         from rh_support_lib.services.cache import CacheService
 
-        cache = CacheService(cache_dir=self.test_cache_dir)
+        cache = CacheService(cache_dir=self.test_cache_dir, scope="unit-test")
         self.assertTrue(cache.enabled)
 
         # 1. Deterministic list cache key hashing
@@ -4745,9 +4755,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         )
 
         # Verify cache file exists
-        cached_file = os.path.join(
-            self.test_cache_dir, "rh-support-cli", "cases", "12345.json"
-        )
+        cached_file = os.path.join(self.case_cache().cases_dir, "12345.json")
         self.assertTrue(os.path.isfile(cached_file))
 
         # Second call: cache hit! Details query count does NOT increase, lightweight probe query count does
@@ -4790,9 +4798,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         # 1. Warm cache
         res_show1 = self.run_cli(["show", "-c", "12345"])
         self.assertEqual(res_show1.returncode, 0)
-        cached_file = os.path.join(
-            self.test_cache_dir, "rh-support-cli", "cases", "12345.json"
-        )
+        cached_file = os.path.join(self.case_cache().cases_dir, "12345.json")
         self.assertTrue(os.path.isfile(cached_file))
 
         # 2. Add comment
@@ -4811,10 +4817,8 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
         from rh_support_lib.api import LegacyAPIClient
         from rh_support_lib.models import Case, CaseComment, CaseDetails
-        from rh_support_lib.services.cache import CacheService
         from rh_support_lib.tui.app import SupportApp
 
-        cache = CacheService(cache_dir=self.test_cache_dir)
         dummy_case = Case(
             case_number="12345",
             summary="SWR Instant Case",
@@ -4848,9 +4852,6 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             attachments=[],
             notified_users=[],
         )
-        cache.set_case_details(
-            "12345", details, last_modified_date="2023-01-02T10:00:00Z"
-        )
 
         async def run_headless_swr():
             from unittest.mock import patch
@@ -4865,6 +4866,9 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 },
             ):
                 app = SupportApp(client, config={"tui": {"poll_interval": 0}})
+                app.case_service.cache_service.set_case_details(
+                    "12345", details, last_modified_date="2023-01-02T10:00:00Z"
+                )
                 async with app.run_test() as pilot:
                     await pilot.pause()
                     # Trigger row selection for cached case 12345
@@ -5364,9 +5368,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         import json
 
         # Pre-populate a unique case in the isolated test cache
-        case_file = os.path.join(
-            self.test_cache_dir, "rh-support-cli", "cases", "987654.json"
-        )
+        case_file = os.path.join(self.case_cache().cases_dir, "987654.json")
         os.makedirs(os.path.dirname(case_file), exist_ok=True)
         cached_record = {
             "cached_at": time.time(),
@@ -6091,6 +6093,125 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             if orig_config:
                 self.env["XDG_CONFIG_HOME"] = orig_config
             shutil.rmtree(temp_dir)
+
+
+class TestContentCacheIsolation(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        environment = mock.patch.dict(
+            os.environ,
+            {
+                "HOME": self.directory.name,
+                "XDG_CACHE_HOME": self.directory.name + "/cache",
+                "XDG_STATE_HOME": self.directory.name + "/state",
+                "REDHAT_SUPPORT_OFFLINE_TOKEN": "credential-A",
+            },
+        )
+        environment.start()
+        self.addCleanup(environment.stop)
+        for target in ("requests.request", "requests.post", "getpass.getpass"):
+            patcher = mock.patch(
+                target,
+                side_effect=AssertionError(
+                    "Offline operation attempted authentication/network"
+                ),
+            )
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def service(self, credential="credential-A", backend="https://graphql.example/a"):
+        from rh_support_lib.api import RedHatAPIClient
+        from rh_support_lib.services.cases import CaseService
+
+        with mock.patch.dict(os.environ, {"REDHAT_SUPPORT_OFFLINE_TOKEN": credential}):
+            return CaseService(RedHatAPIClient(), graphql_url=backend)
+
+    def test_cases_lists_internal_ids_and_local_search_are_isolated(self):
+        from rh_support_lib.models import Case, CaseDetails
+
+        a = self.service()
+        case = Case("100", "private A", "Open", "Low", id="internal-A")
+        a.cache_service.set_case_details("100", CaseDetails(case, "private diagnostic"))
+        key = a.cache_service.compute_list_cache_key()
+        a.cache_service.set_case_list(key, [case])
+        for other in (
+            self.service("credential-B"),
+            self.service(backend="https://graphql.example/b"),
+        ):
+            with self.subTest(namespace=other.graphql_url):
+                self.assertIsNone(other.cache_service.get_case_record("100"))
+                self.assertIsNone(other.cache_service.get_case_list(key))
+                self.assertEqual(other.search_cases("private", local_only=True), [])
+                other.cache_service.invalidate_case("100")
+                self.assertIsNotNone(a.cache_service.get_case_record("100"))
+        again = self.service()
+        self.assertEqual(
+            again.search_cases("diagnostic", local_only=True)[0].id, "internal-A"
+        )
+        self.assertEqual(again.cache_service.get_case_list(key)[0].summary, "private A")
+
+    def test_no_credentials_or_legacy_cache_are_used_for_offline_search(self):
+        from pathlib import Path
+
+        from rh_support_lib.api import RedHatAPIClient
+        from rh_support_lib.services.cases import CaseService
+
+        legacy = Path(self.directory.name) / "cache/rh-support-cli/cases/100.json"
+        legacy.parent.mkdir(parents=True)
+        legacy.write_text(
+            json.dumps({"case": {"case_number": "100", "summary": "legacy secret"}})
+        )
+        with mock.patch.dict(os.environ, {"REDHAT_SUPPORT_OFFLINE_TOKEN": ""}):
+            anonymous = CaseService(RedHatAPIClient())
+            with self.assertRaisesRegex(ValueError, "credential"):
+                anonymous.search_cases("secret", local_only=True)
+        self.assertEqual(self.service().search_cases("secret", local_only=True), [])
+
+    def test_client_credential_binding_survives_environment_changes(self):
+        a = self.service()
+        original = a.cache_service.cases_dir
+        from rh_support_lib.services.cases import CaseService
+
+        with mock.patch.dict(
+            os.environ, {"REDHAT_SUPPORT_OFFLINE_TOKEN": "credential-B"}
+        ):
+            same_client = CaseService(a.api_client, graphql_url=a.graphql_url)
+            self.assertEqual(same_client.cache_service.cases_dir, original)
+            self.assertNotEqual(
+                self.service("credential-B").cache_service.cases_dir, original
+            )
+
+    def test_legacy_tokens_are_isolated_and_unbound_caches_are_disabled(self):
+        from rh_support_lib.api import LegacyAPIClient
+        from rh_support_lib.services.cache import CacheService
+        from rh_support_lib.services.cases import CaseService
+
+        a = CaseService(LegacyAPIClient("access-A"))
+        b = CaseService(LegacyAPIClient("access-B"))
+        self.assertNotEqual(a.cache_service.cases_dir, b.cache_service.cases_dir)
+        self.assertNotIn("access-A", a.cache_service.cases_dir)
+        self.assertFalse(CacheService().enabled)
+
+    def test_case_identifiers_cannot_escape_their_namespace(self):
+        cache = self.service().cache_service
+        for case in ("../../other/cases/100", "/tmp/100", "..\\other\\100"):
+            with self.subTest(case=case):
+                with self.assertRaisesRegex(ValueError, "case identifier"):
+                    cache.get_case_record(case)
+                with self.assertRaisesRegex(ValueError, "case identifier"):
+                    cache.invalidate_case(case)
+
+    def test_injected_cache_cannot_bypass_identity_binding(self):
+        from rh_support_lib.services.cases import CaseService
+
+        a, b = self.service(), self.service("credential-B")
+        with self.assertRaisesRegex(ValueError, "cache.*context"):
+            CaseService(
+                b.api_client, graphql_url=b.graphql_url, cache_service=a.cache_service
+            )
 
 
 class TestCaseLookupQuery(unittest.TestCase):

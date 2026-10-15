@@ -388,7 +388,16 @@ class CaseService:
             graphql_url or os.environ.get("RH_GRAPHQL_URL") or GRAPHQL_URL
         )
         self.state_service = state_service or StateService()
-        self.cache_service = cache_service or CacheService(no_cache=no_cache)
+        scope_getter = getattr(api_client, "get_cache_scope", None)
+        scope = scope_getter(self.graphql_url) if callable(scope_getter) else None
+        scope = scope if isinstance(scope, str) and scope else None
+        if cache_service is not None and cache_service.scope != scope:
+            raise ValueError(
+                "Injected cache does not match the client/backend context."
+            )
+        self.cache_service = cache_service or CacheService(
+            no_cache=no_cache, scope=scope
+        )
 
     def check_case_last_modified(
         self, case_number: str
@@ -787,9 +796,14 @@ class CaseService:
         account: str | None = None,
     ) -> list[Case]:
         """Searches locally cached case records and tracked state across subjects, descriptions, comments, and IDs."""
+        if self.cache_service.scope is None:
+            raise ValueError(
+                "Local search requires a locally readable credential to select its private cache. "
+                "Set REDHAT_SUPPORT_OFFLINE_TOKEN or use --token-file; no authentication is performed."
+            )
         q_lower = (query or "").strip().lower()
         records = self.cache_service.get_all_cached_case_records()
-        user = self.get_current_user()
+        user = self.get_current_user(local_only=True)
         tracked = self.state_service.get_tracked_cases(user)
         results: list[Case] = []
         seen: set[str] = set()
@@ -909,12 +923,16 @@ class CaseService:
             remote_cases = []
 
         # Also search local cache (which matches full description and comment bodies) and merge
-        local_cases = self.search_local_cases(
-            query=query,
-            status=status,
-            severity=severity,
-            product=product,
-            account=account,
+        local_cases = (
+            self.search_local_cases(
+                query=query,
+                status=status,
+                severity=severity,
+                product=product,
+                account=account,
+            )
+            if self.cache_service.scope is not None
+            else []
         )
 
         seen = {c.case_number for c in remote_cases}
@@ -1471,7 +1489,7 @@ class CaseService:
         self.cache_service.invalidate_case_lists()
         return str(case_num)
 
-    def get_current_user(self) -> str:
+    def get_current_user(self, local_only: bool = False) -> str:
         """Determines the current user's SSO username from config, env, JWT token, or system user."""
         for env_var in (
             "REDHAT_SUPPORT_USERNAME",
@@ -1482,7 +1500,13 @@ class CaseService:
             if val and val.strip():
                 return val.strip()
 
-        token = self.api_client.get_token()
+        if local_only:
+            token = getattr(self.api_client, "_token", None) or getattr(
+                self.api_client, "token", None
+            )
+            token = token if isinstance(token, str) else None
+        else:
+            token = self.api_client.get_token()
         jwt_user = extract_jwt_username(token)
         if jwt_user:
             return jwt_user
