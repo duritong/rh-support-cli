@@ -73,6 +73,7 @@ The CLI communicates with three backend endpoints:
 | **Hydra Search API** | REST over HTTP GET | `https://access.redhat.com/hydra/rest` | Knowledgebase (KCS) solutions and technical articles |
 
 ### A. GraphQL CRM Protocol
+* **Lookup Query Validation**: The creation lookup declares only variables used in its selection set. Its offline regression test checks the GraphQL unused-variable rule; it is not a substitute for validation against the production schema. Product lookup currently matches the product name, not a version-specific product record; version/account resolution and unresolved-entity handling require separate corrections.
 * **Relay Cursor Pagination**: Queries use standardized Relay connection specifications (`edges { node, cursor }`, `pageInfo { hasNextPage, endCursor }`).
   * `CaseService.get_case_details`: Automatically exhausts comment pages up to limits using `endCursor`.
   * `CaseService.list_cases`: Paginates through ticket lists in configurable batch sizes (`first: 100`) when `--all` is specified.

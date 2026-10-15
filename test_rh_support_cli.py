@@ -6093,6 +6093,16 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             shutil.rmtree(temp_dir)
 
 
+class TestCaseLookupQuery(unittest.TestCase):
+    def test_lookup_query_uses_every_declared_variable(self):
+        from rh_support_lib.services.cases import GQL_RESOLVE_CASE_LOOKUP_DATA
+
+        signature, _, selection = GQL_RESOLVE_CASE_LOOKUP_DATA.partition("{")
+        for variable in re.findall(r"\$(\w+)\s*:", signature):
+            with self.subTest(variable=variable):
+                self.assertRegex(selection, rf"\${variable}\b")
+
+
 class TestTokenCacheIdentity(unittest.TestCase):
     def setUp(self):
         import tempfile

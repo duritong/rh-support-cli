@@ -268,7 +268,7 @@ query GetActiveProducts($first: Int, $after: String) {
 """
 
 GQL_RESOLVE_CASE_LOOKUP_DATA = """
-query ResolveCaseLookupData($ssoUser: String, $accountNumber: String, $productName: String, $versionName: String) {
+query ResolveCaseLookupData($ssoUser: String, $accountNumber: String, $productName: String) {
   redhat_support_uiapi {
     Contact: query {
       RedHatSupportContact(where: { SSOUserName__c: { eq: $ssoUser } }, first: 1) {
@@ -1332,7 +1332,6 @@ class CaseService:
             "ssoUser": sso_user,
             "accountNumber": account_number,
             "productName": product_name,
-            "versionName": version_name,
         }
         data = self.api_client.execute_graphql(
             GQL_RESOLVE_CASE_LOOKUP_DATA, variables, url=self.graphql_url
