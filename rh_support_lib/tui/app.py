@@ -86,11 +86,11 @@ def build_filter_payload(
 
     raw_status = filters.get("status")
     if raw_status:
-        if isinstance(raw_status, str):
+        if not isinstance(raw_status, (list, tuple)):
             raw_status = [raw_status]
         mapped_statuses = []
         for s in raw_status:
-            val = STATUS_FILTER_MAP.get(str(s).lower(), s)
+            val = STATUS_FILTER_MAP.get(str(s).lower(), str(s))
             for v in val.split(","):
                 mapped_statuses.append(v.strip())
         if len(mapped_statuses) == 1:
@@ -100,11 +100,11 @@ def build_filter_payload(
 
     raw_sev = filters.get("severity")
     if raw_sev:
-        if isinstance(raw_sev, str):
+        if not isinstance(raw_sev, (list, tuple)):
             raw_sev = [raw_sev]
         mapped_sevs = []
         for s in raw_sev:
-            mapped_sevs.append(SEVERITY_MAP.get(str(s).lower(), s))
+            mapped_sevs.append(SEVERITY_MAP.get(str(s).lower(), str(s)))
         if len(mapped_sevs) == 1:
             payload["severity"] = mapped_sevs[0]
         else:
@@ -113,6 +113,8 @@ def build_filter_payload(
     own = filters.get("owner") or filters.get("ownerSSOName")
     if own:
         payload["ownerSSOName"] = str(own)
+    if filters.get("product"):
+        payload["product"] = str(filters["product"])
     if filters.get("following"):
         payload["following"] = True
 
@@ -131,6 +133,7 @@ def build_filter_params(
         "status": stat if isinstance(stat, list) else ([stat] if stat else None),
         "severity": sev if isinstance(sev, list) else ([sev] if sev else None),
         "owner": payload.get("ownerSSOName"),
+        "product": payload.get("product"),
         "following": bool(payload.get("following")),
     }
 
@@ -790,7 +793,7 @@ class SupportApp(App):
                 )
                 if params.get("following"):
                     self.cases = self.case_service.list_followed_cases(
-                        account=params.get("account")
+                        **{k: v for k, v in params.items() if k != "following"}
                     )
                 else:
                     list_kwargs = {k: v for k, v in params.items() if k != "following"}
@@ -863,7 +866,7 @@ class SupportApp(App):
             )
             if params.get("following"):
                 fresh_cases = self.case_service.list_followed_cases(
-                    account=params.get("account")
+                    **{k: v for k, v in params.items() if k != "following"}
                 )
             else:
                 list_kwargs = {k: v for k, v in params.items() if k != "following"}

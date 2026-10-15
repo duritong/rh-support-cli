@@ -157,10 +157,21 @@ class SearchService:
         language: str | None = "en",
         limit: int = 20,
         local_only: bool = False,
+        account: str | None = None,
+        status: list[str] | str | None = None,
+        severity: list[str] | str | None = None,
+        owner: str | None = None,
     ) -> dict[str, list[Any]]:
         """Searches both support cases and KCS solutions."""
         cases = self.search_cases(
-            query=query, product=product, limit=limit, local_only=local_only
+            query=query,
+            product=product,
+            limit=limit,
+            local_only=local_only,
+            account=account,
+            status=status,
+            severity=severity,
+            owner=owner,
         )
         kcs = (
             []

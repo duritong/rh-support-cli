@@ -637,6 +637,8 @@ class CaseService:
             owner=owner,
             limit=limit,
             all_pages=all_pages,
+            product=product,
+            first=first,
         )
         if use_cache and not after and not query and self.cache_service.enabled:
             cached_list = self.cache_service.get_case_list(cache_key)
@@ -787,6 +789,38 @@ class CaseService:
 
         return cases
 
+    @staticmethod
+    def _matches_case_filters(
+        case, account=None, status=None, severity=None, owner=None, product=None
+    ):
+        for actual, expected in (
+            (case.account_number, account),
+            (case.owner, owner),
+            (case.product, product),
+        ):
+            if (
+                expected
+                and str(actual).strip().casefold() != str(expected).strip().casefold()
+            ):
+                return False
+        if status:
+            values = status if isinstance(status, (list, tuple)) else [status]
+            if str(case.status or "").strip().casefold() not in {
+                str(value).strip().casefold() for value in values
+            }:
+                return False
+        if severity:
+            values = severity if isinstance(severity, (list, tuple)) else [severity]
+            actual = SEVERITY_MAP.get(
+                str(case.severity).lower(), str(case.severity)
+            ).casefold()
+            if actual not in {
+                SEVERITY_MAP.get(str(value).lower(), str(value)).casefold()
+                for value in values
+            }:
+                return False
+        return True
+
     def search_local_cases(
         self,
         query: str,
@@ -794,6 +828,7 @@ class CaseService:
         severity: list[str] | str | None = None,
         product: str | None = None,
         account: str | None = None,
+        owner: str | None = None,
     ) -> list[Case]:
         """Searches locally cached case records and tracked state across subjects, descriptions, comments, and IDs."""
         if self.cache_service.scope is None:
@@ -830,32 +865,7 @@ class CaseService:
             ):
                 continue
 
-            c_status = str(case_data.get("status", "")).lower()
-            if status:
-                statuses = [
-                    str(s).lower()
-                    for s in (status if isinstance(status, list) else [status])
-                ]
-                if c_status not in statuses and not any(
-                    s in c_status for s in statuses
-                ):
-                    continue
-
-            c_sev = str(case_data.get("severity", "")).lower()
-            if severity:
-                sevs = [
-                    str(s).lower()
-                    for s in (severity if isinstance(severity, list) else [severity])
-                ]
-                if c_sev not in sevs and not any(s in c_sev for s in sevs):
-                    continue
-
-            if product and product.lower() not in prod:
-                continue
-
             c_acc = str(case_data.get("account_number", ""))
-            if account and str(account) != c_acc:
-                continue
 
             tc = tracked.get(c_num)
             c_obj = Case(
@@ -882,8 +892,11 @@ class CaseService:
                 else False,
                 unread_count=tc.latest_known.unread_comment_count if tc else 0,
             )
-            seen.add(c_num)
-            results.append(c_obj)
+            if self._matches_case_filters(
+                c_obj, account, status, severity, owner, product
+            ):
+                seen.add(c_num)
+                results.append(c_obj)
 
         return results
 
@@ -906,6 +919,7 @@ class CaseService:
                 severity=severity,
                 product=product,
                 account=account,
+                owner=owner,
             )[:limit]
 
         try:
@@ -930,6 +944,7 @@ class CaseService:
                 severity=severity,
                 product=product,
                 account=account,
+                owner=owner,
             )
             if self.cache_service.scope is not None
             else []
@@ -1740,6 +1755,10 @@ class CaseService:
         sync: bool = False,
         account: str | None = None,
         fetch_live: bool = True,
+        status: list[str] | str | None = None,
+        severity: list[str] | str | None = None,
+        owner: str | None = None,
+        product: str | None = None,
     ) -> list[Case]:
         """Returns the list of followed cases for the user. If sync is True, updates checkpoints first."""
         user = username or self.get_current_user()
@@ -1752,7 +1771,7 @@ class CaseService:
 
         case_numbers = list(followed_map.keys())
         if not fetch_live:
-            return [
+            cases = [
                 Case(
                     case_number=c_num,
                     summary=tc.summary or "Followed Case",
@@ -1773,6 +1792,13 @@ class CaseService:
                     old_status=tc.read_checkpoint.status,
                 )
                 for c_num, tc in followed_map.items()
+            ]
+            return [
+                case
+                for case in cases
+                if self._matches_case_filters(
+                    case, account, status, severity, owner, product
+                )
             ]
 
         def fetch_one(c_num: str) -> Case | None:
@@ -1806,4 +1832,9 @@ class CaseService:
         with ThreadPoolExecutor(max_workers=min(10, len(case_numbers))) as executor:
             cases = list(executor.map(fetch_one, case_numbers))
 
-        return [c for c in cases if c is not None]
+        return [
+            c
+            for c in cases
+            if c is not None
+            and self._matches_case_filters(c, account, status, severity, owner, product)
+        ]

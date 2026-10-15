@@ -199,6 +199,7 @@ Private lists and case records live under `private/<opaque-context-hash>/{lists,
 `CacheService(scope=...)` requires an explicit nonempty scope to enable persistence. `CaseService` derives it without network access; injected caches must match the client/backend context. Unknown clients without a string-valued `get_cache_scope(backend)` contract have persistence disabled. Local search requires a scope and uses only locally available identity information for tracking annotations, never token exchange. The non-private product catalog remains in the shared `catalog/` directory for offline completion and the catalog updater.
 
 * **Case Lists**: Saved under `lists/` using deterministic SHA256 key hashing computed from sorted query parameters (`status`, `severity`, `account`, `owner`, `limit`). Controlled by `list_ttl` (default: 60s).
+* **Filter Fidelity**: List keys also include product and requested page size. CLI/TUI following paths forward the same account/status/severity/owner/product constraints; `CaseService` applies these after collecting followed cases. Local search and remote/local merging enforce owner as well as other constraints. Combined search forwards case-only filters to case search, never to KCS. Offline followed results with unavailable metadata cannot satisfy filters on that metadata.
 * **Case Details**: Cached under `cases/<case_number>.json`. Validated against remote servers using lightweight GraphQL probes (`GQL_CHECK_CASE_LAST_MODIFIED`, ~250 bytes) checking `LastModifiedDate`, `Status`, and latest comment metadata before re-fetching full detail payloads.
 * **Bypassing Cache**: Passing `--no-cache` or setting `RH_NO_CACHE=1` bypasses cache reads and writes globally.
 
@@ -225,6 +226,8 @@ The interactive dashboard (`rh_support_lib/tui/app.py`) is implemented using Tex
 ---
 
 ## 9. Test Suite & Mock Architecture
+
+Focused P2 regressions live in `test_p2_*.py`; the main test module's `load_tests` hook explicitly includes the integrated modules so the existing CI/test command runs them as well. Each module can also run directly with `python -m unittest <module>`.
 
 The test suite (`test_rh_support_cli.py`) runs fully offline without requiring network connectivity or real credentials.
 

@@ -7363,5 +7363,10 @@ class TestTuiOperationSafety(unittest.TestCase):
         self.app.render_case_details.assert_not_called()
 
 
+def load_tests(loader, standard_tests, pattern):
+    standard_tests.addTests(loader.loadTestsFromNames(["test_p2_filters"]))
+    return standard_tests
+
+
 if __name__ == "__main__":
     unittest.main()

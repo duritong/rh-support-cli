@@ -59,22 +59,22 @@ def cmd_search(args, api_client, config: dict[str, Any] | None = None) -> None:
     raw_status = getattr(args, "status", None) or filters.get("status")
     mapped_statuses = None
     if raw_status:
-        if isinstance(raw_status, str):
+        if not isinstance(raw_status, (list, tuple)):
             raw_status = [raw_status]
         mapped_statuses = []
         for s in raw_status:
-            val = STATUS_FILTER_MAP.get(str(s).lower(), s)
+            val = STATUS_FILTER_MAP.get(str(s).lower(), str(s))
             for v in val.split(","):
                 mapped_statuses.append(v.strip())
 
     raw_sev = getattr(args, "severity", None) or filters.get("severity")
     mapped_sevs = None
     if raw_sev:
-        if isinstance(raw_sev, str):
+        if not isinstance(raw_sev, (list, tuple)):
             raw_sev = [raw_sev]
         mapped_sevs = []
         for s in raw_sev:
-            mapped_sevs.append(SEVERITY_MAP.get(str(s).lower(), s))
+            mapped_sevs.append(SEVERITY_MAP.get(str(s).lower(), str(s)))
 
     # Language resolution: CLI flag > bookmark > config > default 'en'
     language = (
@@ -114,6 +114,10 @@ def cmd_search(args, api_client, config: dict[str, Any] | None = None) -> None:
         else:  # 'all'
             res = service.search_all(
                 query=query,
+                account=str(account) if account else None,
+                status=mapped_statuses,
+                severity=mapped_sevs,
+                owner=str(owner) if owner else None,
                 product=str(product) if product else None,
                 language=str(language) if language else None,
                 limit=limit,

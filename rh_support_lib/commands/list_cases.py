@@ -53,22 +53,22 @@ def cmd_list(args, api_client, config=None):
     raw_status = filters.get("status")
     mapped_statuses = None
     if raw_status:
-        if isinstance(raw_status, str):
+        if not isinstance(raw_status, (list, tuple)):
             raw_status = [raw_status]
         mapped_statuses = []
         for s in raw_status:
-            val = STATUS_FILTER_MAP.get(str(s).lower(), s)
+            val = STATUS_FILTER_MAP.get(str(s).lower(), str(s))
             for v in val.split(","):
                 mapped_statuses.append(v.strip())
 
     raw_sev = filters.get("severity")
     mapped_sevs = None
     if raw_sev:
-        if isinstance(raw_sev, str):
+        if not isinstance(raw_sev, (list, tuple)):
             raw_sev = [raw_sev]
         mapped_sevs = []
         for s in raw_sev:
-            mapped_sevs.append(SEVERITY_MAP.get(str(s).lower(), s))
+            mapped_sevs.append(SEVERITY_MAP.get(str(s).lower(), str(s)))
 
     own = filters.get("owner") or filters.get("ownerSSOName")
     is_following = bool(filters.get("following"))
@@ -86,6 +86,10 @@ def cmd_list(args, api_client, config=None):
                 username=user_override,
                 sync=sync_flag,
                 account=str(acc) if acc else None,
+                status=mapped_statuses,
+                severity=mapped_sevs,
+                owner=str(own) if own else None,
+                product=filters.get("product"),
             )
         else:
             if not is_structured:
@@ -97,6 +101,7 @@ def cmd_list(args, api_client, config=None):
                 status=mapped_statuses,
                 severity=mapped_sevs,
                 owner=str(own) if own else None,
+                product=filters.get("product"),
                 all_pages=all_pages_flag,
                 limit=limit_val,
             )

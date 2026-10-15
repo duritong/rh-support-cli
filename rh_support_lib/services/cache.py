@@ -301,6 +301,8 @@ class CacheService:
         owner: str | None = None,
         limit: int | None = None,
         all_pages: bool = False,
+        product: str | None = None,
+        first: int = 100,
     ) -> str:
         """Computes a collision-free deterministic hash key based on query filters."""
         norm_status: list[str] = []
@@ -326,6 +328,8 @@ class CacheService:
             "owner": str(owner).strip().lower() if owner else None,
             "limit": limit,
             "all_pages": all_pages,
+            "product": str(product).strip() if product else None,
+            "first": first,
         }
         serialized = json.dumps(query_payload, sort_keys=True)
         query_hash = hashlib.sha256(serialized.encode("utf-8")).hexdigest()[:16]
