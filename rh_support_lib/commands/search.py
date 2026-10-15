@@ -42,6 +42,10 @@ def cmd_search(args, api_client, config: dict[str, Any] | None = None) -> None:
     limit = getattr(args, "limit", None)
     limit = 20 if limit is None else limit
     local_only = bool(getattr(args, "local", False))
+    if local_only and search_type == "kcs":
+        sys.exit(
+            "Search Error: --local searches cached cases only; KCS-only search requires network access."
+        )
     open_browser = bool(getattr(args, "open", False) or getattr(args, "browser", False))
 
     # CLI Overrides take precedence over bookmarks

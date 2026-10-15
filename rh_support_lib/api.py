@@ -3,6 +3,8 @@ from __future__ import annotations
 import getpass
 import hashlib
 import json
+import logging
+import math
 import os
 import pathlib
 import sys
@@ -11,15 +13,7 @@ import threading
 import time
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-try:
-    import requests
-except ImportError:
-    print("Error: The 'requests' library is required.")
-    print("Please install it using: pip install requests")
-    sys.exit(1)
-
-import logging
-
+import requests
 import requests.sessions
 
 from rh_support_lib.constants import SSO_URL
@@ -162,6 +156,14 @@ def _get_token_cache_file():
     return token_cache_dir, os.path.join(token_cache_dir, cache_filename)
 
 
+class AuthenticationError(Exception):
+    """Credential selection or SSO authentication failed safely."""
+
+
+class RequestReplayError(Exception):
+    """An unauthorized request cannot safely replay its body."""
+
+
 def _get_offline_token(token_file_arg=None, interactive=True):
     """
     Resolves an offline credential without exchanging it for an access token.
@@ -171,53 +173,41 @@ def _get_offline_token(token_file_arg=None, interactive=True):
     3. Config File (~/.config/rh-support-cli/token)
     4. Interactive Prompt
     """
-    offline_token = None
-
-    # 1. CLI Argument
-    if token_file_arg:
-        if not os.path.isfile(token_file_arg):
-            if not interactive:
-                return None
-            sys.exit(f"Error: Token file '{token_file_arg}' not found.")
-        try:
+    try:
+        # A selected source must never silently fall back to another identity.
+        config_path = os.path.expanduser("~/.config/rh-support-cli/token")
+        if token_file_arg is not None:
             with open(token_file_arg, "r") as f:
                 offline_token = f.read().strip()
-        except OSError as e:
-            if not interactive:
-                return None
-            sys.exit(f"Error reading token file: {e}")
-
-    # 2. Environment Variable
-    if not offline_token:
-        offline_token = os.environ.get("REDHAT_SUPPORT_OFFLINE_TOKEN")
-
-    # 3. Config File
-    if not offline_token:
-        config_path = os.path.expanduser("~/.config/rh-support-cli/token")
-        if os.path.isfile(config_path):
-            try:
-                with open(config_path, "r") as f:
-                    offline_token = f.read().strip()
-            except OSError as e:
-                if interactive:
-                    print(f"Warning: Failed to read token from {config_path}: {e}")
-
-    # 4. Prompt
-    if not offline_token and interactive:
-        if sys.stdin.isatty():
+        elif "REDHAT_SUPPORT_OFFLINE_TOKEN" in os.environ:
+            offline_token = os.environ["REDHAT_SUPPORT_OFFLINE_TOKEN"].strip()
+        elif os.path.exists(config_path):
+            with open(config_path, "r") as f:
+                offline_token = f.read().strip()
+        elif interactive and sys.stdin.isatty():
             offline_token = getpass.getpass("Please enter your Red Hat Offline Token: ")
         else:
-            print("No 'REDHAT_SUPPORT_OFFLINE_TOKEN' environment variable found.")
+            offline_token = None
+    except (OSError, UnicodeError, ValueError, EOFError):
+        if not interactive:
+            return None
+        raise AuthenticationError(
+            "Unable to read the selected offline token."
+        ) from None
 
-    if not offline_token and interactive:
-        sys.exit("Error: Token cannot be empty.")
-
-    return offline_token
+    if not isinstance(offline_token, str) or not offline_token.strip():
+        if not interactive:
+            return None
+        raise AuthenticationError("An offline token is required.") from None
+    return offline_token.strip()
 
 
 def get_access_token(token_file_arg=None, offline_token=None):
     """Exchanges the selected offline credential, reusing only its bound token cache."""
-    offline_token = offline_token or _get_offline_token(token_file_arg)
+    if offline_token is None:
+        offline_token = _get_offline_token(token_file_arg)
+    if not isinstance(offline_token, str) or not offline_token.strip():
+        raise AuthenticationError("An offline token is required.") from None
 
     # 5. Check Cache
     token_cache_dir, token_cache_file = _get_token_cache_file()
@@ -239,19 +229,30 @@ def get_access_token(token_file_arg=None, offline_token=None):
 
             expiry = cache_data.get("expires_at", 0)
             # Check if token is valid (with 30s buffer)
-            if cache_data.get(
-                "credential_context"
-            ) == credential_context and time.time() < (expiry - 30):
+            if cache_data.get("credential_context") == credential_context and (
+                not isinstance(expiry, bool)
+                and isinstance(expiry, (int, float))
+                and math.isfinite(expiry)
+                and time.time() < (expiry - 30)
+            ):
                 # cache hit
                 access_token = cache_data.get("access_token")
                 # Ensure the cached token is valid (contains 2 periods for real OIDC JWT, or we are in mock/custom SSO mode)
-                if access_token and (
-                    access_token.count(".") == 2
-                    or os.environ.get("RH_SSO_URL")
-                    or os.environ.get("RH_API_URL")
+                if (
+                    isinstance(access_token, str)
+                    and access_token
+                    and not any(
+                        character.isspace() or ord(character) < 32
+                        for character in access_token
+                    )
+                    and (
+                        access_token.count(".") == 2
+                        or os.environ.get("RH_SSO_URL")
+                        or os.environ.get("RH_API_URL")
+                    )
                 ):
                     return access_token
-        except (OSError, json.JSONDecodeError, TypeError):
+        except (OSError, ValueError, TypeError, AttributeError, OverflowError):
             # ignore cache errors
             pass
 
@@ -266,8 +267,27 @@ def get_access_token(token_file_arg=None, offline_token=None):
         response.raise_for_status()
         data = response.json()
 
+        if not isinstance(data, dict):
+            raise AuthenticationError(
+                "SSO returned an invalid token response."
+            ) from None
         access_token = data.get("access_token")
-        expires_in = data.get("expires_in", 300)  # Default 5 min if missing
+        expires_in = data.get("expires_in")
+        if (
+            not isinstance(access_token, str)
+            or not access_token
+            or any(
+                character.isspace() or ord(character) < 32 for character in access_token
+            )
+            or isinstance(expires_in, bool)
+            or not isinstance(expires_in, (int, float))
+            or expires_in <= 0
+            or not math.isfinite(expires_in)
+            or not math.isfinite(time.time() + expires_in)
+        ):
+            raise AuthenticationError(
+                "SSO returned an invalid token response."
+            ) from None
         refresh_token = data.get("refresh_token")
 
         # Save to cache
@@ -305,11 +325,8 @@ def get_access_token(token_file_arg=None, offline_token=None):
 
         return access_token
 
-    except requests.exceptions.RequestException as e:
-        print("Error: Failed to authenticate.")
-        if e.response is not None:
-            print(f"SSO Response: {e.response.text}")
-        sys.exit(1)
+    except (requests.exceptions.RequestException, ValueError, OverflowError):
+        raise AuthenticationError("Failed to authenticate with SSO.") from None
 
 
 def get_json(url, token):
@@ -350,7 +367,7 @@ class RedHatAPIClient:
     def __init__(
         self, token_file_arg: str | None = None, token_file: str | None = None
     ):
-        self.token_file_arg = token_file or token_file_arg
+        self.token_file_arg = token_file if token_file is not None else token_file_arg
         self._token = None
         self._offline_token = None
         self._auth_lock = threading.RLock()
@@ -391,6 +408,52 @@ class RedHatAPIClient:
             return self._token
 
     def request(self, method, url, **kwargs):
+        positions = []
+        replayable = True
+
+        def capture(body):
+            nonlocal replayable
+            if hasattr(body, "read"):
+                try:
+                    position = body.tell()
+                    if (
+                        not isinstance(position, int)
+                        or position < 0
+                        or not callable(getattr(body, "seek", None))
+                    ):
+                        replayable = False
+                    else:
+                        positions.append((body, position))
+                except Exception:  # noqa: BLE001 - custom streams may fail arbitrarily
+                    replayable = False
+            elif isinstance(body, dict):
+                for value in body.values():
+                    capture(value)
+            elif isinstance(body, (list, tuple)):
+                for value in body:
+                    capture(value)
+            elif not isinstance(body, (type(None), bytes, str, int, float, bool)):
+                replayable = False
+
+        # Snapshot offsets before requests can consume streams; never buffer bodies.
+        capture(kwargs.get("data"))
+        files = kwargs.get("files")
+        if isinstance(files, (dict, list, tuple)):
+            items = files.items() if isinstance(files, dict) else files
+            for item in items:
+                if not isinstance(item, (list, tuple)) or len(item) != 2:
+                    replayable = False
+                    continue
+                value = item[1]
+                if isinstance(value, (list, tuple)):
+                    if not 2 <= len(value) <= 4:
+                        replayable = False
+                        continue
+                    value = value[1]
+                capture(value)
+        elif files is not None:
+            replayable = False
+
         headers = dict(kwargs.get("headers") or {})
         with self._auth_lock:
             token = self.get_token()
@@ -403,6 +466,19 @@ class RedHatAPIClient:
         resp = requests.request(method, url, **kwargs)
         if resp.status_code == 401:
             resp.close()
+            if not replayable:
+                raise RequestReplayError(
+                    "Cannot retry unauthorized request: body is not replayable."
+                ) from None
+            try:
+                for body, position in positions:
+                    body.seek(position)
+                    if body.tell() != position:
+                        raise ValueError("Body position was not restored.")
+            except Exception:  # noqa: BLE001 - never expose stream exception details
+                raise RequestReplayError(
+                    "Cannot retry unauthorized request: body could not be rewound."
+                ) from None
             # Another in-flight request may already have refreshed this token.
             with self._auth_lock:
                 token = self.get_token(

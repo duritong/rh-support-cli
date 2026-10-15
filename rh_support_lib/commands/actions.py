@@ -1,6 +1,7 @@
 import os
 import sys
 
+from rh_support_lib.api import AuthenticationError
 from rh_support_lib.constants import STATUS_MAP
 from rh_support_lib.services.cases import CaseService
 from rh_support_lib.utils import open_editor, strip_header_comments
@@ -126,6 +127,8 @@ def cmd_comment(args, api_client, config=None):
 
                     header_content = "\n".join(header_lines).strip()
 
+            except AuthenticationError:
+                raise
             except Exception as e:  # noqa: BLE001
                 print(f"Warning: Failed to fetch previous comments: {e}")
 

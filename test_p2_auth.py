@@ -340,18 +340,19 @@ class AtomicTokenCacheTests(unittest.TestCase):
         self.assertEqual(api.get_access_token(offline_token="b"), "b.access.jwt")
         self.assertEqual(self.post.call_count, 2)
 
-    def test_authentication_failure_keeps_output_and_exit_contract(self):
+    def test_authentication_failure_raises_sanitized_library_exception(self):
         self.post.side_effect = api.requests.exceptions.HTTPError(
             response=Mock(text="SSO failure")
         )
         output = io.StringIO()
-        with redirect_stdout(output), self.assertRaises(SystemExit) as caught:
+        with (
+            redirect_stdout(output),
+            self.assertRaises(api.AuthenticationError) as caught,
+        ):
             api.get_access_token(offline_token="a")
-        self.assertEqual(caught.exception.code, 1)
-        self.assertEqual(
-            output.getvalue(),
-            "Error: Failed to authenticate.\nSSO Response: SSO failure\n",
-        )
+        self.assertEqual(output.getvalue(), "")
+        self.assertEqual(str(caught.exception), "Failed to authenticate with SSO.")
+        self.assertTrue(caught.exception.__suppress_context__)
 
 
 if __name__ == "__main__":

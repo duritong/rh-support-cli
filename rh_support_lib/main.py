@@ -2,7 +2,11 @@ import argparse
 import os
 import sys
 
-from rh_support_lib.api import enable_debug_logging
+from rh_support_lib.api import (
+    AuthenticationError,
+    RequestReplayError,
+    enable_debug_logging,
+)
 from rh_support_lib.commands.actions import (
     cmd_attach,
     cmd_close,
@@ -32,7 +36,7 @@ except ImportError:
     argcomplete = None
 
 
-def main():
+def _main():
     if "--mock" in sys.argv:
         import http.server
         import threading
@@ -876,6 +880,10 @@ Authentication:
         setup_completers(parser)
         argcomplete.autocomplete(parser)
     args = parser.parse_args()
+    if args.command == "search" and args.local and args.type == "kcs":
+        parser.error(
+            "--local searches cached cases only; KCS-only search requires network access."
+        )
 
     if getattr(args, "command", None) not in ("create", "comment", "close"):
         args.format = "json" if args.json else args.output_format or "text"
@@ -967,6 +975,13 @@ Authentication:
         cmd_tui(args, api_client, config)
     elif args.command == "search":
         cmd_search(args, api_client, config)
+
+
+def main():
+    try:
+        return _main()
+    except (AuthenticationError, RequestReplayError) as error:
+        sys.exit(f"Error: {error}")
 
 
 if __name__ == "__main__":

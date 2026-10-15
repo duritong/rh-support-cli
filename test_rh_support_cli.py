@@ -1224,7 +1224,7 @@ class TestRhSupportCli(unittest.TestCase):
         )
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("Error: Token cannot be empty", result.stderr)
+        self.assertIn("offline token is required", result.stderr)
 
     def test_attach_file(self):
         """Test attaching a file to a case"""
@@ -7396,6 +7396,7 @@ def load_tests(loader, standard_tests, pattern):
                 "test_p2_configuration",
                 "test_p2_auth",
                 "test_p2_search",
+                "test_p2_auth_errors",
             ]
         )
     )

@@ -1302,7 +1302,7 @@ class SupportApp(App):
         owner = case.owner or "Unknown"
         comments = details.comments
 
-        user = self.case_service.get_current_user()
+        user = self.case_service.get_current_user(local_only=True)
         tc = self.case_service.state_service.get_tracked_cases(user).get(str(num))
 
         status_changed = False
@@ -1533,7 +1533,7 @@ class SupportApp(App):
         ).lstrip("0") != str(case_num).lstrip("0"):
             return
         self._cancel_read_dwell()
-        user = self.case_service.get_current_user()
+        user = self.case_service.get_current_user(local_only=True)
         status = None
         severity = None
         last_comm_id = None
@@ -1584,7 +1584,7 @@ class SupportApp(App):
         if not case_id:
             return
 
-        user = self.case_service.get_current_user()
+        user = self.case_service.get_current_user(local_only=True)
         status = None
         severity = None
         last_comm_id = None
@@ -1642,7 +1642,7 @@ class SupportApp(App):
                     case_id = str(row_keys[table.cursor_row].value)
         if not case_id:
             return
-        user = self.case_service.get_current_user()
+        user = self.case_service.get_current_user(local_only=True)
         is_followed = self.case_service.state_service.toggle_follow(user, case_id)
         for c in self.cases:
             c_num = str(c.case_number or c.id or "")
@@ -1660,7 +1660,7 @@ class SupportApp(App):
             self.screen.add_class("layout-vertical")
             self.layout = "vertical"
         with contextlib.suppress(Exception):
-            user = self.case_service.get_current_user()
+            user = self.case_service.get_current_user(local_only=True)
             self.case_service.state_service.set_tui_layout(user, self.layout)
 
     def action_refresh(self) -> None:

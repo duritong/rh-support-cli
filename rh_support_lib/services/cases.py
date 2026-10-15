@@ -386,6 +386,7 @@ class CaseService:
         config: dict | None = None,
     ):
         self.api_client = api_client
+        self._resolved_username = None
         self.graphql_url = (
             graphql_url or os.environ.get("RH_GRAPHQL_URL") or GRAPHQL_URL
         )
@@ -1629,7 +1630,18 @@ class CaseService:
             token = self.api_client.get_token()
         jwt_user = extract_jwt_username(token, sso_only=require_sso)
         if jwt_user:
+            self._resolved_username = jwt_user
             return jwt_user
+
+        if local_only:
+            if self._resolved_username and not require_sso:
+                return self._resolved_username
+            offline_token = getattr(self.api_client, "_offline_token", None)
+            offline_user = extract_jwt_username(
+                offline_token if isinstance(offline_token, str) else None, sso_only=True
+            )
+            if offline_user:
+                return offline_user
 
         if require_sso:
             raise ValueError(

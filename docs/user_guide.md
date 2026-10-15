@@ -92,6 +92,8 @@ rh-support-cli --config-file /path/to/custom_config.yaml list
 ```
 
 ### Debugging & HTTP Logging (`--debug` / `--debug-file`)
+Authentication failures produce a nonzero CLI error without printing raw SSO responses. An explicitly selected empty or unreadable credential does not silently fall back to a different source. Library consumers receive exceptions instead of a process exit. Automatic authentication retries preserve seekable body offsets; a non-replayable body fails rather than resubmitting empty content.
+
 Inspect network communication and API payloads:
 * `--debug`: Prints redacted HTTP requests and responses directly to `stderr`.
 * `--debug-file <path>`: Logs full, untruncated redacted JSON requests and non-streamed responses to the specified file while keeping console output clean.
@@ -117,6 +119,8 @@ Product-scoped bookmarks and combined account/status/severity/owner filters also
 Private case lists and threads are isolated by the selected credential and backend. Older unscoped case caches are not reused; fetch cases again to populate the isolated cache. Changing an offline token selects a new cache, even if it belongs to the same user.
 
 `search --local` performs no authentication or network requests. It requires a locally readable offline credential (via `--token-file`, `REDHAT_SUPPORT_OFFLINE_TOKEN`, or the standard token file) to select its cache. Without one, it exits with an actionable error instead of searching unrelated cached data. A valid cached access token is not required.
+
+Local mode searches case caches only. `search --local --type all` leaves KCS results empty without a remote search; `--local --type kcs` is rejected before authentication or network access.
 
 To bypass reading from or writing to the local disk cache, pass `--no-cache` or set `export RH_NO_CACHE=1`:
 ```bash
