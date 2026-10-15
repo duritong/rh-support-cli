@@ -944,9 +944,9 @@ Authentication:
     elif args.command == "create":
         cmd_create(args, api_client, config)
     elif args.command == "comment":
-        cmd_comment(args, api_client)
+        cmd_comment(args, api_client, config)
     elif args.command == "close":
-        cmd_close(args, api_client)
+        cmd_close(args, api_client, config)
     elif args.command == "list":
         cmd_list(args, api_client, config)
     elif args.command == "show":
@@ -954,11 +954,11 @@ Authentication:
     elif args.command == "apply":
         cmd_apply(args, api_client, config)
     elif args.command == "follow":
-        cmd_follow(args, api_client)
+        cmd_follow(args, api_client, config)
     elif args.command == "following":
         cmd_following(args, api_client, config)
     elif args.command == "unfollow":
-        cmd_unfollow(args, api_client)
+        cmd_unfollow(args, api_client, config)
     elif args.command == "sync":
         cmd_sync(args, api_client, config)
     elif args.command == "updates":

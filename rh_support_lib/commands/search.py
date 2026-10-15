@@ -85,7 +85,7 @@ def cmd_search(args, api_client, config: dict[str, Any] | None = None) -> None:
         or config.get("kcs", {}).get("language")
         or "en"
     )
-    service = SearchService(api_client)
+    service = SearchService(api_client, config=config)
     cases: list[Case] = []
     kcs: list[KCSSearchResult] = []
 

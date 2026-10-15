@@ -23,7 +23,7 @@ def cmd_sync(args, api_client, config=None):
             enable=getattr(args, "enable", False),
         )
         return
-    case_service = CaseService(api_client)
+    case_service = CaseService(api_client, config=config)
     user = getattr(args, "user", None) or case_service.get_current_user()
     acc = getattr(args, "account", None)
     fmt = getattr(args, "format", "text")
@@ -63,7 +63,7 @@ def cmd_sync(args, api_client, config=None):
 
 def cmd_updates(args, api_client, config=None):
     """Displays unread updates and new comments across tracked cases."""
-    case_service = CaseService(api_client)
+    case_service = CaseService(api_client, config=config)
     user = getattr(args, "user", None) or case_service.get_current_user()
     state_service = case_service.state_service
 

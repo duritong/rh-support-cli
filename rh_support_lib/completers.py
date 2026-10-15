@@ -144,20 +144,25 @@ def severity_completer(prefix: str = "", **kwargs: Any) -> list[str]:
     return [s for s in SEVERITY_CHOICES if s.lower().startswith(prefix_low)]
 
 
-def bookmark_completer(prefix: str = "", **kwargs: Any) -> list[str]:
+def bookmark_completer(
+    prefix: str = "", parsed_args: Any = None, **kwargs: Any
+) -> list[str]:
     """Completes bookmark names defined in config.yaml."""
     with contextlib.suppress(Exception):
-        cfg = load_config()
+        cfg = load_config(getattr(parsed_args, "config_file", None))
         bms = list((cfg.get("bookmarks") or {}).keys())
         prefix_low = prefix.lower()
         return [b for b in bms if b.lower().startswith(prefix_low)]
     return []
 
 
-def template_completer(prefix: str = "", **kwargs: Any) -> list[str]:
+def template_completer(
+    prefix: str = "", parsed_args: Any = None, **kwargs: Any
+) -> list[str]:
     """Completes template names found in the templates directory."""
     with contextlib.suppress(Exception):
-        tpl_dir = resolve_templates_dir()
+        cfg = load_config(getattr(parsed_args, "config_file", None))
+        tpl_dir = resolve_templates_dir(cfg)
         if os.path.isdir(tpl_dir):
             names = []
             for f in os.listdir(tpl_dir):

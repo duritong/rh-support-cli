@@ -48,7 +48,7 @@ def cmd_create(args, api_client, config):
 
     # 1. Gather Data (Flags or Interactive)
 
-    case_service = CaseService(api_client)
+    case_service = CaseService(api_client, config=config)
 
     # Product
     product = args.product or defaults.get("product")
@@ -180,7 +180,7 @@ def cmd_create(args, api_client, config):
 
     # 3. Create Case
     print("Creating case...")
-    case_service = CaseService(api_client)
+    case_service = CaseService(api_client, config=config)
     extra_fields = {
         k: v
         for k, v in defaults.items()

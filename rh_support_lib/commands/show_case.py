@@ -13,7 +13,7 @@ def cmd_show(args, api_client, config: dict | None = None):
     is_structured = fmt in ("json", "yaml") or getattr(args, "json", False)
     if not is_structured:
         print(f"Fetching case {args.case}...")
-    service = CaseService(api_client)
+    service = CaseService(api_client, config=config)
     try:
         details = service.get_case_details(args.case)
     except Exception:  # noqa: BLE001

@@ -7393,6 +7393,7 @@ def load_tests(loader, standard_tests, pattern):
                 "test_p2_attachments",
                 "test_p2_parser",
                 "test_p2_tui_actions",
+                "test_p2_configuration",
             ]
         )
     )

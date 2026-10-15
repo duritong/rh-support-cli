@@ -10,9 +10,14 @@ from rh_support_lib.services.cases import CaseService
 class SearchService:
     """Unified search service for Red Hat Support Cases and Knowledgebase (KCS) content."""
 
-    def __init__(self, api_client, case_service: CaseService | None = None):
+    def __init__(
+        self,
+        api_client,
+        case_service: CaseService | None = None,
+        config: dict | None = None,
+    ):
         self.api_client = api_client
-        self.case_service = case_service or CaseService(api_client)
+        self.case_service = case_service or CaseService(api_client, config=config)
 
     def search_cases(
         self,

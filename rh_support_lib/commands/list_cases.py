@@ -74,7 +74,7 @@ def cmd_list(args, api_client, config=None):
     is_following = bool(filters.get("following"))
     sync_flag = bool(getattr(args, "sync", False))
     user_override = getattr(args, "user", None) or filters.get("user")
-    service = CaseService(api_client)
+    service = CaseService(api_client, config=config)
     fmt = getattr(args, "format", "text")
     is_structured = fmt in ("json", "yaml") or getattr(args, "json", False)
 

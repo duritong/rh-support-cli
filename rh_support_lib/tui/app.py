@@ -141,14 +141,17 @@ def build_filter_params(
 class TemplateModal(ModalScreen[str]):
     """Modal screen for applying templates."""
 
-    def __init__(self, case_id: str, default_template: str = ""):
+    def __init__(
+        self, case_id: str, default_template: str = "", config: dict | None = None
+    ):
         super().__init__()
         self.case_id = case_id
         self.default_template = default_template
+        self.config = config or {}
 
     def compose(self) -> ComposeResult:
         # Load local templates
-        templates_dir = resolve_templates_dir()
+        templates_dir = resolve_templates_dir(self.config)
         choices = []
         if os.path.isdir(templates_dir):
             import contextlib
@@ -639,7 +642,7 @@ class SupportApp(App):
         if not isinstance(token, (RedHatAPIClient, LegacyAPIClient)):
             token = LegacyAPIClient(token)
         self.api_client = token
-        self.config = config
+        self.config = config or {}
         self.active_bookmark = bookmark
         self.no_default_bookmark = no_default_bookmark
         self.cases: list[Case] = []
@@ -654,7 +657,7 @@ class SupportApp(App):
         self.current_details: CaseDetails | None = None
         self.current_attachments: list[Attachment] = []
         self.active_jobs: list[str] = []
-        self.case_service = CaseService(self.api_client)
+        self.case_service = CaseService(self.api_client, config=config)
         self.attachment_service = AttachmentService(self.api_client)
         cache_cfg = (config.get("cache") or {}) if config else {}
         tui_cfg = (config.get("tui") or {}) if config else {}
@@ -2013,7 +2016,9 @@ class SupportApp(App):
                 )
 
         default_tmpl = self.config.get("default_create_template") or ""
-        self.push_screen(TemplateModal(case_id, default_tmpl), handle_template)
+        self.push_screen(
+            TemplateModal(case_id, default_tmpl, config=self.config), handle_template
+        )
 
     def execute_template(self, case_id: str, template_name: str) -> None:
         with self.track_job(f"Applying template '{template_name}'..."):

@@ -14,7 +14,7 @@ APPLY_FIELDS = {"summary", "description", "status", "severity"}
 def cmd_apply(args, api_client, config):
     # 1. Fetch Case Details via CaseService
     print(f"Fetching case {args.case} details...")
-    case_service = CaseService(api_client)
+    case_service = CaseService(api_client, config=config)
     try:
         details = case_service.get_case_details(args.case)
     except Exception as e:  # noqa: BLE001

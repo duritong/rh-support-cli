@@ -383,6 +383,7 @@ class CaseService:
         state_service: StateService | None = None,
         cache_service: CacheService | None = None,
         no_cache: bool = False,
+        config: dict | None = None,
     ):
         self.api_client = api_client
         self.graphql_url = (
@@ -397,7 +398,7 @@ class CaseService:
                 "Injected cache does not match the client/backend context."
             )
         self.cache_service = cache_service or CacheService(
-            no_cache=no_cache, scope=scope
+            no_cache=no_cache, scope=scope, config=config
         )
 
     def check_case_last_modified(

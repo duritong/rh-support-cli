@@ -58,6 +58,7 @@ rh-support-cli/
 * **No-Auth Execution Paths**: Operations that inspect only local resources (e.g. `list-templates`, `completion`, or `--local` search) bypass OIDC token verification for instant execution.
 * **Structured Serialization**: All query commands provide pure JSON/YAML serialization via `format_structured_output` (`--json`, `--format yaml`), suppressing banners and ANSI sequences for clean pipe processing with tools like `jq`.
 * **Output Option Parsing**: Serialization uses the internal `output_format` destination; create/comment/close retain their content-format destination. Child options use `argparse.SUPPRESS` defaults so absent child flags cannot overwrite root values. Both attachment aliases register their nested options. JSON/simple-output/cache flags are resolved from parsed arguments, not raw argument-string scans that can mistake content values for flags.
+* **Effective Configuration**: CLI/TUI presenters explicitly pass the loaded config to service construction, including nested search services and both create-service instances. `CaseService(config=...)` configures the real cache TTLs without loading configuration implicitly in the library or changing cache identity. Comment/close and the TUI template selector use the same configured template directory. Completers consult their parsed `--config-file` argument locally. Explicit state-file resolution and confirmation/output policies are unchanged.
 
 ---
 

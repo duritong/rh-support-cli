@@ -18,7 +18,7 @@ def cmd_download(args, api_client):
     cmd_attachment_download(args, api_client)
 
 
-def cmd_comment(args, api_client):
+def cmd_comment(args, api_client, config=None):
 
     # 1. Process templates if specified
     template_content = ""
@@ -38,7 +38,7 @@ def cmd_comment(args, api_client):
                     except yaml.YAMLError:
                         template_vars[k] = v
 
-        templates_dir = resolve_templates_dir()
+        templates_dir = resolve_templates_dir(config)
         engine = TemplateEngine(templates_dir)
         try:
             template_data = engine.process(args.template, template_vars)
@@ -96,7 +96,7 @@ def cmd_comment(args, api_client):
             lines = f.readlines()
         file_content = strip_header_comments(lines).strip()
 
-    case_service = CaseService(api_client)
+    case_service = CaseService(api_client, config=config)
 
     if args.edit or (not args.file and not getattr(args, "template", None)):
         # Prepare context if needed
@@ -168,10 +168,10 @@ def cmd_comment(args, api_client):
         sys.exit(f"Network Error: {e}")
 
 
-def cmd_close(args, api_client):
+def cmd_close(args, api_client, config=None):
     """Closes a support case with a comment, explicitly setting status to 'closed'."""
     args.status = "closed"
-    return cmd_comment(args, api_client)
+    return cmd_comment(args, api_client, config=config)
 
 
 def cmd_link(args):
