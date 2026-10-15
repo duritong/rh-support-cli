@@ -252,6 +252,8 @@ The interactive dashboard (`rh_support_lib/tui/app.py`) is implemented using Tex
 
 Focused P2 regressions live in `test_p2_*.py`; the main test module's `load_tests` hook explicitly includes the integrated modules so the existing CI/test command runs them as well. Each module can also run directly with `python -m unittest <module>`.
 
+The canonical whole-suite entry point wraps all collected cases in `test_support.SandboxSuite`. It uses a temporary HOME/XDG/TMP tree, clears credential/path/proxy/session overrides, and blocks non-loopback DNS and socket connections. Python CLI subprocesses inherit the network guard through a test-only `sitecustomize` path; normal application imports do not activate it. Real Requests serialization with a mocked transport remains testable. Spawn/forkserver children must finish before cleanup. This is serial process-global test isolation, not an OS sandbox for native/non-Python networking. Use the canonical command below for whole-suite verification rather than unguarded discovery. Test-support helpers are excluded from installed packages.
+
 The test suite (`test_rh_support_cli.py`) runs fully offline without requiring network connectivity or real credentials.
 
 ### Mock Server (`MockRedHatHandler`)

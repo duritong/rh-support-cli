@@ -7415,6 +7415,8 @@ class TestTuiOperationSafety(unittest.TestCase):
 
 
 def load_tests(loader, standard_tests, pattern):
+    from test_support import SandboxSuite
+
     standard_tests.addTests(
         loader.loadTestsFromNames(
             [
@@ -7432,10 +7434,11 @@ def load_tests(loader, standard_tests, pattern):
                 "test_p2_editor",
                 "test_p2_read_failures",
                 "test_p2_tui_read_errors",
+                "test_p2_isolation",
             ]
         )
     )
-    return standard_tests
+    return SandboxSuite(standard_tests)
 
 
 if __name__ == "__main__":
