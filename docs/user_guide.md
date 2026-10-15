@@ -458,7 +458,7 @@ rh-support-cli --simple-output show -c 12345678
 ```
 
 ### 5.16 Shell Auto-Completion (`completion`)
-Generates shell auto-completion for commands, options, and bookmarks:
+Generates shell auto-completion for commands, options, and dynamic values:
 ```bash
 # Print bash completion script:
 rh-support-cli completion
@@ -469,7 +469,16 @@ eval "$(rh-support-cli completion)"
 # Persist bash completion in ~/.bashrc:
 echo 'eval "$(rh-support-cli completion)"' >> ~/.bashrc
 ```
----
+
+#### Dynamic Context-Aware Completions
+Pressing `<TAB>` automatically suggests context-relevant values:
+* **Products (`-p` / `--product`)**: Consults local catalog cache (`~/.cache/rh-support-cli/catalog/products.json`), falling back to bundled enterprise products (e.g. `Red Hat OpenShift Container Platform`).
+* **Statuses (`-s` / `--status`)**: Contextually suggests query filters (`open`, `closed`, `redhat`, `customer`, `in_progress`) on `list`/`search`, or update transitions (`none`, `keep`, `redhat`, `customer`, `closed`) on `comment`.
+* **Severities (`--severity`)**: Suggests `Low`, `Normal`, `High`, `Urgent`, `1`, `2`, `3`, `4`.
+* **Bookmarks (`-b` / `--bookmark`)**: Suggests bookmark names defined in your `config.yaml`.
+* **Templates (`-t` / `--template`)**: Suggests local template names from `~/.config/rh-support-cli/templates/`.
+* **Case Numbers (`-c` / `--case`)**: Suggests tracked, followed, and recently viewed case numbers from `~/.local/state/rh-support-cli/state.yaml`.
+* **File Paths (`-f` / `-o` / `--token-file`)**: Tab-completes local files and directories via `FilesCompleter`.
 
 ## 6. Interactive TUI Mode (`tui`)
 

@@ -17,6 +17,10 @@ setup(
         "rich",
         "textual",
     ],
+    package_data={
+        "rh_support_lib": ["data/*.json"],
+    },
+    include_package_data=True,
     entry_points={
         "console_scripts": [
             "rh-support-cli=rh_support_lib.main:main",

@@ -13,11 +13,15 @@ rh-support-cli/
 ├── rh-support-cli.py           # Global CLI entry-point script
 ├── setup.py                    # Package installation configuration
 ├── test_rh_support_cli.py      # Comprehensive end-to-end unit test suite
+├── scripts/
+│   └── update_catalog.py       # Script to refresh repository products.json from API
 └── rh_support_lib/             # Core application library
-    ├── api.py                  # Red Hat SSO auth, OIDC token caching, HTTP client
+    ├── data/
+    │   └── products.json       # Bundled catalog of Red Hat products for offline auto-completion
     ├── config.py               # YAML configuration loader (bookmarks, templates, cache)
     ├── constants.py            # Shared API URLs, picklist status mappings, ANSI colors
     ├── models.py               # Domain models (Case, CaseComment, Attachment, KCSSearchResult)
+    ├── completers.py           # Dynamic shell auto-completers (products, statuses, bookmarks, templates)
     ├── templates.py            # YAML Jinja2 template processing engine
     ├── utils.py                # Formatting, rich-text conversion, ISO date helpers
     ├── commands/               # CLI presentation commands
@@ -224,4 +228,28 @@ ruff format --check .
 
 # Auto-format codebase
 ruff format .
+
+---
+
+## 10. Refreshing the Bundled Product Catalog
+
+The repository includes a bundled product catalog (`rh_support_lib/data/products.json`) used for offline shell auto-completion and default product lookups without requiring a network call.
+
+To refresh this catalog with the latest active products from Red Hat's GraphQL API:
+
+```bash
+# Run with active environment variable or stored token:
+./scripts/update_catalog.py
+
+# Or pass a specific token file:
+./scripts/update_catalog.py --token-file /path/to/token.txt
+```
+
+The script queries all active products across all pages from Red Hat's GraphQL API, saves the structured output into `rh_support_lib/data/products.json`, and updates your local user cache at `~/.cache/rh-support-cli/catalog/products.json`.
+
+After running the script, review and commit the updated data file:
+```bash
+git add rh_support_lib/data/products.json
+git commit -m "Update Red Hat product catalog"
+```
 ```

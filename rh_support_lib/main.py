@@ -873,8 +873,10 @@ Authentication:
             )
 
     if argcomplete:
-        argcomplete.autocomplete(parser)
+        from rh_support_lib.completers import setup_completers
 
+        setup_completers(parser)
+        argcomplete.autocomplete(parser)
     args = parser.parse_args()
     if "--simple-output" in sys.argv or getattr(args, "simple_output", False):
         args.simple_output = True

@@ -269,8 +269,10 @@ def extract_jwt_username(token: str | None) -> str | None:
 class RedHatAPIClient:
     """OIDC Client for Red Hat Support Case API with transparent token refreshing."""
 
-    def __init__(self, token_file_arg=None):
-        self.token_file_arg = token_file_arg
+    def __init__(
+        self, token_file_arg: str | None = None, token_file: str | None = None
+    ):
+        self.token_file_arg = token_file or token_file_arg
         self._token = None
 
     def get_token(self, force_refresh=False):

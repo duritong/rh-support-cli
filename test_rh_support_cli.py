@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import http.server
 import io
 import json
@@ -1144,6 +1146,39 @@ class TestRhSupportCli(unittest.TestCase):
             input=input,
             check=False,
         )
+
+    def run_completion(
+        self, comp_line: str, extra_env: dict | None = None
+    ) -> list[str]:
+        """Helper to run CLI under argcomplete and return completions list."""
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(mode="w+", delete=False) as tf:
+            out_path = tf.name
+
+        env = self.env.copy()
+        if extra_env:
+            env.update(extra_env)
+        env["_ARGCOMPLETE"] = "1"
+        env["_ARGCOMPLETE_IFS"] = "\n"
+        env["_ARGCOMPLETE_STDOUT_FILENAME"] = out_path
+        env["COMP_LINE"] = comp_line
+        env["COMP_POINT"] = str(len(comp_line))
+
+        try:
+            subprocess.run(
+                [sys.executable, self.cli_path],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            with open(out_path, "r") as f:
+                content = f.read()
+            return [line.strip() for line in content.splitlines() if line.strip()]
+        finally:
+            if os.path.exists(out_path):
+                os.remove(out_path)
 
     def test_auth_failure_missing_token(self):
         """Test that the CLI fails gracefully if no token is provided"""
@@ -5763,6 +5798,291 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         finally:
             if orig_home:
                 self.env["HOME"] = orig_home
+            shutil.rmtree(temp_dir)
+
+    def test_bash_completion_and_dynamic_completers(self):
+        """Test dynamic bash auto-completion completers for products, statuses, severities, bookmarks, templates, and cases."""
+        import argparse
+        import json
+        import shutil
+        import tempfile
+
+        import yaml
+
+        from rh_support_lib.completers import (
+            bookmark_completer,
+            case_completer,
+            case_type_completer,
+            product_completer,
+            setup_completers,
+            severity_completer,
+            status_completer,
+            template_completer,
+        )
+
+        temp_dir = tempfile.mkdtemp()
+        orig_home = os.environ.get("HOME")
+        orig_cache = os.environ.get("XDG_CACHE_HOME")
+        os.environ["HOME"] = temp_dir
+        os.environ["XDG_CACHE_HOME"] = os.path.join(temp_dir, ".cache")
+        try:
+            # 1. Product Completer with fallback defaults
+            prods = product_completer("Red Hat Open")
+            self.assertIn("Red Hat OpenShift Container Platform", prods)
+            self.assertIn("Red Hat OpenStack Platform", prods)
+            self.assertNotIn("Red Hat Enterprise Linux", prods)
+
+            # Product Completer with custom cached products in products.json
+            catalog_dir = os.path.join(temp_dir, ".cache", "rh-support-cli", "catalog")
+            os.makedirs(catalog_dir, exist_ok=True)
+            with open(os.path.join(catalog_dir, "products.json"), "w") as f:
+                json.dump(
+                    {
+                        "products": [
+                            {"name": "Custom In-House Product"},
+                            {"name": "Red Hat Custom Stack"},
+                        ]
+                    },
+                    f,
+                )
+            cached_prods = product_completer("Custom")
+            self.assertIn("Custom In-House Product", cached_prods)
+            self.assertIn("Red Hat Custom Stack", cached_prods)
+
+            # 2. Status Completer (list/search context vs comment/close context)
+            class FakeArgs:
+                command = "list"
+
+            list_statuses = status_completer("o", parsed_args=FakeArgs())
+            self.assertIn("open", list_statuses)
+            self.assertNotIn("none", list_statuses)
+
+            FakeArgs.command = "comment"
+            comment_statuses = status_completer("n", parsed_args=FakeArgs())
+            self.assertIn("none", comment_statuses)
+
+            # 3. Severity Completer
+            sevs = severity_completer("u")
+            self.assertIn("Urgent", sevs)
+
+            # 4. Bookmark Completer
+            config_dir = os.path.join(temp_dir, ".config", "rh-support-cli")
+            os.makedirs(config_dir, exist_ok=True)
+            with open(os.path.join(config_dir, "config.yaml"), "w") as f:
+                yaml.safe_dump(
+                    {"bookmarks": {"my-team-cases": {}, "ocp-urgent": {}}}, f
+                )
+            bms = bookmark_completer("ocp")
+            self.assertIn("ocp-urgent", bms)
+
+            # 5. Template Completer
+            tpl_dir = os.path.join(config_dir, "templates")
+            os.makedirs(tpl_dir, exist_ok=True)
+            with open(os.path.join(tpl_dir, "custom_issue.yaml"), "w") as f:
+                f.write("summary: test\n")
+            tmpls = template_completer("custom")
+            self.assertIn("custom_issue", tmpls)
+
+            # 6. Case Completer
+            state_dir = os.path.join(temp_dir, ".local", "state", "rh-support-cli")
+            os.makedirs(state_dir, exist_ok=True)
+            with open(os.path.join(state_dir, "state.yaml"), "w") as f:
+                yaml.safe_dump(
+                    {
+                        "users": {
+                            "jdeveloper": {
+                                "tracked_cases": {"04526149": {}},
+                                "following": {"12345678": {}},
+                            }
+                        }
+                    },
+                    f,
+                )
+            cases = case_completer("045")
+            self.assertIn("04526149", cases)
+
+            # 7. Case Type Completer
+            types = case_type_completer("s")
+            self.assertIn("Standard", types)
+
+            # 8. setup_completers attachment & choices protection
+            parser = argparse.ArgumentParser(prog="rh-support-cli")
+            subs = parser.add_subparsers(dest="cmd")
+            p_list = subs.add_parser("list")
+            p_act = p_list.add_argument("--product")
+            s_act = p_list.add_argument("-s", "--status")
+            p_apply = subs.add_parser("apply")
+            tmpl_act = p_apply.add_argument("-t", "--template")
+            p_search = subs.add_parser("search")
+            type_act = p_search.add_argument(
+                "-t", "--type", choices=["cases", "kcs", "all"]
+            )
+            setup_completers(parser)
+            self.assertEqual(getattr(p_act, "completer", None), product_completer)
+            self.assertEqual(getattr(s_act, "completer", None), status_completer)
+            self.assertEqual(getattr(tmpl_act, "completer", None), template_completer)
+            # Choices actions must never be overridden with a custom completer
+            self.assertIsNone(getattr(type_act, "completer", None))
+            self.assertEqual(type_act.choices, ["cases", "kcs", "all"])
+        finally:
+            if orig_home is not None:
+                os.environ["HOME"] = orig_home
+            else:
+                os.environ.pop("HOME", None)
+            if orig_cache is not None:
+                os.environ["XDG_CACHE_HOME"] = orig_cache
+            else:
+                os.environ.pop("XDG_CACHE_HOME", None)
+            shutil.rmtree(temp_dir)
+
+    def test_update_catalog_script(self):
+        """Test update_catalog script execution and JSON output writing."""
+        import json
+        import shutil
+        import subprocess
+        import tempfile
+
+        temp_dir = tempfile.mkdtemp()
+        out_file = os.path.join(temp_dir, "test_products.json")
+        script_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "scripts", "update_catalog.py"
+        )
+        try:
+            res = subprocess.run(
+                [sys.executable, script_path, "--output", out_file, "--no-cache", "-q"],
+                env=self.env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(
+                res.returncode, 0, f"Script failed: {res.stderr}\n{res.stdout}"
+            )
+            self.assertTrue(os.path.isfile(out_file))
+            with open(out_file, "r") as f:
+                data = json.load(f)
+            self.assertIn("products", data)
+            self.assertIn("count", data)
+            self.assertIn("updated_at", data)
+            self.assertTrue(len(data["products"]) >= 1)
+        finally:
+            shutil.rmtree(temp_dir)
+
+    def test_cli_bash_completion_e2e_scenarios(self):
+        """End-to-end integration test of actual bash tab-completion invocations across CLI commands."""
+        import tempfile
+
+        import yaml
+
+        temp_dir = tempfile.mkdtemp()
+        orig_home = self.env.get("HOME")
+        orig_state = self.env.get("XDG_STATE_HOME")
+        orig_config = self.env.get("XDG_CONFIG_HOME")
+        self.env["HOME"] = temp_dir
+        self.env["XDG_STATE_HOME"] = os.path.join(temp_dir, ".local", "state")
+        self.env["XDG_CONFIG_HOME"] = os.path.join(temp_dir, ".config")
+
+        try:
+            # 1. Setup sample templates, bookmarks, and state
+            config_dir = os.path.join(temp_dir, ".config", "rh-support-cli")
+            tpl_dir = os.path.join(config_dir, "templates")
+            os.makedirs(tpl_dir, exist_ok=True)
+            with open(os.path.join(tpl_dir, "base_bit.yaml"), "w") as f:
+                f.write("summary: bit\n")
+            with open(os.path.join(tpl_dir, "rh_watchers.yaml"), "w") as f:
+                f.write("summary: watchers\n")
+
+            with open(os.path.join(config_dir, "config.yaml"), "w") as f:
+                yaml.safe_dump({"bookmarks": {"ocp-urgent": {}, "rhel-kernel": {}}}, f)
+
+            state_dir = os.path.join(temp_dir, ".local", "state", "rh-support-cli")
+            os.makedirs(state_dir, exist_ok=True)
+            with open(os.path.join(state_dir, "state.yaml"), "w") as f:
+                yaml.safe_dump(
+                    {
+                        "users": {
+                            "jdeveloper": {
+                                "tracked_cases": {"04526149": {}},
+                                "following": {"12345678": {}},
+                            }
+                        }
+                    },
+                    f,
+                )
+
+            # Scenario 1: search --type MUST complete choices (cases, kcs, all) and NOT templates
+            res_search_type = self.run_completion("rh-support-cli search --type ")
+            self.assertEqual(res_search_type, ["cases", "kcs", "all"])
+            self.assertNotIn("base_bit", res_search_type)
+
+            # Scenario 2: apply -t MUST complete template names
+            res_apply_t = self.run_completion("rh-support-cli apply -t ")
+            self.assertIn("base_bit", res_apply_t)
+            self.assertIn("rh_watchers", res_apply_t)
+
+            # Scenario 3: list --status completes query statuses
+            res_list_status = self.run_completion("rh-support-cli list --status ")
+            self.assertIn("open", res_list_status)
+            self.assertIn("closed", res_list_status)
+            self.assertIn("in_progress", res_list_status)
+
+            # Scenario 4: comment -s completes comment transition statuses
+            res_comment_status = self.run_completion(
+                "rh-support-cli comment -c 12345 -s "
+            )
+            self.assertIn("none", res_comment_status)
+            self.assertIn("keep", res_comment_status)
+            self.assertIn("redhat", res_comment_status)
+
+            # Scenario 5: list --severity completes severity values
+            res_severity = self.run_completion("rh-support-cli list --severity ")
+            self.assertIn("Low", res_severity)
+            self.assertIn("Urgent", res_severity)
+
+            # Scenario 6: search --product completes products from catalog
+            res_prod = self.run_completion("rh-support-cli search --product Red")
+            self.assertTrue(
+                any(
+                    "Enterprise\\ Linux" in p or "Enterprise Linux" in p
+                    for p in res_prod
+                )
+            )
+            self.assertTrue(any("OpenShift" in p for p in res_prod))
+
+            # Scenario 7: list -b completes configured bookmarks
+            res_bm = self.run_completion("rh-support-cli list -b ")
+            self.assertIn("ocp-urgent", res_bm)
+            self.assertIn("rhel-kernel", res_bm)
+
+            # Scenario 8: show -c completes tracked case numbers
+            res_case = self.run_completion("rh-support-cli show -c ")
+            self.assertIn("04526149", res_case)
+            self.assertIn("12345678", res_case)
+
+            # Scenario 9: create --type completes ticket types
+            res_create_type = self.run_completion("rh-support-cli create --type ")
+            self.assertIn("Standard", res_create_type)
+            self.assertIn("Bug", res_create_type)
+
+            # Scenario 10: show --order completes order values
+            res_order = self.run_completion("rh-support-cli show --order ")
+            self.assertEqual(res_order, ["newest", "oldest", "desc", "asc"])
+
+            # Scenario 11: list --format completes format choices
+            res_fmt = self.run_completion("rh-support-cli list --format ")
+            self.assertEqual(res_fmt, ["text", "json", "yaml"])
+
+            # Scenario 12: tui --layout completes layout choices
+            res_layout = self.run_completion("rh-support-cli tui --layout ")
+            self.assertEqual(res_layout, ["vertical", "horizontal", "mailbox"])
+
+        finally:
+            if orig_home:
+                self.env["HOME"] = orig_home
+            if orig_state:
+                self.env["XDG_STATE_HOME"] = orig_state
+            if orig_config:
+                self.env["XDG_CONFIG_HOME"] = orig_config
             shutil.rmtree(temp_dir)
 
 

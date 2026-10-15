@@ -1,0 +1,6271 @@
+{
+  "updated_at": "2026-10-15T08:00:40Z",
+  "count": 895,
+  "products": [
+    {
+      "id": "01tNr00000HfFPHIA3",
+      "name": ".NET Core",
+      "version_name": "N/A",
+      "family": "Cloud Native App Dev",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFkdIAF",
+      "name": ".NET Core 8.0",
+      "version_name": "8.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFPHIA3"
+    },
+    {
+      "id": "01tNr00000HfFOhIAN",
+      "name": "Ansible Automation Analytics",
+      "version_name": "N/A",
+      "family": "Management &amp; Automation",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFUtIAN",
+      "name": "Ansible Automation Analytics Online",
+      "version_name": "Online",
+      "family": "",
+      "parent_id": "01tNr00000HfFOhIAN"
+    },
+    {
+      "id": "01tNr00000HfFOiIAN",
+      "name": "Ansible Automation Hub",
+      "version_name": "N/A",
+      "family": "Management &amp; Automation",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFUuIAN",
+      "name": "Ansible Automation Hub Online",
+      "version_name": "Online",
+      "family": "",
+      "parent_id": "01tNr00000HfFOiIAN"
+    },
+    {
+      "id": "01tNr00000HfFQ1IAN",
+      "name": "Ansible Collections",
+      "version_name": "N/A",
+      "family": "Management &amp; Automation",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFlFIAV",
+      "name": "Ansible Collections Online",
+      "version_name": "Online",
+      "family": "",
+      "parent_id": "01tNr00000HfFQ1IAN"
+    },
+    {
+      "id": "01tNr00000HfFOdIAN",
+      "name": "Azure Red Hat OpenShift",
+      "version_name": "N/A",
+      "family": "Cloud Native App Dev",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFS0IAN",
+      "name": "Azure Red Hat OpenShift",
+      "version_name": "Azure Red Hat OpenShift",
+      "family": "",
+      "parent_id": "01tNr00000HfFOdIAN"
+    },
+    {
+      "id": "01tNr00000HfFQcIAN",
+      "name": "Convert2RHEL",
+      "version_name": "N/A",
+      "family": "Management &amp; Automation",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfG0bIAF",
+      "name": "Convert2RHEL AlmaLinux OS 8",
+      "version_name": "AlmaLinux OS 8",
+      "family": "",
+      "parent_id": "01tNr00000HfFQcIAN"
+    },
+    {
+      "id": "01tNr00000HfG1RIAV",
+      "name": "Convert2RHEL AlmaLinux OS 9",
+      "version_name": "AlmaLinux OS 9",
+      "family": "",
+      "parent_id": "01tNr00000HfFQcIAN"
+    },
+    {
+      "id": "01tNr00000HfG0YIAV",
+      "name": "Convert2RHEL CentOS Linux 7",
+      "version_name": "CentOS Linux 7",
+      "family": "",
+      "parent_id": "01tNr00000HfFQcIAN"
+    },
+    {
+      "id": "01tNr00000HfG0XIAV",
+      "name": "Convert2RHEL CentOS Linux 8",
+      "version_name": "CentOS Linux 8",
+      "family": "",
+      "parent_id": "01tNr00000HfFQcIAN"
+    },
+    {
+      "id": "01tNr00000HfG0aIAF",
+      "name": "Convert2RHEL Oracle Linux 7",
+      "version_name": "Oracle Linux 7",
+      "family": "",
+      "parent_id": "01tNr00000HfFQcIAN"
+    },
+    {
+      "id": "01tNr00000HfG0ZIAV",
+      "name": "Convert2RHEL Oracle Linux 8",
+      "version_name": "Oracle Linux 8",
+      "family": "",
+      "parent_id": "01tNr00000HfFQcIAN"
+    },
+    {
+      "id": "01tNr00000HfG1TIAV",
+      "name": "Convert2RHEL Oracle Linux 9",
+      "version_name": "Oracle Linux 9",
+      "family": "",
+      "parent_id": "01tNr00000HfFQcIAN"
+    },
+    {
+      "id": "01tNr00000HfG0cIAF",
+      "name": "Convert2RHEL Rocky 8",
+      "version_name": "Rocky 8",
+      "family": "",
+      "parent_id": "01tNr00000HfFQcIAN"
+    },
+    {
+      "id": "01tNr00000HfG1SIAV",
+      "name": "Convert2RHEL Rocky 9",
+      "version_name": "Rocky 9",
+      "family": "",
+      "parent_id": "01tNr00000HfFQcIAN"
+    },
+    {
+      "id": "01tNr00000JFswPIAT",
+      "name": "Fedora Hummingbird Linux",
+      "version_name": "N/A",
+      "family": "",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000JHEQDIA5",
+      "name": "Fedora Hummingbird Linux Rolling",
+      "version_name": "Rolling",
+      "family": "",
+      "parent_id": "01tNr00000JFswPIAT"
+    },
+    {
+      "id": "01tNr00000HfFPqIAN",
+      "name": "Hybrid Committed Spend",
+      "version_name": "N/A",
+      "family": "",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFgqIAF",
+      "name": "Hybrid Committed Spend Online",
+      "version_name": "Online",
+      "family": "",
+      "parent_id": "01tNr00000HfFPqIAN"
+    },
+    {
+      "id": "01tNr00000HfFOxIAN",
+      "name": "JBoss Enterprise Application Platform expansion pack",
+      "version_name": "N/A",
+      "family": "Cloud Native App Dev",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFkUIAV",
+      "name": "JBoss Enterprise Application Platform expansion pack 5.0.0",
+      "version_name": "5.0.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFOxIAN"
+    },
+    {
+      "id": "01tNr00000HfG62IAF",
+      "name": "JBoss Enterprise Application Platform expansion pack 6.0.0",
+      "version_name": "6.0.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFOxIAN"
+    },
+    {
+      "id": "01tNr00000KKuk6IAD",
+      "name": "Lightwell Network",
+      "version_name": "N/A",
+      "family": "Cloud Native App Dev",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000KKy9NIAT",
+      "name": "Lightwell Network Rolling",
+      "version_name": "Rolling",
+      "family": "",
+      "parent_id": "01tNr00000KKuk6IAD"
+    },
+    {
+      "id": "01tNr00000HfFOqIAN",
+      "name": "Migration Toolkit for Applications",
+      "version_name": "N/A",
+      "family": "Cloud Native App Dev",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfG2kIAF",
+      "name": "Migration Toolkit for Applications 7.3",
+      "version_name": "7.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFOqIAN"
+    },
+    {
+      "id": "01tNr00000HfFPSIA3",
+      "name": "Migration Toolkit for Virtualization",
+      "version_name": "N/A",
+      "family": "Management &amp; Automation",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfG5hIAF",
+      "name": "Migration Toolkit for Virtualization 2.10",
+      "version_name": "2.10",
+      "family": "",
+      "parent_id": "01tNr00000HfFPSIA3"
+    },
+    {
+      "id": "01tNr00000HkSveIAF",
+      "name": "Migration Toolkit for Virtualization 2.11",
+      "version_name": "2.11",
+      "family": "",
+      "parent_id": "01tNr00000HfFPSIA3"
+    },
+    {
+      "id": "01tNr00000HfG3AIAV",
+      "name": "Migration Toolkit for Virtualization 2.8",
+      "version_name": "2.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFPSIA3"
+    },
+    {
+      "id": "01tNr00000HfG3BIAV",
+      "name": "Migration Toolkit for Virtualization 2.9",
+      "version_name": "2.9",
+      "family": "",
+      "parent_id": "01tNr00000HfFPSIA3"
+    },
+    {
+      "id": "01tNr00000HfFOcIAN",
+      "name": "Open Liberty",
+      "version_name": "N/A",
+      "family": "Cloud Native App Dev",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfG1UIAV",
+      "name": "Open Liberty 24.0.0.12",
+      "version_name": "24.0.0.12",
+      "family": "",
+      "parent_id": "01tNr00000HfFOcIAN"
+    },
+    {
+      "id": "01tNr00000HfFkMIAV",
+      "name": "Open Liberty 24.0.0.6",
+      "version_name": "24.0.0.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFOcIAN"
+    },
+    {
+      "id": "01tNr00000HfFkzIAF",
+      "name": "Open Liberty 24.0.0.9",
+      "version_name": "24.0.0.9",
+      "family": "",
+      "parent_id": "01tNr00000HfFOcIAN"
+    },
+    {
+      "id": "01tNr00000HfG2AIAV",
+      "name": "Open Liberty 25.0.0.3",
+      "version_name": "25.0.0.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFOcIAN"
+    },
+    {
+      "id": "01tNr00000HfFOFIA3",
+      "name": "OpenJDK",
+      "version_name": "N/A",
+      "family": "Cloud Native App Dev",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfESQIA3",
+      "name": "OpenJDK 11",
+      "version_name": "11",
+      "family": "",
+      "parent_id": "01tNr00000HfFOFIA3"
+    },
+    {
+      "id": "01tNr00000HfFdCIAV",
+      "name": "OpenJDK 17",
+      "version_name": "17",
+      "family": "",
+      "parent_id": "01tNr00000HfFOFIA3"
+    },
+    {
+      "id": "01tNr00000HfFiJIAV",
+      "name": "OpenJDK 21",
+      "version_name": "21",
+      "family": "",
+      "parent_id": "01tNr00000HfFOFIA3"
+    },
+    {
+      "id": "01tNr00000HfG5vIAF",
+      "name": "OpenJDK 25",
+      "version_name": "25",
+      "family": "",
+      "parent_id": "01tNr00000HfFOFIA3"
+    },
+    {
+      "id": "01tNr00000HfESPIA3",
+      "name": "OpenJDK 8",
+      "version_name": "8",
+      "family": "",
+      "parent_id": "01tNr00000HfFOFIA3"
+    },
+    {
+      "id": "01tNr00000HfFPZIA3",
+      "name": "OpenShift API for Data Protection",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfG2uIAF",
+      "name": "OpenShift API for Data Protection 1.5",
+      "version_name": "1.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFPZIA3"
+    },
+    {
+      "id": "01tNr00000KMtOvIAL",
+      "name": "OpenShift API for Data Protection 1.6",
+      "version_name": "1.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFPZIA3"
+    },
+    {
+      "id": "01tNr00000HfFOJIA3",
+      "name": "OpenShift Container Platform",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFfQIAV",
+      "name": "OpenShift Container Platform 4.12",
+      "version_name": "4.12",
+      "family": "",
+      "parent_id": "01tNr00000HfFOJIA3"
+    },
+    {
+      "id": "01tNr00000HfFhqIAF",
+      "name": "OpenShift Container Platform 4.14",
+      "version_name": "4.14",
+      "family": "",
+      "parent_id": "01tNr00000HfFOJIA3"
+    },
+    {
+      "id": "01tNr00000HfFkIIAV",
+      "name": "OpenShift Container Platform 4.16",
+      "version_name": "4.16",
+      "family": "",
+      "parent_id": "01tNr00000HfFOJIA3"
+    },
+    {
+      "id": "01tNr00000HfG1pIAF",
+      "name": "OpenShift Container Platform 4.18",
+      "version_name": "4.18",
+      "family": "",
+      "parent_id": "01tNr00000HfFOJIA3"
+    },
+    {
+      "id": "01tNr00000HfG30IAF",
+      "name": "OpenShift Container Platform 4.19",
+      "version_name": "4.19",
+      "family": "",
+      "parent_id": "01tNr00000HfFOJIA3"
+    },
+    {
+      "id": "01tNr00000HfG5aIAF",
+      "name": "OpenShift Container Platform 4.20",
+      "version_name": "4.20",
+      "family": "",
+      "parent_id": "01tNr00000HfFOJIA3"
+    },
+    {
+      "id": "01tNr00000HfG6QIAV",
+      "name": "OpenShift Container Platform 4.21",
+      "version_name": "4.21",
+      "family": "",
+      "parent_id": "01tNr00000HfFOJIA3"
+    },
+    {
+      "id": "01tNr00000JxZWfIAN",
+      "name": "OpenShift Container Platform 4.22",
+      "version_name": "4.22",
+      "family": "",
+      "parent_id": "01tNr00000HfFOJIA3"
+    },
+    {
+      "id": "01tNr00000HfE9AIAV",
+      "name": "OpenShift Dedicated",
+      "version_name": "OpenShift Dedicated",
+      "family": "",
+      "parent_id": "01tNr00000HfFPIIA3"
+    },
+    {
+      "id": "01tNr00000HfFPIIA3",
+      "name": "OpenShift Dedicated",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000MVRldIAH",
+      "name": "OpenShift Workload Availability",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000MVRnFIAX",
+      "name": "OpenShift Workload Availability 0",
+      "version_name": "0",
+      "family": "",
+      "parent_id": "01tNr00000MVRldIAH"
+    },
+    {
+      "id": "01tNr00000HfFPAIA3",
+      "name": "Other",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFplIAF",
+      "name": "Other - Unknown",
+      "version_name": "Unknown",
+      "family": "",
+      "parent_id": "01tNr00000HfFPAIA3"
+    },
+    {
+      "id": "01tNr00000HfFQkIAN",
+      "name": "Pen Drive Powered by Red Hat Lightspeed",
+      "version_name": "N/A",
+      "family": "Management &amp; Automation",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfG6NIAV",
+      "name": "Pen Drive Powered by Red Hat Lightspeed 1,0",
+      "version_name": "1,0",
+      "family": "",
+      "parent_id": "01tNr00000HfFQkIAN"
+    },
+    {
+      "id": "01tNr00000HfFPxIAN",
+      "name": "Quay.io",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFjZIAV",
+      "name": "Quay.io Online",
+      "version_name": "Online",
+      "family": "",
+      "parent_id": "01tNr00000HfFPxIAN"
+    },
+    {
+      "id": "01tNr00000HfFPGIA3",
+      "name": "Quickstart Cloud Installer",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFugIAF",
+      "name": "Quickstart Cloud Installer 1.1",
+      "version_name": "1.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFPGIA3"
+    },
+    {
+      "id": "01tNr00000HfFOGIA3",
+      "name": "Red Hat 3scale API Management",
+      "version_name": "N/A",
+      "family": "Cloud Native App Dev",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFv3IAF",
+      "name": "Red Hat 3scale API Management 2.0.0  On-premises",
+      "version_name": "2.0.0  On-premises",
+      "family": "",
+      "parent_id": "01tNr00000HfFOGIA3"
+    },
+    {
+      "id": "01tNr00000HfFxpIAF",
+      "name": "Red Hat 3scale API Management 2.1.0 On-premises",
+      "version_name": "2.1.0 On-premises",
+      "family": "",
+      "parent_id": "01tNr00000HfFOGIA3"
+    },
+    {
+      "id": "01tNr00000HfFZLIA3",
+      "name": "Red Hat 3scale API Management 2.10.0 On-premises",
+      "version_name": "2.10.0 On-premises",
+      "family": "",
+      "parent_id": "01tNr00000HfFOGIA3"
+    },
+    {
+      "id": "01tNr00000HfFbrIAF",
+      "name": "Red Hat 3scale API Management 2.11.0 On-Premise",
+      "version_name": "2.11.0 On-Premise",
+      "family": "",
+      "parent_id": "01tNr00000HfFOGIA3"
+    },
+    {
+      "id": "01tNr00000HfFcSIAV",
+      "name": "Red Hat 3scale API Management 2.11.1 On-Premise",
+      "version_name": "2.11.1 On-Premise",
+      "family": "",
+      "parent_id": "01tNr00000HfFOGIA3"
+    },
+    {
+      "id": "01tNr00000HfFd1IAF",
+      "name": "Red Hat 3scale API Management 2.11.2 On-Premise",
+      "version_name": "2.11.2 On-Premise",
+      "family": "",
+      "parent_id": "01tNr00000HfFOGIA3"
+    },
+    {
+      "id": "01tNr00000HfFeIIAV",
+      "name": "Red Hat 3scale API Management 2.12.0 On-Premise",
+      "version_name": "2.12.0 On-Premise",
+      "family": "",
+      "parent_id": "01tNr00000HfFOGIA3"
+    },
+    {
+      "id": "01tNr00000HfFgVIAV",
+      "name": "Red Hat 3scale API Management 2.12.2 On-Premise",
+      "version_name": "2.12.2 On-Premise",
+      "family": "",
+      "parent_id": "01tNr00000HfFOGIA3"
+    },
+    {
+      "id": "01tNr00000HfFf4IAF",
+      "name": "Red Hat 3scale API Management 2.13.0 On-Premise",
+      "version_name": "2.13.0 On-Premise",
+      "family": "",
+      "parent_id": "01tNr00000HfFOGIA3"
+    },
+    {
+      "id": "01tNr00000HfFfYIAV",
+      "name": "Red Hat 3scale API Management 2.13.1 On-Premise",
+      "version_name": "2.13.1 On-Premise",
+      "family": "",
+      "parent_id": "01tNr00000HfFOGIA3"
+    },
+    {
+      "id": "01tNr00000HfFfwIAF",
+      "name": "Red Hat 3scale API Management 2.13.2 On-Premise",
+      "version_name": "2.13.2 On-Premise",
+      "family": "",
+      "parent_id": "01tNr00000HfFOGIA3"
+    },
+    {
+      "id": "01tNr00000HfFidIAF",
+      "name": "Red Hat 3scale API Management 2.14.0",
+      "version_name": "2.14.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFOGIA3"
+    },
+    {
+      "id": "01tNr00000HfG0zIAF",
+      "name": "Red Hat 3scale API Management 2.15.0",
+      "version_name": "2.15.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFOGIA3"
+    },
+    {
+      "id": "01tNr00000HfG5rIAF",
+      "name": "Red Hat 3scale API Management 2.16.0",
+      "version_name": "2.16.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFOGIA3"
+    },
+    {
+      "id": "01tNr00000HfFzPIAV",
+      "name": "Red Hat 3scale API Management 2.2.0  On-Premises",
+      "version_name": "2.2.0  On-Premises",
+      "family": "",
+      "parent_id": "01tNr00000HfFOGIA3"
+    },
+    {
+      "id": "01tNr00000HfFzjIAF",
+      "name": "Red Hat 3scale API Management 2.2.1 On-Premises",
+      "version_name": "2.2.1 On-Premises",
+      "family": "",
+      "parent_id": "01tNr00000HfFOGIA3"
+    },
+    {
+      "id": "01tNr00000HfG09IAF",
+      "name": "Red Hat 3scale API Management 2.3.0 On-Premises",
+      "version_name": "2.3.0 On-Premises",
+      "family": "",
+      "parent_id": "01tNr00000HfFOGIA3"
+    },
+    {
+      "id": "01tNr00000HfESRIA3",
+      "name": "Red Hat 3scale API Management 2.4.0 On-Premises",
+      "version_name": "2.4.0 On-Premises",
+      "family": "",
+      "parent_id": "01tNr00000HfFOGIA3"
+    },
+    {
+      "id": "01tNr00000HfFREIA3",
+      "name": "Red Hat 3scale API Management 2.5.0  On-Premises",
+      "version_name": "2.5.0  On-Premises",
+      "family": "",
+      "parent_id": "01tNr00000HfFOGIA3"
+    },
+    {
+      "id": "01tNr00000HfFRSIA3",
+      "name": "Red Hat 3scale API Management 2.5.1 On-Premises",
+      "version_name": "2.5.1 On-Premises",
+      "family": "",
+      "parent_id": "01tNr00000HfFOGIA3"
+    },
+    {
+      "id": "01tNr00000HfFRZIA3",
+      "name": "Red Hat 3scale API Management 2.5.2 On-Premises",
+      "version_name": "2.5.2 On-Premises",
+      "family": "",
+      "parent_id": "01tNr00000HfFOGIA3"
+    },
+    {
+      "id": "01tNr00000HfFSIIA3",
+      "name": "Red Hat 3scale API Management 2.6.0  On-Premises",
+      "version_name": "2.6.0  On-Premises",
+      "family": "",
+      "parent_id": "01tNr00000HfFOGIA3"
+    },
+    {
+      "id": "01tNr00000HfFUyIAN",
+      "name": "Red Hat 3scale API Management 2.7.0 On-Premises",
+      "version_name": "2.7.0 On-Premises",
+      "family": "",
+      "parent_id": "01tNr00000HfFOGIA3"
+    },
+    {
+      "id": "01tNr00000HfFV8IAN",
+      "name": "Red Hat 3scale API Management 2.7.1 On-Premises",
+      "version_name": "2.7.1 On-Premises",
+      "family": "",
+      "parent_id": "01tNr00000HfFOGIA3"
+    },
+    {
+      "id": "01tNr00000HfFW0IAN",
+      "name": "Red Hat 3scale API Management 2.8.0 On-Premises",
+      "version_name": "2.8.0 On-Premises",
+      "family": "",
+      "parent_id": "01tNr00000HfFOGIA3"
+    },
+    {
+      "id": "01tNr00000HfFX6IAN",
+      "name": "Red Hat 3scale API Management 2.9.0 On-Premises",
+      "version_name": "2.9.0 On-Premises",
+      "family": "",
+      "parent_id": "01tNr00000HfFOGIA3"
+    },
+    {
+      "id": "01tNr00000HfFZ0IAN",
+      "name": "Red Hat 3scale API Management 2.9.1 On-Premises",
+      "version_name": "2.9.1 On-Premises",
+      "family": "",
+      "parent_id": "01tNr00000HfFOGIA3"
+    },
+    {
+      "id": "01tNr00000HfFOtIAN",
+      "name": "Red Hat Advanced Cluster Management for Kubernetes",
+      "version_name": "N/A",
+      "family": "Management &amp; Automation",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfG2DIAV",
+      "name": "Red Hat Advanced Cluster Management for Kubernetes 2.13",
+      "version_name": "2.13",
+      "family": "",
+      "parent_id": "01tNr00000HfFOtIAN"
+    },
+    {
+      "id": "01tNr00000HfG3YIAV",
+      "name": "Red Hat Advanced Cluster Management for Kubernetes 2.14",
+      "version_name": "2.14",
+      "family": "",
+      "parent_id": "01tNr00000HfFOtIAN"
+    },
+    {
+      "id": "01tNr00000HfG6HIAV",
+      "name": "Red Hat Advanced Cluster Management for Kubernetes 2.15",
+      "version_name": "2.15",
+      "family": "",
+      "parent_id": "01tNr00000HfFOtIAN"
+    },
+    {
+      "id": "01tNr00000JUEsDIAX",
+      "name": "Red Hat Advanced Cluster Management for Kubernetes 2.16",
+      "version_name": "2.16",
+      "family": "",
+      "parent_id": "01tNr00000HfFOtIAN"
+    },
+    {
+      "id": "01tNr00000KIAS1IAP",
+      "name": "Red Hat Advanced Cluster Management for Kubernetes 2.17",
+      "version_name": "2.17",
+      "family": "",
+      "parent_id": "01tNr00000HfFOtIAN"
+    },
+    {
+      "id": "01tNr00000HfFPlIAN",
+      "name": "Red Hat Advanced Cluster Security Cloud Service",
+      "version_name": "N/A",
+      "family": "",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFg2IAF",
+      "name": "Red Hat Advanced Cluster Security Cloud Service Online",
+      "version_name": "Online",
+      "family": "",
+      "parent_id": "01tNr00000HfFPlIAN"
+    },
+    {
+      "id": "01tNr00000HfFPQIA3",
+      "name": "Red Hat Advanced Cluster Security for Kubernetes",
+      "version_name": "N/A",
+      "family": "Management &amp; Automation",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfG5uIAF",
+      "name": "Red Hat Advanced Cluster Security for Kubernetes 4.10",
+      "version_name": "4.10",
+      "family": "",
+      "parent_id": "01tNr00000HfFPQIA3"
+    },
+    {
+      "id": "01tNr00000KqTtdIAF",
+      "name": "Red Hat Advanced Cluster Security for Kubernetes 4.11",
+      "version_name": "4.11",
+      "family": "",
+      "parent_id": "01tNr00000HfFPQIA3"
+    },
+    {
+      "id": "01tNr00000HfFjCIAV",
+      "name": "Red Hat Advanced Cluster Security for Kubernetes 4.4",
+      "version_name": "4.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFPQIA3"
+    },
+    {
+      "id": "01tNr00000HfFjoIAF",
+      "name": "Red Hat Advanced Cluster Security for Kubernetes 4.5",
+      "version_name": "4.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFPQIA3"
+    },
+    {
+      "id": "01tNr00000HfG1FIAV",
+      "name": "Red Hat Advanced Cluster Security for Kubernetes 4.6",
+      "version_name": "4.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFPQIA3"
+    },
+    {
+      "id": "01tNr00000HfG1dIAF",
+      "name": "Red Hat Advanced Cluster Security for Kubernetes 4.7",
+      "version_name": "4.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFPQIA3"
+    },
+    {
+      "id": "01tNr00000HfG2oIAF",
+      "name": "Red Hat Advanced Cluster Security for Kubernetes 4.8",
+      "version_name": "4.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFPQIA3"
+    },
+    {
+      "id": "01tNr00000HfFQgIAN",
+      "name": "Red Hat AI Inference Server",
+      "version_name": "N/A",
+      "family": "",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HkSvdIAF",
+      "name": "Red Hat AI Inference Server 3.2",
+      "version_name": "3.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFQgIAN"
+    },
+    {
+      "id": "01tNr00000I4sPGIAZ",
+      "name": "Red Hat AI Inference Server 3.3",
+      "version_name": "3.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFQgIAN"
+    },
+    {
+      "id": "01tNr00000MJxHVIA1",
+      "name": "Red Hat AI Inference Server 3.4",
+      "version_name": "3.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFQgIAN"
+    },
+    {
+      "id": "01tNr00000MJxHWIA1",
+      "name": "Red Hat AI Inference Server 3.5",
+      "version_name": "3.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFQgIAN"
+    },
+    {
+      "id": "01tNr00000HfFNuIAN",
+      "name": "Red Hat AMQ",
+      "version_name": "N/A",
+      "family": "Cloud Native App Dev",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfG3IIAV",
+      "name": "Red Hat AMQ 7.12.5",
+      "version_name": "7.12.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFNuIAN"
+    },
+    {
+      "id": "01tNr00000I5E3BIAV",
+      "name": "Red Hat AMQ 7.12.6",
+      "version_name": "7.12.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFNuIAN"
+    },
+    {
+      "id": "01tNr00000JIo3SIAT",
+      "name": "Red Hat AMQ 7.12.7",
+      "version_name": "7.12.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFNuIAN"
+    },
+    {
+      "id": "01tNr00000HfG2rIAF",
+      "name": "Red Hat AMQ 7.13.0",
+      "version_name": "7.13.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFNuIAN"
+    },
+    {
+      "id": "01tNr00000HfG6FIAV",
+      "name": "Red Hat AMQ 7.13.3",
+      "version_name": "7.13.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFNuIAN"
+    },
+    {
+      "id": "01tNr00000I5E3CIAV",
+      "name": "Red Hat AMQ 7.13.4",
+      "version_name": "7.13.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFNuIAN"
+    },
+    {
+      "id": "01tNr00000JIo3RIAT",
+      "name": "Red Hat AMQ 7.13.5",
+      "version_name": "7.13.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFNuIAN"
+    },
+    {
+      "id": "01tNr00000MWoBYIA1",
+      "name": "Red Hat AMQ 7.13.6",
+      "version_name": "7.13.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFNuIAN"
+    },
+    {
+      "id": "01tNr00000IyXgHIAV",
+      "name": "Red Hat AMQ 7.14.0",
+      "version_name": "7.14.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFNuIAN"
+    },
+    {
+      "id": "01tNr00000MWoBXIA1",
+      "name": "Red Hat AMQ 7.14.1",
+      "version_name": "7.14.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFNuIAN"
+    },
+    {
+      "id": "01tNr00000HfFOKIA3",
+      "name": "Red Hat AMQ Clients",
+      "version_name": "N/A",
+      "family": "Cloud Native App Dev",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfG2vIAF",
+      "name": "Red Hat AMQ Clients 2025.Q2",
+      "version_name": "2025.Q2",
+      "family": "",
+      "parent_id": "01tNr00000HfFOKIA3"
+    },
+    {
+      "id": "01tNr00000HfG38IAF",
+      "name": "Red Hat AMQ Clients 2025.Q3",
+      "version_name": "2025.Q3",
+      "family": "",
+      "parent_id": "01tNr00000HfFOKIA3"
+    },
+    {
+      "id": "01tNr00000HkgYjIAJ",
+      "name": "Red Hat AMQ Clients 2026.Q1",
+      "version_name": "2026.Q1",
+      "family": "",
+      "parent_id": "01tNr00000HfFOKIA3"
+    },
+    {
+      "id": "01tNr00000HfFO0IAN",
+      "name": "Red Hat AMQ Interconnect",
+      "version_name": "N/A",
+      "family": "Cloud Native App Dev",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfESgIAN",
+      "name": "Red Hat AMQ Interconnect 1.1.0",
+      "version_name": "1.1.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO0IAN"
+    },
+    {
+      "id": "01tNr00000HfFb0IAF",
+      "name": "Red Hat AMQ Interconnect 1.10.0",
+      "version_name": "1.10.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO0IAN"
+    },
+    {
+      "id": "01tNr00000HfFcbIAF",
+      "name": "Red Hat AMQ Interconnect 1.10.1",
+      "version_name": "1.10.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO0IAN"
+    },
+    {
+      "id": "01tNr00000HfFcdIAF",
+      "name": "Red Hat AMQ Interconnect 1.10.4",
+      "version_name": "1.10.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFO0IAN"
+    },
+    {
+      "id": "01tNr00000HfFdpIAF",
+      "name": "Red Hat AMQ Interconnect 1.10.7",
+      "version_name": "1.10.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFO0IAN"
+    },
+    {
+      "id": "01tNr00000HfEShIAN",
+      "name": "Red Hat AMQ Interconnect 1.2.0",
+      "version_name": "1.2.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO0IAN"
+    },
+    {
+      "id": "01tNr00000HfESpIAN",
+      "name": "Red Hat AMQ Interconnect 1.2.1",
+      "version_name": "1.2.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO0IAN"
+    },
+    {
+      "id": "01tNr00000HfESqIAN",
+      "name": "Red Hat AMQ Interconnect 1.2.2",
+      "version_name": "1.2.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFO0IAN"
+    },
+    {
+      "id": "01tNr00000HfESiIAN",
+      "name": "Red Hat AMQ Interconnect 1.3.0",
+      "version_name": "1.3.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO0IAN"
+    },
+    {
+      "id": "01tNr00000HfETMIA3",
+      "name": "Red Hat AMQ Interconnect 1.4.0",
+      "version_name": "1.4.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO0IAN"
+    },
+    {
+      "id": "01tNr00000HfFRUIA3",
+      "name": "Red Hat AMQ Interconnect 1.4.1",
+      "version_name": "1.4.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO0IAN"
+    },
+    {
+      "id": "01tNr00000HfERyIAN",
+      "name": "Red Hat AMQ Interconnect 1.5.0",
+      "version_name": "1.5.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO0IAN"
+    },
+    {
+      "id": "01tNr00000HfFVEIA3",
+      "name": "Red Hat AMQ Interconnect 1.5.1",
+      "version_name": "1.5.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO0IAN"
+    },
+    {
+      "id": "01tNr00000HfFVFIA3",
+      "name": "Red Hat AMQ Interconnect 1.5.2",
+      "version_name": "1.5.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFO0IAN"
+    },
+    {
+      "id": "01tNr00000HfFUcIAN",
+      "name": "Red Hat AMQ Interconnect 1.6.0",
+      "version_name": "1.6.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO0IAN"
+    },
+    {
+      "id": "01tNr00000HfFVGIA3",
+      "name": "Red Hat AMQ Interconnect 1.6.1",
+      "version_name": "1.6.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO0IAN"
+    },
+    {
+      "id": "01tNr00000HfFVkIAN",
+      "name": "Red Hat AMQ Interconnect 1.7.0",
+      "version_name": "1.7.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO0IAN"
+    },
+    {
+      "id": "01tNr00000HfFWbIAN",
+      "name": "Red Hat AMQ Interconnect 1.8.0",
+      "version_name": "1.8.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO0IAN"
+    },
+    {
+      "id": "01tNr00000HfFaVIAV",
+      "name": "Red Hat AMQ Interconnect 1.9.0",
+      "version_name": "1.9.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO0IAN"
+    },
+    {
+      "id": "01tNr00000HfFPLIA3",
+      "name": "Red Hat Ansible Automation Platform",
+      "version_name": "N/A",
+      "family": "Management &amp; Automation",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000LL1MnIAL",
+      "name": "Red Hat Ansible Automation Platform 2.4 EUS",
+      "version_name": "2.4 EUS",
+      "family": "",
+      "parent_id": "01tNr00000HfFPLIA3"
+    },
+    {
+      "id": "01tNr00000HfFl9IAF",
+      "name": "Red Hat Ansible Automation Platform 2.5",
+      "version_name": "2.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFPLIA3"
+    },
+    {
+      "id": "01tNr00000HfG5RIAV",
+      "name": "Red Hat Ansible Automation Platform 2.6",
+      "version_name": "2.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFPLIA3"
+    },
+    {
+      "id": "01tNr00000Jpu6rIAB",
+      "name": "Red Hat Ansible Automation Platform 2.7",
+      "version_name": "2.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFPLIA3"
+    },
+    {
+      "id": "01tNr00000HfFhpIAF",
+      "name": "Red Hat Ansible Automation Platform Ansible Lightspeed with IBM watsonx Code Assistant",
+      "version_name": "Ansible Lightspeed with IBM watsonx Code Assistant",
+      "family": "",
+      "parent_id": "01tNr00000HfFPLIA3"
+    },
+    {
+      "id": "01tNr00000HfFPiIAN",
+      "name": "Red Hat Ansible Automation Platform On Clouds",
+      "version_name": "N/A",
+      "family": "Management &amp; Automation",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfG0wIAF",
+      "name": "Red Hat Ansible Automation Platform On Clouds AWS - Managed Service",
+      "version_name": "AWS - Managed Service",
+      "family": "",
+      "parent_id": "01tNr00000HfFPiIAN"
+    },
+    {
+      "id": "01tNr00000HfFenIAF",
+      "name": "Red Hat Ansible Automation Platform On Clouds Azure - Managed",
+      "version_name": "Azure - Managed",
+      "family": "",
+      "parent_id": "01tNr00000HfFPiIAN"
+    },
+    {
+      "id": "01tNr00000HfFPWIA3",
+      "name": "Red Hat build of Apache Camel for Quarkus",
+      "version_name": "N/A",
+      "family": "",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfG1LIAV",
+      "name": "Red Hat build of Apache Camel for Quarkus 3.15.0",
+      "version_name": "3.15.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFPWIA3"
+    },
+    {
+      "id": "01tNr00000HfG1sIAF",
+      "name": "Red Hat build of Apache Camel for Quarkus 3.15.3",
+      "version_name": "3.15.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFPWIA3"
+    },
+    {
+      "id": "01tNr00000HfG25IAF",
+      "name": "Red Hat build of Apache Camel for Quarkus 3.15.4",
+      "version_name": "3.15.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFPWIA3"
+    },
+    {
+      "id": "01tNr00000HfG2eIAF",
+      "name": "Red Hat build of Apache Camel for Quarkus 3.20.0",
+      "version_name": "3.20.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFPWIA3"
+    },
+    {
+      "id": "01tNr00000HfG5qIAF",
+      "name": "Red Hat build of Apache Camel for Quarkus 3.27.0",
+      "version_name": "3.27.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFPWIA3"
+    },
+    {
+      "id": "01tNr00000HfG68IAF",
+      "name": "Red Hat build of Apache Camel for Quarkus 3.27.1",
+      "version_name": "3.27.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFPWIA3"
+    },
+    {
+      "id": "01tNr00000HfG6XIAV",
+      "name": "Red Hat build of Apache Camel for Quarkus 3.27.2",
+      "version_name": "3.27.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFPWIA3"
+    },
+    {
+      "id": "01tNr00000IrPltIAF",
+      "name": "Red Hat build of Apache Camel for Quarkus 3.27.3",
+      "version_name": "3.27.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFPWIA3"
+    },
+    {
+      "id": "01tNr00000JpzD1IAJ",
+      "name": "Red Hat build of Apache Camel for Quarkus 3.33.0",
+      "version_name": "3.33.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFPWIA3"
+    },
+    {
+      "id": "01tNr00000LTnKcIAL",
+      "name": "Red Hat build of Apache Camel for Quarkus 3.33.3",
+      "version_name": "3.33.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFPWIA3"
+    },
+    {
+      "id": "01tNr00000HfFPeIAN",
+      "name": "Red Hat build of Apache Camel for Spring Boot",
+      "version_name": "N/A",
+      "family": "",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFhlIAF",
+      "name": "Red Hat build of Apache Camel for Spring Boot 4.0.0",
+      "version_name": "4.0.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFPeIAN"
+    },
+    {
+      "id": "01tNr00000HfFiZIAV",
+      "name": "Red Hat build of Apache Camel for Spring Boot 4.0.1",
+      "version_name": "4.0.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFPeIAN"
+    },
+    {
+      "id": "01tNr00000HfFixIAF",
+      "name": "Red Hat build of Apache Camel for Spring Boot 4.0.3",
+      "version_name": "4.0.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFPeIAN"
+    },
+    {
+      "id": "01tNr00000HfG2cIAF",
+      "name": "Red Hat build of Apache Camel for Spring Boot 4.10.3",
+      "version_name": "4.10.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFPeIAN"
+    },
+    {
+      "id": "01tNr00000HfG5pIAF",
+      "name": "Red Hat build of Apache Camel for Spring Boot 4.14.1",
+      "version_name": "4.14.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFPeIAN"
+    },
+    {
+      "id": "01tNr00000HfG6BIAV",
+      "name": "Red Hat build of Apache Camel for Spring Boot 4.14.2",
+      "version_name": "4.14.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFPeIAN"
+    },
+    {
+      "id": "01tNr00000I0h2bIAB",
+      "name": "Red Hat build of Apache Camel for Spring Boot 4.14.4",
+      "version_name": "4.14.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFPeIAN"
+    },
+    {
+      "id": "01tNr00000JUEsEIAX",
+      "name": "Red Hat build of Apache Camel for Spring Boot 4.18.1",
+      "version_name": "4.18.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFPeIAN"
+    },
+    {
+      "id": "01tNr00000LL1MoIAL",
+      "name": "Red Hat build of Apache Camel for Spring Boot 4.18.3",
+      "version_name": "4.18.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFPeIAN"
+    },
+    {
+      "id": "01tNr00000ME3qzIAD",
+      "name": "Red Hat build of Apache Camel for Spring Boot 4.18.4",
+      "version_name": "4.18.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFPeIAN"
+    },
+    {
+      "id": "01tNr00000HfFjnIAF",
+      "name": "Red Hat build of Apache Camel for Spring Boot 4.4.0",
+      "version_name": "4.4.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFPeIAN"
+    },
+    {
+      "id": "01tNr00000HfFkYIAV",
+      "name": "Red Hat build of Apache Camel for Spring Boot 4.4.1",
+      "version_name": "4.4.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFPeIAN"
+    },
+    {
+      "id": "01tNr00000HfFktIAF",
+      "name": "Red Hat build of Apache Camel for Spring Boot 4.4.2",
+      "version_name": "4.4.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFPeIAN"
+    },
+    {
+      "id": "01tNr00000HfG0rIAF",
+      "name": "Red Hat build of Apache Camel for Spring Boot 4.4.3",
+      "version_name": "4.4.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFPeIAN"
+    },
+    {
+      "id": "01tNr00000HfG1HIAV",
+      "name": "Red Hat build of Apache Camel for Spring Boot 4.4.4",
+      "version_name": "4.4.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFPeIAN"
+    },
+    {
+      "id": "01tNr00000HfG1IIAV",
+      "name": "Red Hat build of Apache Camel for Spring Boot 4.8.0",
+      "version_name": "4.8.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFPeIAN"
+    },
+    {
+      "id": "01tNr00000HfG2SIAV",
+      "name": "Red Hat build of Apache Camel for Spring Boot 4.8.3",
+      "version_name": "4.8.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFPeIAN"
+    },
+    {
+      "id": "01tNr00000HfG2TIAV",
+      "name": "Red Hat build of Apache Camel for Spring Boot 4.8.5",
+      "version_name": "4.8.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFPeIAN"
+    },
+    {
+      "id": "01tNr00000HfFP1IAN",
+      "name": "Red Hat build of Apicurio Registry",
+      "version_name": "N/A",
+      "family": "Cloud Native App Dev",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfG2xIAF",
+      "name": "Red Hat build of Apicurio Registry 2.6.12",
+      "version_name": "2.6.12",
+      "family": "",
+      "parent_id": "01tNr00000HfFP1IAN"
+    },
+    {
+      "id": "01tNr00000HfG2yIAF",
+      "name": "Red Hat build of Apicurio Registry 3.0.9",
+      "version_name": "3.0.9",
+      "family": "",
+      "parent_id": "01tNr00000HfFP1IAN"
+    },
+    {
+      "id": "01tNr00000HfG5zIAF",
+      "name": "Red Hat build of Apicurio Registry 3.1.0",
+      "version_name": "3.1.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFP1IAN"
+    },
+    {
+      "id": "01tNr00000HfG6PIAV",
+      "name": "Red Hat build of Apicurio Registry 3.1.6",
+      "version_name": "3.1.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFP1IAN"
+    },
+    {
+      "id": "01tNr00000HfG6gIAF",
+      "name": "Red Hat build of Apicurio Registry 3.1.6.GA1",
+      "version_name": "3.1.6.GA1",
+      "family": "",
+      "parent_id": "01tNr00000HfFP1IAN"
+    },
+    {
+      "id": "01tNr00000HfFQiIAN",
+      "name": "Red Hat build of Cryostat",
+      "version_name": "N/A",
+      "family": "Cloud Native App Dev",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfG3nIAF",
+      "name": "Red Hat build of Cryostat 3.0",
+      "version_name": "3.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFQiIAN"
+    },
+    {
+      "id": "01tNr00000HfG3eIAF",
+      "name": "Red Hat build of Cryostat 4.0",
+      "version_name": "4.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFQiIAN"
+    },
+    {
+      "id": "01tNr00000JePMZIA3",
+      "name": "Red Hat build of Cryostat 4.2",
+      "version_name": "4.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFQiIAN"
+    },
+    {
+      "id": "01tNr00000HfFP3IAN",
+      "name": "Red Hat build of Debezium",
+      "version_name": "N/A",
+      "family": "Cloud Native App Dev",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfG2HIAV",
+      "name": "Red Hat build of Debezium 3.0.8",
+      "version_name": "3.0.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFP3IAN"
+    },
+    {
+      "id": "01tNr00000HfG5WIAV",
+      "name": "Red Hat build of Debezium 3.2.4",
+      "version_name": "3.2.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFP3IAN"
+    },
+    {
+      "id": "01tNr00000HfG6AIAV",
+      "name": "Red Hat build of Debezium 3.2.5",
+      "version_name": "3.2.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFP3IAN"
+    },
+    {
+      "id": "01tNr00000IJ42LIAT",
+      "name": "Red Hat build of Debezium 3.2.6",
+      "version_name": "3.2.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFP3IAN"
+    },
+    {
+      "id": "01tNr00000IJ42MIAT",
+      "name": "Red Hat build of Debezium 3.2.7",
+      "version_name": "3.2.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFP3IAN"
+    },
+    {
+      "id": "01tNr00000IybiHIAR",
+      "name": "Red Hat build of Debezium 3.4.3",
+      "version_name": "3.4.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFP3IAN"
+    },
+    {
+      "id": "01tNr00000HfFY9IAN",
+      "name": "Red Hat build of Debezium Pre-release",
+      "version_name": "Pre-release",
+      "family": "",
+      "parent_id": "01tNr00000HfFP3IAN"
+    },
+    {
+      "id": "01tNr00000HfFPuIAN",
+      "name": "Red Hat build of Keycloak",
+      "version_name": "N/A",
+      "family": "Cloud Native App Dev",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfG21IAF",
+      "name": "Red Hat build of Keycloak 26.0.10",
+      "version_name": "26.0.10",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfG2OIAV",
+      "name": "Red Hat build of Keycloak 26.0.11",
+      "version_name": "26.0.11",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfG2nIAF",
+      "name": "Red Hat build of Keycloak 26.0.12",
+      "version_name": "26.0.12",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfG3DIAV",
+      "name": "Red Hat build of Keycloak 26.0.13",
+      "version_name": "26.0.13",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfG3RIAV",
+      "name": "Red Hat build of Keycloak 26.0.14",
+      "version_name": "26.0.14",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfG3dIAF",
+      "name": "Red Hat build of Keycloak 26.0.15",
+      "version_name": "26.0.15",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfG5cIAF",
+      "name": "Red Hat build of Keycloak 26.0.16",
+      "version_name": "26.0.16",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfG5lIAF",
+      "name": "Red Hat build of Keycloak 26.0.17",
+      "version_name": "26.0.17",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfG16IAF",
+      "name": "Red Hat build of Keycloak 26.0.5",
+      "version_name": "26.0.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfG1AIAV",
+      "name": "Red Hat build of Keycloak 26.0.6",
+      "version_name": "26.0.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfG1JIAV",
+      "name": "Red Hat build of Keycloak 26.0.7",
+      "version_name": "26.0.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfG1eIAF",
+      "name": "Red Hat build of Keycloak 26.0.8",
+      "version_name": "26.0.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfG1fIAF",
+      "name": "Red Hat build of Keycloak 26.0.9",
+      "version_name": "26.0.9",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfG5ZIAV",
+      "name": "Red Hat build of Keycloak 26.2.10",
+      "version_name": "26.2.10",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfG65IAF",
+      "name": "Red Hat build of Keycloak 26.2.11",
+      "version_name": "26.2.11",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfG64IAF",
+      "name": "Red Hat build of Keycloak 26.2.12",
+      "version_name": "26.2.12",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfG6cIAF",
+      "name": "Red Hat build of Keycloak 26.2.13",
+      "version_name": "26.2.13",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000IHd14IAD",
+      "name": "Red Hat build of Keycloak 26.2.14",
+      "version_name": "26.2.14",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000JEimDIAT",
+      "name": "Red Hat build of Keycloak 26.2.15",
+      "version_name": "26.2.15",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000JukjcIAB",
+      "name": "Red Hat build of Keycloak 26.2.15.SP1",
+      "version_name": "26.2.15.SP1",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000JukjdIAB",
+      "name": "Red Hat build of Keycloak 26.2.16",
+      "version_name": "26.2.16",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfG2bIAF",
+      "name": "Red Hat build of Keycloak 26.2.4",
+      "version_name": "26.2.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfG2sIAF",
+      "name": "Red Hat build of Keycloak 26.2.5",
+      "version_name": "26.2.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfG3OIAV",
+      "name": "Red Hat build of Keycloak 26.2.6",
+      "version_name": "26.2.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfG3PIAV",
+      "name": "Red Hat build of Keycloak 26.2.7",
+      "version_name": "26.2.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfG3cIAF",
+      "name": "Red Hat build of Keycloak 26.2.8",
+      "version_name": "26.2.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfG3mIAF",
+      "name": "Red Hat build of Keycloak 26.2.9",
+      "version_name": "26.2.9",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000IHd13IAD",
+      "name": "Red Hat build of Keycloak 26.4.10",
+      "version_name": "26.4.10",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000JEimEIAT",
+      "name": "Red Hat build of Keycloak 26.4.11",
+      "version_name": "26.4.11",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000JukjbIAB",
+      "name": "Red Hat build of Keycloak 26.4.11.SP1",
+      "version_name": "26.4.11.SP1",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000JukjaIAB",
+      "name": "Red Hat build of Keycloak 26.4.12",
+      "version_name": "26.4.12",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000LIVPTIA5",
+      "name": "Red Hat build of Keycloak 26.4.13",
+      "version_name": "26.4.13",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000LIVPUIA5",
+      "name": "Red Hat build of Keycloak 26.4.14",
+      "version_name": "26.4.14",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000Lc9CgIAJ",
+      "name": "Red Hat build of Keycloak 26.4.15",
+      "version_name": "26.4.15",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfG5kIAF",
+      "name": "Red Hat build of Keycloak 26.4.2",
+      "version_name": "26.4.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfG5tIAF",
+      "name": "Red Hat build of Keycloak 26.4.4",
+      "version_name": "26.4.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfG5yIAF",
+      "name": "Red Hat build of Keycloak 26.4.5",
+      "version_name": "26.4.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfG63IAF",
+      "name": "Red Hat build of Keycloak 26.4.6",
+      "version_name": "26.4.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfG6VIAV",
+      "name": "Red Hat build of Keycloak 26.4.7",
+      "version_name": "26.4.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfG6WIAV",
+      "name": "Red Hat build of Keycloak 26.4.8",
+      "version_name": "26.4.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfG6bIAF",
+      "name": "Red Hat build of Keycloak 26.4.9",
+      "version_name": "26.4.9",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000JukjZIAR",
+      "name": "Red Hat build of Keycloak 26.6.2",
+      "version_name": "26.6.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000KGpUTIA1",
+      "name": "Red Hat build of Keycloak 26.6.3",
+      "version_name": "26.6.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000LIVPRIA5",
+      "name": "Red Hat build of Keycloak 26.6.4",
+      "version_name": "26.6.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000LIVPSIA5",
+      "name": "Red Hat build of Keycloak 26.6.5",
+      "version_name": "26.6.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000Lc9CfIAJ",
+      "name": "Red Hat build of Keycloak 26.6.6",
+      "version_name": "26.6.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFPuIAN"
+    },
+    {
+      "id": "01tNr00000HfFQjIAN",
+      "name": "Red Hat Build of Podman Desktop",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000JACEfIAP",
+      "name": "Red Hat Build of Podman Desktop 1.1",
+      "version_name": "1.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFQjIAN"
+    },
+    {
+      "id": "01tNr00000LnrrtIAB",
+      "name": "Red Hat Build of Podman Desktop 1.2",
+      "version_name": "1.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFQjIAN"
+    },
+    {
+      "id": "01tNr00000HfFOoIAN",
+      "name": "Red Hat build of Quarkus",
+      "version_name": "N/A",
+      "family": "Cloud Native App Dev",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfG0xIAF",
+      "name": "Red Hat build of Quarkus 3.15.1",
+      "version_name": "3.15.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfG1KIAV",
+      "name": "Red Hat build of Quarkus 3.15.2",
+      "version_name": "3.15.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfG1hIAF",
+      "name": "Red Hat build of Quarkus 3.15.3",
+      "version_name": "3.15.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfG1qIAF",
+      "name": "Red Hat build of Quarkus 3.15.3.SP1",
+      "version_name": "3.15.3.SP1",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfG26IAF",
+      "name": "Red Hat build of Quarkus 3.15.4",
+      "version_name": "3.15.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfG2qIAF",
+      "name": "Red Hat build of Quarkus 3.15.5",
+      "version_name": "3.15.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfG3SIAV",
+      "name": "Red Hat build of Quarkus 3.15.6",
+      "version_name": "3.15.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfG3WIAV",
+      "name": "Red Hat build of Quarkus 3.15.6.SP1",
+      "version_name": "3.15.6.SP1",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfG5SIAV",
+      "name": "Red Hat build of Quarkus 3.15.7",
+      "version_name": "3.15.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfFj4IAF",
+      "name": "Red Hat build of Quarkus 3.2.10",
+      "version_name": "3.2.10",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfFjXIAV",
+      "name": "Red Hat build of Quarkus 3.2.11",
+      "version_name": "3.2.11",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfFjtIAF",
+      "name": "Red Hat build of Quarkus 3.2.12",
+      "version_name": "3.2.12",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfFlMIAV",
+      "name": "Red Hat build of Quarkus 3.2.12.SP1",
+      "version_name": "3.2.12.SP1",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfFheIAF",
+      "name": "Red Hat build of Quarkus 3.2.6",
+      "version_name": "3.2.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfFiRIAV",
+      "name": "Red Hat build of Quarkus 3.2.9",
+      "version_name": "3.2.9",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfFivIAF",
+      "name": "Red Hat build of Quarkus 3.2.9.SP1",
+      "version_name": "3.2.9.SP1",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfG2PIAV",
+      "name": "Red Hat build of Quarkus 3.20.0",
+      "version_name": "3.20.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfG2pIAF",
+      "name": "Red Hat build of Quarkus 3.20.1",
+      "version_name": "3.20.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfG3TIAV",
+      "name": "Red Hat build of Quarkus 3.20.2",
+      "version_name": "3.20.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfG3XIAV",
+      "name": "Red Hat build of Quarkus 3.20.2.SP1",
+      "version_name": "3.20.2.SP1",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfG5VIAV",
+      "name": "Red Hat build of Quarkus 3.20.3",
+      "version_name": "3.20.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfG67IAF",
+      "name": "Red Hat build of Quarkus 3.20.4",
+      "version_name": "3.20.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfG6UIAV",
+      "name": "Red Hat build of Quarkus 3.20.4.SP1",
+      "version_name": "3.20.4.SP1",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfG6TIAV",
+      "name": "Red Hat build of Quarkus 3.20.5",
+      "version_name": "3.20.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfG5bIAF",
+      "name": "Red Hat build of Quarkus 3.27.0",
+      "version_name": "3.27.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfG66IAF",
+      "name": "Red Hat build of Quarkus 3.27.1",
+      "version_name": "3.27.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfG6SIAV",
+      "name": "Red Hat build of Quarkus 3.27.1.SP1",
+      "version_name": "3.27.1.SP1",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfG6RIAV",
+      "name": "Red Hat build of Quarkus 3.27.2",
+      "version_name": "3.27.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfFjrIAF",
+      "name": "Red Hat build of Quarkus 3.8.3",
+      "version_name": "3.8.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfFjsIAF",
+      "name": "Red Hat build of Quarkus 3.8.4",
+      "version_name": "3.8.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfFkOIAV",
+      "name": "Red Hat build of Quarkus 3.8.5",
+      "version_name": "3.8.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfFkXIAV",
+      "name": "Red Hat build of Quarkus 3.8.5.SP1",
+      "version_name": "3.8.5.SP1",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfFl7IAF",
+      "name": "Red Hat build of Quarkus 3.8.6",
+      "version_name": "3.8.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfFlLIAV",
+      "name": "Red Hat build of Quarkus 3.8.6.SP1",
+      "version_name": "3.8.6.SP1",
+      "family": "",
+      "parent_id": "01tNr00000HfFOoIAN"
+    },
+    {
+      "id": "01tNr00000HfFOIIA3",
+      "name": "Red Hat Ceph Storage",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFbaIAF",
+      "name": "Red Hat Ceph Storage 5.0",
+      "version_name": "5.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFOIIA3"
+    },
+    {
+      "id": "01tNr00000HfFdNIAV",
+      "name": "Red Hat Ceph Storage 5.1",
+      "version_name": "5.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFOIIA3"
+    },
+    {
+      "id": "01tNr00000HfFe3IAF",
+      "name": "Red Hat Ceph Storage 5.2",
+      "version_name": "5.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFOIIA3"
+    },
+    {
+      "id": "01tNr00000HfFfhIAF",
+      "name": "Red Hat Ceph Storage 5.3",
+      "version_name": "5.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFOIIA3"
+    },
+    {
+      "id": "01tNr00000HfFibIAF",
+      "name": "Red Hat Ceph Storage 6.1",
+      "version_name": "6.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFOIIA3"
+    },
+    {
+      "id": "01tNr00000HfFicIAF",
+      "name": "Red Hat Ceph Storage 7.0",
+      "version_name": "7.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFOIIA3"
+    },
+    {
+      "id": "01tNr00000HfG0sIAF",
+      "name": "Red Hat Ceph Storage 7.1",
+      "version_name": "7.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFOIIA3"
+    },
+    {
+      "id": "01tNr00000HfG1GIAV",
+      "name": "Red Hat Ceph Storage 8.0",
+      "version_name": "8.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFOIIA3"
+    },
+    {
+      "id": "01tNr00000HfG31IAF",
+      "name": "Red Hat Ceph Storage 8.1",
+      "version_name": "8.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFOIIA3"
+    },
+    {
+      "id": "01tNr00000HfG6MIAV",
+      "name": "Red Hat Ceph Storage 9.0",
+      "version_name": "9.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFOIIA3"
+    },
+    {
+      "id": "01tNr00000HfFPJIA3",
+      "name": "Red Hat Certificate System",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfG0iIAF",
+      "name": "Red Hat Certificate System 10.1",
+      "version_name": "10.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFPJIA3"
+    },
+    {
+      "id": "01tNr00000HfG0jIAF",
+      "name": "Red Hat Certificate System 10.2",
+      "version_name": "10.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFPJIA3"
+    },
+    {
+      "id": "01tNr00000HfG0kIAF",
+      "name": "Red Hat Certificate System 10.3",
+      "version_name": "10.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFPJIA3"
+    },
+    {
+      "id": "01tNr00000HfG0lIAF",
+      "name": "Red Hat Certificate System 10.4",
+      "version_name": "10.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFPJIA3"
+    },
+    {
+      "id": "01tNr00000HfG0mIAF",
+      "name": "Red Hat Certificate System 10.5",
+      "version_name": "10.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFPJIA3"
+    },
+    {
+      "id": "01tNr00000HfG0nIAF",
+      "name": "Red Hat Certificate System 10.6",
+      "version_name": "10.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFPJIA3"
+    },
+    {
+      "id": "01tNr00000HfG2tIAF",
+      "name": "Red Hat Certificate System 10.8",
+      "version_name": "10.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFPJIA3"
+    },
+    {
+      "id": "01tNr00000KXNQXIA5",
+      "name": "Red Hat Certificate System 11.0",
+      "version_name": "11.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFPJIA3"
+    },
+    {
+      "id": "01tNr00000HfFQdIAN",
+      "name": "Red Hat Connectivity Link",
+      "version_name": "N/A",
+      "family": "Management &amp; Automation",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfG13IAF",
+      "name": "Red Hat Connectivity Link 1.0",
+      "version_name": "1.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFQdIAN"
+    },
+    {
+      "id": "01tNr00000HfG6IIAV",
+      "name": "Red Hat Connectivity Link 1.1",
+      "version_name": "1.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFQdIAN"
+    },
+    {
+      "id": "01tNr00000HfG6JIAV",
+      "name": "Red Hat Connectivity Link 1.2",
+      "version_name": "1.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFQdIAN"
+    },
+    {
+      "id": "01tNr00000I5PQ1IAN",
+      "name": "Red Hat Connectivity Link 1.3",
+      "version_name": "1.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFQdIAN"
+    },
+    {
+      "id": "01tNr00000JjLrlIAF",
+      "name": "Red Hat Connectivity Link 1.4",
+      "version_name": "1.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFQdIAN"
+    },
+    {
+      "id": "01tNr00000HfFOsIAN",
+      "name": "Red Hat Cost Management",
+      "version_name": "N/A",
+      "family": "Management &amp; Automation",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFbyIAF",
+      "name": "Red Hat Cost Management CLOUD",
+      "version_name": "CLOUD",
+      "family": "",
+      "parent_id": "01tNr00000HfFOsIAN"
+    },
+    {
+      "id": "01tNr00000HfFP9IAN",
+      "name": "Red Hat Customer Portal",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFoaIAF",
+      "name": "Red Hat Customer Portal Current Version",
+      "version_name": "Current Version",
+      "family": "",
+      "parent_id": "01tNr00000HfFP9IAN"
+    },
+    {
+      "id": "01tNr00000HfFOLIA3",
+      "name": "Red Hat Data Grid",
+      "version_name": "N/A",
+      "family": "Cloud Native App Dev",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000IHd0zIAD",
+      "name": "Red Hat Data Grid 8.6.0",
+      "version_name": "8.6.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFOLIA3"
+    },
+    {
+      "id": "01tNr00000KGpUUIA1",
+      "name": "Red Hat Data Grid 8.6.1",
+      "version_name": "8.6.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFOLIA3"
+    },
+    {
+      "id": "01tNr00000L6rOvIAJ",
+      "name": "Red Hat Data Grid 8.6.2",
+      "version_name": "8.6.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFOLIA3"
+    },
+    {
+      "id": "01tNr00000HfFPrIAN",
+      "name": "Red Hat Developer Hub",
+      "version_name": "N/A",
+      "family": "Cloud Native App Dev",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000K1hAkIAJ",
+      "name": "Red Hat Developer Hub 1.10",
+      "version_name": "1.10",
+      "family": "",
+      "parent_id": "01tNr00000HfFPrIAN"
+    },
+    {
+      "id": "01tNr00000HfG1OIAV",
+      "name": "Red Hat Developer Hub 1.4",
+      "version_name": "1.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFPrIAN"
+    },
+    {
+      "id": "01tNr00000HfG23IAF",
+      "name": "Red Hat Developer Hub 1.5",
+      "version_name": "1.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFPrIAN"
+    },
+    {
+      "id": "01tNr00000HfG2aIAF",
+      "name": "Red Hat Developer Hub 1.6",
+      "version_name": "1.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFPrIAN"
+    },
+    {
+      "id": "01tNr00000HfG3VIAV",
+      "name": "Red Hat Developer Hub 1.7",
+      "version_name": "1.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFPrIAN"
+    },
+    {
+      "id": "01tNr00000HfG5oIAF",
+      "name": "Red Hat Developer Hub 1.8",
+      "version_name": "1.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFPrIAN"
+    },
+    {
+      "id": "01tNr00000ISNiTIAX",
+      "name": "Red Hat Developer Hub 1.9",
+      "version_name": "1.9",
+      "family": "",
+      "parent_id": "01tNr00000HfFPrIAN"
+    },
+    {
+      "id": "01tNr00000HfFPkIAN",
+      "name": "Red Hat Device Edge",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFfWIAV",
+      "name": "Red Hat Device Edge 4",
+      "version_name": "4",
+      "family": "",
+      "parent_id": "01tNr00000HfFPkIAN"
+    },
+    {
+      "id": "01tNr00000HfFOyIAN",
+      "name": "Red Hat Directory Server",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFWSIA3",
+      "name": "Red Hat Directory Server 11.0",
+      "version_name": "11.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFOyIAN"
+    },
+    {
+      "id": "01tNr00000HfFiiIAF",
+      "name": "Red Hat Directory Server 11.1",
+      "version_name": "11.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFOyIAN"
+    },
+    {
+      "id": "01tNr00000HfFijIAF",
+      "name": "Red Hat Directory Server 11.2",
+      "version_name": "11.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFOyIAN"
+    },
+    {
+      "id": "01tNr00000HfFikIAF",
+      "name": "Red Hat Directory Server 11.3",
+      "version_name": "11.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFOyIAN"
+    },
+    {
+      "id": "01tNr00000HfFihIAF",
+      "name": "Red Hat Directory Server 11.4",
+      "version_name": "11.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFOyIAN"
+    },
+    {
+      "id": "01tNr00000HfFilIAF",
+      "name": "Red Hat Directory Server 11.5",
+      "version_name": "11.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFOyIAN"
+    },
+    {
+      "id": "01tNr00000HfFimIAF",
+      "name": "Red Hat Directory Server 11.6",
+      "version_name": "11.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFOyIAN"
+    },
+    {
+      "id": "01tNr00000HfFinIAF",
+      "name": "Red Hat Directory Server 11.7",
+      "version_name": "11.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFOyIAN"
+    },
+    {
+      "id": "01tNr00000HfG0eIAF",
+      "name": "Red Hat Directory Server 11.8",
+      "version_name": "11.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFOyIAN"
+    },
+    {
+      "id": "01tNr00000HfG0fIAF",
+      "name": "Red Hat Directory Server 11.9",
+      "version_name": "11.9",
+      "family": "",
+      "parent_id": "01tNr00000HfFOyIAN"
+    },
+    {
+      "id": "01tNr00000HfFeSIAV",
+      "name": "Red Hat Directory Server 12.0",
+      "version_name": "12.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFOyIAN"
+    },
+    {
+      "id": "01tNr00000HfFifIAF",
+      "name": "Red Hat Directory Server 12.1",
+      "version_name": "12.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFOyIAN"
+    },
+    {
+      "id": "01tNr00000HfFieIAF",
+      "name": "Red Hat Directory Server 12.2",
+      "version_name": "12.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFOyIAN"
+    },
+    {
+      "id": "01tNr00000HfFigIAF",
+      "name": "Red Hat Directory Server 12.3",
+      "version_name": "12.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFOyIAN"
+    },
+    {
+      "id": "01tNr00000HfG0hIAF",
+      "name": "Red Hat Directory Server 12.4",
+      "version_name": "12.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFOyIAN"
+    },
+    {
+      "id": "01tNr00000HfG2hIAF",
+      "name": "Red Hat Directory Server 12.5",
+      "version_name": "12.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFOyIAN"
+    },
+    {
+      "id": "01tNr00000HfG2iIAF",
+      "name": "Red Hat Directory Server 12.6",
+      "version_name": "12.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFOyIAN"
+    },
+    {
+      "id": "01tNr00000KFYYvIAP",
+      "name": "Red Hat Directory Server 12.7",
+      "version_name": "12.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFOyIAN"
+    },
+    {
+      "id": "01tNr00000KFYYwIAP",
+      "name": "Red Hat Directory Server 12.8",
+      "version_name": "12.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFOyIAN"
+    },
+    {
+      "id": "01tNr00000HfG2jIAF",
+      "name": "Red Hat Directory Server 13.0",
+      "version_name": "13.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFOyIAN"
+    },
+    {
+      "id": "01tNr00000HfG60IAF",
+      "name": "Red Hat Directory Server 13.1",
+      "version_name": "13.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFOyIAN"
+    },
+    {
+      "id": "01tNr00000KFYYxIAP",
+      "name": "Red Hat Directory Server 13.2",
+      "version_name": "13.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFOyIAN"
+    },
+    {
+      "id": "01tNr00000HfFPbIAN",
+      "name": "Red Hat Edge Management",
+      "version_name": "N/A",
+      "family": "Cloud Native App Dev",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFdsIAF",
+      "name": "Red Hat Edge Management Online",
+      "version_name": "Online",
+      "family": "",
+      "parent_id": "01tNr00000HfFPbIAN"
+    },
+    {
+      "id": "01tNr00000HfFQlIAN",
+      "name": "Red Hat Edge Manager",
+      "version_name": "N/A",
+      "family": "",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000LlfekIAB",
+      "name": "Red Hat Edge Manager 1.2",
+      "version_name": "1.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFQlIAN"
+    },
+    {
+      "id": "01tNr00000HfFNyIAN",
+      "name": "Red Hat Enterprise Linux",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfG2gIAF",
+      "name": "Red Hat Enterprise Linux 10.0",
+      "version_name": "10.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000IxFv7IAF",
+      "name": "Red Hat Enterprise Linux 10.2",
+      "version_name": "10.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFucIAF",
+      "name": "Red Hat Enterprise Linux 5 - ELP",
+      "version_name": "5 - ELP",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFosIAF",
+      "name": "Red Hat Enterprise Linux 6.0",
+      "version_name": "6.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFotIAF",
+      "name": "Red Hat Enterprise Linux 6.1",
+      "version_name": "6.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFylIAF",
+      "name": "Red Hat Enterprise Linux 6.10",
+      "version_name": "6.10",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFouIAF",
+      "name": "Red Hat Enterprise Linux 6.2",
+      "version_name": "6.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFpnIAF",
+      "name": "Red Hat Enterprise Linux 6.3",
+      "version_name": "6.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFr8IAF",
+      "name": "Red Hat Enterprise Linux 6.4",
+      "version_name": "6.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFsPIAV",
+      "name": "Red Hat Enterprise Linux 6.5",
+      "version_name": "6.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFtOIAV",
+      "name": "Red Hat Enterprise Linux 6.6",
+      "version_name": "6.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFtPIAV",
+      "name": "Red Hat Enterprise Linux 6.7",
+      "version_name": "6.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfE9CIAV",
+      "name": "Red Hat Enterprise Linux 6.8",
+      "version_name": "6.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFuVIAV",
+      "name": "Red Hat Enterprise Linux 6.9",
+      "version_name": "6.9",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFsSIAV",
+      "name": "Red Hat Enterprise Linux 7.0",
+      "version_name": "7.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFtSIAV",
+      "name": "Red Hat Enterprise Linux 7.1",
+      "version_name": "7.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfE8xIAF",
+      "name": "Red Hat Enterprise Linux 7.2",
+      "version_name": "7.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFuBIAV",
+      "name": "Red Hat Enterprise Linux 7.3",
+      "version_name": "7.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFvYIAV",
+      "name": "Red Hat Enterprise Linux 7.4",
+      "version_name": "7.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFyBIAV",
+      "name": "Red Hat Enterprise Linux 7.5",
+      "version_name": "7.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfG0QIAV",
+      "name": "Red Hat Enterprise Linux 7.6",
+      "version_name": "7.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFR7IAN",
+      "name": "Red Hat Enterprise Linux 7.7",
+      "version_name": "7.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFUaIAN",
+      "name": "Red Hat Enterprise Linux 7.8",
+      "version_name": "7.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFRqIAN",
+      "name": "Red Hat Enterprise Linux 7.9",
+      "version_name": "7.9",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFRHIA3",
+      "name": "Red Hat Enterprise Linux 8.0",
+      "version_name": "8.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFUmIAN",
+      "name": "Red Hat Enterprise Linux 8.1",
+      "version_name": "8.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFjuIAF",
+      "name": "Red Hat Enterprise Linux 8.10",
+      "version_name": "8.10",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFWIIA3",
+      "name": "Red Hat Enterprise Linux 8.2",
+      "version_name": "8.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFYvIAN",
+      "name": "Red Hat Enterprise Linux 8.3",
+      "version_name": "8.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFZDIA3",
+      "name": "Red Hat Enterprise Linux 8.4",
+      "version_name": "8.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFc4IAF",
+      "name": "Red Hat Enterprise Linux 8.5",
+      "version_name": "8.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFdmIAF",
+      "name": "Red Hat Enterprise Linux 8.6",
+      "version_name": "8.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFeoIAF",
+      "name": "Red Hat Enterprise Linux 8.7",
+      "version_name": "8.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFgFIAV",
+      "name": "Red Hat Enterprise Linux 8.8",
+      "version_name": "8.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFhzIAF",
+      "name": "Red Hat Enterprise Linux 8.9",
+      "version_name": "8.9",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFdnIAF",
+      "name": "Red Hat Enterprise Linux 9.0",
+      "version_name": "9.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFezIAF",
+      "name": "Red Hat Enterprise Linux 9.1",
+      "version_name": "9.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFg9IAF",
+      "name": "Red Hat Enterprise Linux 9.2",
+      "version_name": "9.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFhyIAF",
+      "name": "Red Hat Enterprise Linux 9.3",
+      "version_name": "9.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFjhIAF",
+      "name": "Red Hat Enterprise Linux 9.4",
+      "version_name": "9.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfG14IAF",
+      "name": "Red Hat Enterprise Linux 9.5",
+      "version_name": "9.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfG2fIAF",
+      "name": "Red Hat Enterprise Linux 9.6",
+      "version_name": "9.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfG5mIAF",
+      "name": "Red Hat Enterprise Linux 9.7",
+      "version_name": "9.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000IxFv8IAF",
+      "name": "Red Hat Enterprise Linux 9.8",
+      "version_name": "9.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFNyIAN"
+    },
+    {
+      "id": "01tNr00000HfFPzIAN",
+      "name": "Red Hat Enterprise Linux AI",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfG0pIAF",
+      "name": "Red Hat Enterprise Linux AI 1.2",
+      "version_name": "1.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFPzIAN"
+    },
+    {
+      "id": "01tNr00000MJxHSIA1",
+      "name": "Red Hat Enterprise Linux AI 3.4",
+      "version_name": "3.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFPzIAN"
+    },
+    {
+      "id": "01tNr00000MJxHTIA1",
+      "name": "Red Hat Enterprise Linux AI 3.5",
+      "version_name": "3.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFPzIAN"
+    },
+    {
+      "id": "01tNr00000HfFO2IAN",
+      "name": "Red Hat Enterprise Linux for ARM",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFvjIAF",
+      "name": "Red Hat Enterprise Linux for ARM 7.4",
+      "version_name": "7.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFO2IAN"
+    },
+    {
+      "id": "01tNr00000HfFyDIAV",
+      "name": "Red Hat Enterprise Linux for ARM 7.5",
+      "version_name": "7.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFO2IAN"
+    },
+    {
+      "id": "01tNr00000HfES0IAN",
+      "name": "Red Hat Enterprise Linux for ARM 7.6",
+      "version_name": "7.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFO2IAN"
+    },
+    {
+      "id": "01tNr00000HfFOHIA3",
+      "name": "Red Hat Enterprise Linux for IBM System z (Structure A)",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFyIIAV",
+      "name": "Red Hat Enterprise Linux for IBM System z (Structure A) 7.5",
+      "version_name": "7.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFOHIA3"
+    },
+    {
+      "id": "01tNr00000MJxFpIAL",
+      "name": "Red Hat Enterprise Linux for NVIDIA",
+      "version_name": "N/A",
+      "family": "",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000MJxHZIA1",
+      "name": "Red Hat Enterprise Linux for NVIDIA 26.03",
+      "version_name": "26.03",
+      "family": "",
+      "parent_id": "01tNr00000MJxFpIAL"
+    },
+    {
+      "id": "01tNr00000HfFOUIA3",
+      "name": "Red Hat Enterprise Linux for Power LE (POWER9)",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFvkIAF",
+      "name": "Red Hat Enterprise Linux for Power LE (POWER9) 7.4",
+      "version_name": "7.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFOUIA3"
+    },
+    {
+      "id": "01tNr00000HfFy8IAF",
+      "name": "Red Hat Enterprise Linux for Power LE (POWER9) 7.5",
+      "version_name": "7.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFOUIA3"
+    },
+    {
+      "id": "01tNr00000HfFR8IAN",
+      "name": "Red Hat Enterprise Linux for Power LE (POWER9) 7.6",
+      "version_name": "7.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFOUIA3"
+    },
+    {
+      "id": "01tNr00000HfFO3IAN",
+      "name": "Red Hat Enterprise Linux for Real Time",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFtvIAF",
+      "name": "Red Hat Enterprise Linux for Real Time 7.1",
+      "version_name": "7.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO3IAN"
+    },
+    {
+      "id": "01tNr00000HfFuYIAV",
+      "name": "Red Hat Enterprise Linux for Real Time 7.2",
+      "version_name": "7.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFO3IAN"
+    },
+    {
+      "id": "01tNr00000HfFuZIAV",
+      "name": "Red Hat Enterprise Linux for Real Time 7.3",
+      "version_name": "7.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFO3IAN"
+    },
+    {
+      "id": "01tNr00000HfFyEIAV",
+      "name": "Red Hat Enterprise Linux for Real Time 7.4",
+      "version_name": "7.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFO3IAN"
+    },
+    {
+      "id": "01tNr00000HfFyFIAV",
+      "name": "Red Hat Enterprise Linux for Real Time 7.5",
+      "version_name": "7.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFO3IAN"
+    },
+    {
+      "id": "01tNr00000HfES1IAN",
+      "name": "Red Hat Enterprise Linux for Real Time 7.6",
+      "version_name": "7.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFO3IAN"
+    },
+    {
+      "id": "01tNr00000HfES2IAN",
+      "name": "Red Hat Enterprise Linux for Real Time 7.7",
+      "version_name": "7.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFO3IAN"
+    },
+    {
+      "id": "01tNr00000HfFRrIAN",
+      "name": "Red Hat Enterprise Linux for Real Time 7.8",
+      "version_name": "7.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFO3IAN"
+    },
+    {
+      "id": "01tNr00000HfFYkIAN",
+      "name": "Red Hat Enterprise Linux for Real Time 7.9",
+      "version_name": "7.9",
+      "family": "",
+      "parent_id": "01tNr00000HfFO3IAN"
+    },
+    {
+      "id": "01tNr00000HfFS4IAN",
+      "name": "Red Hat Enterprise Linux for Real Time 8.0",
+      "version_name": "8.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO3IAN"
+    },
+    {
+      "id": "01tNr00000HfFS5IAN",
+      "name": "Red Hat Enterprise Linux for Real Time 8.1",
+      "version_name": "8.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO3IAN"
+    },
+    {
+      "id": "01tNr00000HfFjwIAF",
+      "name": "Red Hat Enterprise Linux for Real Time 8.10",
+      "version_name": "8.10",
+      "family": "",
+      "parent_id": "01tNr00000HfFO3IAN"
+    },
+    {
+      "id": "01tNr00000HfFS6IAN",
+      "name": "Red Hat Enterprise Linux for Real Time 8.2",
+      "version_name": "8.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFO3IAN"
+    },
+    {
+      "id": "01tNr00000HfFbNIAV",
+      "name": "Red Hat Enterprise Linux for Real Time 8.3",
+      "version_name": "8.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFO3IAN"
+    },
+    {
+      "id": "01tNr00000HfFbOIAV",
+      "name": "Red Hat Enterprise Linux for Real Time 8.4",
+      "version_name": "8.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFO3IAN"
+    },
+    {
+      "id": "01tNr00000HfFdHIAV",
+      "name": "Red Hat Enterprise Linux for Real Time 8.5",
+      "version_name": "8.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFO3IAN"
+    },
+    {
+      "id": "01tNr00000HfFgGIAV",
+      "name": "Red Hat Enterprise Linux for Real Time 8.6",
+      "version_name": "8.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFO3IAN"
+    },
+    {
+      "id": "01tNr00000HfFgHIAV",
+      "name": "Red Hat Enterprise Linux for Real Time 8.7",
+      "version_name": "8.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFO3IAN"
+    },
+    {
+      "id": "01tNr00000HfFgIIAV",
+      "name": "Red Hat Enterprise Linux for Real Time 8.8",
+      "version_name": "8.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFO3IAN"
+    },
+    {
+      "id": "01tNr00000HfFi2IAF",
+      "name": "Red Hat Enterprise Linux for Real Time 8.9",
+      "version_name": "8.9",
+      "family": "",
+      "parent_id": "01tNr00000HfFO3IAN"
+    },
+    {
+      "id": "01tNr00000HfFO4IAN",
+      "name": "Red Hat Enterprise Linux for SAP Applications",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfES3IAN",
+      "name": "Red Hat Enterprise Linux for SAP Applications 6.10",
+      "version_name": "6.10",
+      "family": "",
+      "parent_id": "01tNr00000HfFO4IAN"
+    },
+    {
+      "id": "01tNr00000HfFz1IAF",
+      "name": "Red Hat Enterprise Linux for SAP Applications 7.2",
+      "version_name": "7.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFO4IAN"
+    },
+    {
+      "id": "01tNr00000HfFz2IAF",
+      "name": "Red Hat Enterprise Linux for SAP Applications 7.3",
+      "version_name": "7.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFO4IAN"
+    },
+    {
+      "id": "01tNr00000HfFz3IAF",
+      "name": "Red Hat Enterprise Linux for SAP Applications 7.4",
+      "version_name": "7.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFO4IAN"
+    },
+    {
+      "id": "01tNr00000HfFz4IAF",
+      "name": "Red Hat Enterprise Linux for SAP Applications 7.5",
+      "version_name": "7.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFO4IAN"
+    },
+    {
+      "id": "01tNr00000HfES4IAN",
+      "name": "Red Hat Enterprise Linux for SAP Applications 7.6",
+      "version_name": "7.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFO4IAN"
+    },
+    {
+      "id": "01tNr00000HfES5IAN",
+      "name": "Red Hat Enterprise Linux for SAP Applications 7.7",
+      "version_name": "7.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFO4IAN"
+    },
+    {
+      "id": "01tNr00000HfFRsIAN",
+      "name": "Red Hat Enterprise Linux for SAP Applications 7.8",
+      "version_name": "7.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFO4IAN"
+    },
+    {
+      "id": "01tNr00000HfFYnIAN",
+      "name": "Red Hat Enterprise Linux for SAP Applications 7.9",
+      "version_name": "7.9",
+      "family": "",
+      "parent_id": "01tNr00000HfFO4IAN"
+    },
+    {
+      "id": "01tNr00000HfFSAIA3",
+      "name": "Red Hat Enterprise Linux for SAP Applications 8.0",
+      "version_name": "8.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO4IAN"
+    },
+    {
+      "id": "01tNr00000HfFSBIA3",
+      "name": "Red Hat Enterprise Linux for SAP Applications 8.1",
+      "version_name": "8.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO4IAN"
+    },
+    {
+      "id": "01tNr00000HfFSCIA3",
+      "name": "Red Hat Enterprise Linux for SAP Applications 8.2",
+      "version_name": "8.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFO4IAN"
+    },
+    {
+      "id": "01tNr00000HfFbQIAV",
+      "name": "Red Hat Enterprise Linux for SAP Applications 8.3",
+      "version_name": "8.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFO4IAN"
+    },
+    {
+      "id": "01tNr00000HfFbRIAV",
+      "name": "Red Hat Enterprise Linux for SAP Applications 8.4",
+      "version_name": "8.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFO4IAN"
+    },
+    {
+      "id": "01tNr00000HfFdIIAV",
+      "name": "Red Hat Enterprise Linux for SAP Applications 8.5",
+      "version_name": "8.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFO4IAN"
+    },
+    {
+      "id": "01tNr00000HfFO5IAN",
+      "name": "Red Hat Enterprise Linux for SAP HANA",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfES6IAN",
+      "name": "Red Hat Enterprise Linux for SAP HANA 6.10",
+      "version_name": "6.10",
+      "family": "",
+      "parent_id": "01tNr00000HfFO5IAN"
+    },
+    {
+      "id": "01tNr00000HfFt3IAF",
+      "name": "Red Hat Enterprise Linux for SAP HANA 6.5",
+      "version_name": "6.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFO5IAN"
+    },
+    {
+      "id": "01tNr00000HfFlUIAV",
+      "name": "Red Hat Enterprise Linux for SAP HANA 6.6",
+      "version_name": "6.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFO5IAN"
+    },
+    {
+      "id": "01tNr00000HfFvDIAV",
+      "name": "Red Hat Enterprise Linux for SAP HANA 6.7",
+      "version_name": "6.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFO5IAN"
+    },
+    {
+      "id": "01tNr00000HfFvEIAV",
+      "name": "Red Hat Enterprise Linux for SAP HANA 7.1",
+      "version_name": "7.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO5IAN"
+    },
+    {
+      "id": "01tNr00000HfFvFIAV",
+      "name": "Red Hat Enterprise Linux for SAP HANA 7.2",
+      "version_name": "7.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFO5IAN"
+    },
+    {
+      "id": "01tNr00000HfFvGIAV",
+      "name": "Red Hat Enterprise Linux for SAP HANA 7.3",
+      "version_name": "7.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFO5IAN"
+    },
+    {
+      "id": "01tNr00000HfFyGIAV",
+      "name": "Red Hat Enterprise Linux for SAP HANA 7.4",
+      "version_name": "7.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFO5IAN"
+    },
+    {
+      "id": "01tNr00000HfFyHIAV",
+      "name": "Red Hat Enterprise Linux for SAP HANA 7.5",
+      "version_name": "7.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFO5IAN"
+    },
+    {
+      "id": "01tNr00000HfES7IAN",
+      "name": "Red Hat Enterprise Linux for SAP HANA 7.6",
+      "version_name": "7.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFO5IAN"
+    },
+    {
+      "id": "01tNr00000HfES8IAN",
+      "name": "Red Hat Enterprise Linux for SAP HANA 7.7",
+      "version_name": "7.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFO5IAN"
+    },
+    {
+      "id": "01tNr00000HfFRtIAN",
+      "name": "Red Hat Enterprise Linux for SAP HANA 7.8",
+      "version_name": "7.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFO5IAN"
+    },
+    {
+      "id": "01tNr00000HfFYmIAN",
+      "name": "Red Hat Enterprise Linux for SAP HANA 7.9",
+      "version_name": "7.9",
+      "family": "",
+      "parent_id": "01tNr00000HfFO5IAN"
+    },
+    {
+      "id": "01tNr00000HfFO6IAN",
+      "name": "Red Hat Enterprise Linux for SAP Solutions",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfES9IAN",
+      "name": "Red Hat Enterprise Linux for SAP Solutions 6.10",
+      "version_name": "6.10",
+      "family": "",
+      "parent_id": "01tNr00000HfFO6IAN"
+    },
+    {
+      "id": "01tNr00000HfFyrIAF",
+      "name": "Red Hat Enterprise Linux for SAP Solutions 7.2",
+      "version_name": "7.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFO6IAN"
+    },
+    {
+      "id": "01tNr00000HfFysIAF",
+      "name": "Red Hat Enterprise Linux for SAP Solutions 7.3",
+      "version_name": "7.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFO6IAN"
+    },
+    {
+      "id": "01tNr00000HfFytIAF",
+      "name": "Red Hat Enterprise Linux for SAP Solutions 7.4",
+      "version_name": "7.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFO6IAN"
+    },
+    {
+      "id": "01tNr00000HfFyuIAF",
+      "name": "Red Hat Enterprise Linux for SAP Solutions 7.5",
+      "version_name": "7.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFO6IAN"
+    },
+    {
+      "id": "01tNr00000HfESAIA3",
+      "name": "Red Hat Enterprise Linux for SAP Solutions 7.6",
+      "version_name": "7.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFO6IAN"
+    },
+    {
+      "id": "01tNr00000HfESBIA3",
+      "name": "Red Hat Enterprise Linux for SAP Solutions 7.7",
+      "version_name": "7.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFO6IAN"
+    },
+    {
+      "id": "01tNr00000HfFRuIAN",
+      "name": "Red Hat Enterprise Linux for SAP Solutions 7.8",
+      "version_name": "7.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFO6IAN"
+    },
+    {
+      "id": "01tNr00000HfFYlIAN",
+      "name": "Red Hat Enterprise Linux for SAP Solutions 7.9",
+      "version_name": "7.9",
+      "family": "",
+      "parent_id": "01tNr00000HfFO6IAN"
+    },
+    {
+      "id": "01tNr00000HfFS7IAN",
+      "name": "Red Hat Enterprise Linux for SAP Solutions 8.0",
+      "version_name": "8.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO6IAN"
+    },
+    {
+      "id": "01tNr00000HfFS8IAN",
+      "name": "Red Hat Enterprise Linux for SAP Solutions 8.1",
+      "version_name": "8.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO6IAN"
+    },
+    {
+      "id": "01tNr00000HfFjvIAF",
+      "name": "Red Hat Enterprise Linux for SAP Solutions 8.10",
+      "version_name": "8.10",
+      "family": "",
+      "parent_id": "01tNr00000HfFO6IAN"
+    },
+    {
+      "id": "01tNr00000HfFS9IAN",
+      "name": "Red Hat Enterprise Linux for SAP Solutions 8.2",
+      "version_name": "8.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFO6IAN"
+    },
+    {
+      "id": "01tNr00000HfFbPIAV",
+      "name": "Red Hat Enterprise Linux for SAP Solutions 8.4",
+      "version_name": "8.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFO6IAN"
+    },
+    {
+      "id": "01tNr00000HfFdJIAV",
+      "name": "Red Hat Enterprise Linux for SAP Solutions 8.5",
+      "version_name": "8.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFO6IAN"
+    },
+    {
+      "id": "01tNr00000HfFgJIAV",
+      "name": "Red Hat Enterprise Linux for SAP Solutions 8.6",
+      "version_name": "8.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFO6IAN"
+    },
+    {
+      "id": "01tNr00000HfFgKIAV",
+      "name": "Red Hat Enterprise Linux for SAP Solutions 8.7",
+      "version_name": "8.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFO6IAN"
+    },
+    {
+      "id": "01tNr00000HfFgLIAV",
+      "name": "Red Hat Enterprise Linux for SAP Solutions 8.8",
+      "version_name": "8.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFO6IAN"
+    },
+    {
+      "id": "01tNr00000HfFi0IAF",
+      "name": "Red Hat Enterprise Linux for SAP Solutions 8.9",
+      "version_name": "8.9",
+      "family": "",
+      "parent_id": "01tNr00000HfFO6IAN"
+    },
+    {
+      "id": "01tNr00000HfFgMIAV",
+      "name": "Red Hat Enterprise Linux for SAP Solutions 9.0",
+      "version_name": "9.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO6IAN"
+    },
+    {
+      "id": "01tNr00000HfFgNIAV",
+      "name": "Red Hat Enterprise Linux for SAP Solutions 9.1",
+      "version_name": "9.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO6IAN"
+    },
+    {
+      "id": "01tNr00000HfFgOIAV",
+      "name": "Red Hat Enterprise Linux for SAP Solutions 9.2",
+      "version_name": "9.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFO6IAN"
+    },
+    {
+      "id": "01tNr00000HfFi1IAF",
+      "name": "Red Hat Enterprise Linux for SAP Solutions 9.3",
+      "version_name": "9.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFO6IAN"
+    },
+    {
+      "id": "01tNr00000HfFjiIAF",
+      "name": "Red Hat Enterprise Linux for SAP Solutions 9.4",
+      "version_name": "9.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFO6IAN"
+    },
+    {
+      "id": "01tNr00000LBs5qIAD",
+      "name": "Red Hat Enterprise Linux for SAP Solutions 9.5",
+      "version_name": "9.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFO6IAN"
+    },
+    {
+      "id": "01tNr00000LBs5rIAD",
+      "name": "Red Hat Enterprise Linux for SAP Solutions 9.6",
+      "version_name": "9.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFO6IAN"
+    },
+    {
+      "id": "01tNr00000LBs5sIAD",
+      "name": "Red Hat Enterprise Linux for SAP Solutions 9.7",
+      "version_name": "9.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFO6IAN"
+    },
+    {
+      "id": "01tNr00000LBs5tIAD",
+      "name": "Red Hat Enterprise Linux for SAP Solutions 9.8",
+      "version_name": "9.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFO6IAN"
+    },
+    {
+      "id": "01tNr00000HfFP7IAN",
+      "name": "Red Hat Enterprise MRG Messaging",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFsyIAF",
+      "name": "Red Hat Enterprise MRG Messaging 2.5",
+      "version_name": "2.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFP7IAN"
+    },
+    {
+      "id": "01tNr00000HfFlaIAF",
+      "name": "Red Hat Enterprise MRG Messaging 3.2",
+      "version_name": "3.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFP7IAN"
+    },
+    {
+      "id": "01tNr00000HfFO8IAN",
+      "name": "Red Hat Fuse",
+      "version_name": "N/A",
+      "family": "Cloud Native App Dev",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFzNIAV",
+      "name": "Red Hat Fuse 7.0",
+      "version_name": "7.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO8IAN"
+    },
+    {
+      "id": "01tNr00000HfFzkIAF",
+      "name": "Red Hat Fuse 7.0.1",
+      "version_name": "7.0.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO8IAN"
+    },
+    {
+      "id": "01tNr00000HfG01IAF",
+      "name": "Red Hat Fuse 7.1.0",
+      "version_name": "7.1.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO8IAN"
+    },
+    {
+      "id": "01tNr00000HfFcQIAV",
+      "name": "Red Hat Fuse 7.10.0",
+      "version_name": "7.10.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO8IAN"
+    },
+    {
+      "id": "01tNr00000HfFd5IAF",
+      "name": "Red Hat Fuse 7.10.1",
+      "version_name": "7.10.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO8IAN"
+    },
+    {
+      "id": "01tNr00000HfFdhIAF",
+      "name": "Red Hat Fuse 7.10.2",
+      "version_name": "7.10.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFO8IAN"
+    },
+    {
+      "id": "01tNr00000HfFeGIAV",
+      "name": "Red Hat Fuse 7.11.0",
+      "version_name": "7.11.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO8IAN"
+    },
+    {
+      "id": "01tNr00000HfFf5IAF",
+      "name": "Red Hat Fuse 7.11.1",
+      "version_name": "7.11.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO8IAN"
+    },
+    {
+      "id": "01tNr00000HfFgmIAF",
+      "name": "Red Hat Fuse 7.12.0",
+      "version_name": "7.12.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO8IAN"
+    },
+    {
+      "id": "01tNr00000HfFiKIAV",
+      "name": "Red Hat Fuse 7.12.1",
+      "version_name": "7.12.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO8IAN"
+    },
+    {
+      "id": "01tNr00000HfFjzIAF",
+      "name": "Red Hat Fuse 7.13.0",
+      "version_name": "7.13.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO8IAN"
+    },
+    {
+      "id": "01tNr00000HfESOIA3",
+      "name": "Red Hat Fuse 7.2.0",
+      "version_name": "7.2.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO8IAN"
+    },
+    {
+      "id": "01tNr00000HfETPIA3",
+      "name": "Red Hat Fuse 7.3.0",
+      "version_name": "7.3.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO8IAN"
+    },
+    {
+      "id": "01tNr00000HfFRcIAN",
+      "name": "Red Hat Fuse 7.3.1",
+      "version_name": "7.3.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO8IAN"
+    },
+    {
+      "id": "01tNr00000HfESDIA3",
+      "name": "Red Hat Fuse 7.4.0",
+      "version_name": "7.4.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO8IAN"
+    },
+    {
+      "id": "01tNr00000HfFUrIAN",
+      "name": "Red Hat Fuse 7.5.0",
+      "version_name": "7.5.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO8IAN"
+    },
+    {
+      "id": "01tNr00000HfFVzIAN",
+      "name": "Red Hat Fuse 7.6.0",
+      "version_name": "7.6.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO8IAN"
+    },
+    {
+      "id": "01tNr00000HfFWtIAN",
+      "name": "Red Hat Fuse 7.7.0",
+      "version_name": "7.7.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO8IAN"
+    },
+    {
+      "id": "01tNr00000HfFacIAF",
+      "name": "Red Hat Fuse 7.8.0",
+      "version_name": "7.8.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO8IAN"
+    },
+    {
+      "id": "01tNr00000HfFbSIAV",
+      "name": "Red Hat Fuse 7.9.0",
+      "version_name": "7.9.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO8IAN"
+    },
+    {
+      "id": "01tNr00000HfFQhIAN",
+      "name": "Red Hat In-Vehicle Operating System",
+      "version_name": "N/A",
+      "family": "Other",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfG34IAF",
+      "name": "Red Hat In-Vehicle Operating System 1.0",
+      "version_name": "1.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFQhIAN"
+    },
+    {
+      "id": "01tNr00000HfFO9IAN",
+      "name": "Red Hat JBoss Enterprise Application Platform",
+      "version_name": "N/A",
+      "family": "Cloud Native App Dev",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFq9IAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.0.0",
+      "version_name": "6.0.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFr0IAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.0.1",
+      "version_name": "6.0.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFrrIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.1.0",
+      "version_name": "6.1.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFsBIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.1.1",
+      "version_name": "6.1.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFsRIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.2.0",
+      "version_name": "6.2.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFshIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.2.1",
+      "version_name": "6.2.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFsoIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.2.2",
+      "version_name": "6.2.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFt1IAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.2.3",
+      "version_name": "6.2.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFt6IAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.2.4",
+      "version_name": "6.2.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFtMIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.3.0",
+      "version_name": "6.3.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFtaIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.3.1",
+      "version_name": "6.3.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFteIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.3.2",
+      "version_name": "6.3.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFu3IAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.3.3",
+      "version_name": "6.3.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfE8XIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.4.0",
+      "version_name": "6.4.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfE8eIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.4.1",
+      "version_name": "6.4.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfE9vIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.4.10",
+      "version_name": "6.4.10",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfEA3IAN",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.4.11",
+      "version_name": "6.4.11",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFuIIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.4.12",
+      "version_name": "6.4.12",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFuaIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.4.13",
+      "version_name": "6.4.13",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFuqIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.4.14",
+      "version_name": "6.4.14",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFv7IAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.4.15",
+      "version_name": "6.4.15",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFvOIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.4.16",
+      "version_name": "6.4.16",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFxUIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.4.17",
+      "version_name": "6.4.17",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFxrIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.4.18",
+      "version_name": "6.4.18",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFyQIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.4.19",
+      "version_name": "6.4.19",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfE8pIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.4.2",
+      "version_name": "6.4.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFzIIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.4.20",
+      "version_name": "6.4.20",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfG07IAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.4.21",
+      "version_name": "6.4.21",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFRJIA3",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.4.22",
+      "version_name": "6.4.22",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFWeIAN",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.4.23",
+      "version_name": "6.4.23",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFeBIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.4.24",
+      "version_name": "6.4.24",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfE8vIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.4.3",
+      "version_name": "6.4.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfE8yIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.4.4",
+      "version_name": "6.4.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFlcIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.4.5",
+      "version_name": "6.4.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfE95IAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.4.6",
+      "version_name": "6.4.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfE9FIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.4.7",
+      "version_name": "6.4.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfE9SIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.4.8",
+      "version_name": "6.4.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfE9jIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 6.4.9",
+      "version_name": "6.4.9",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfE9OIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.0.0",
+      "version_name": "7.0.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfE9kIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.0.1",
+      "version_name": "7.0.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfE9wIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.0.2",
+      "version_name": "7.0.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFuEIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.0.3",
+      "version_name": "7.0.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFuWIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.0.4",
+      "version_name": "7.0.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFurIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.0.5",
+      "version_name": "7.0.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFvLIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.0.6",
+      "version_name": "7.0.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFvZIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.0.7",
+      "version_name": "7.0.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFxZIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.0.8",
+      "version_name": "7.0.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFyJIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.0.9",
+      "version_name": "7.0.9",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFy3IAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.1.0",
+      "version_name": "7.1.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFyXIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.1.1",
+      "version_name": "7.1.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFypIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.1.2",
+      "version_name": "7.1.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFzUIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.1.3",
+      "version_name": "7.1.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFzrIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.1.4",
+      "version_name": "7.1.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfG0TIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.1.5",
+      "version_name": "7.1.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfESxIAN",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.1.6",
+      "version_name": "7.1.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfESZIA3",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.2.0",
+      "version_name": "7.2.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFRIIA3",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.2.1",
+      "version_name": "7.2.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFRWIA3",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.2.2",
+      "version_name": "7.2.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfESEIA3",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.2.3",
+      "version_name": "7.2.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFSUIA3",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.2.4",
+      "version_name": "7.2.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFUvIAN",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.2.5",
+      "version_name": "7.2.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFVUIA3",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.2.6",
+      "version_name": "7.2.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFVlIAN",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.2.7",
+      "version_name": "7.2.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFW5IAN",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.2.8",
+      "version_name": "7.2.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFXCIA3",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.2.9",
+      "version_name": "7.2.9",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFVxIAN",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.3.0",
+      "version_name": "7.3.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFWRIA3",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.3.1",
+      "version_name": "7.3.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFcNIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.3.10",
+      "version_name": "7.3.10",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFX3IAN",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.3.2",
+      "version_name": "7.3.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFYqIAN",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.3.3",
+      "version_name": "7.3.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFaMIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.3.4",
+      "version_name": "7.3.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFatIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.3.5",
+      "version_name": "7.3.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFbEIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.3.6",
+      "version_name": "7.3.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFZoIAN",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.3.7",
+      "version_name": "7.3.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFa7IAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.3.8",
+      "version_name": "7.3.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFbcIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.3.9",
+      "version_name": "7.3.9",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFa8IAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.4.0",
+      "version_name": "7.4.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFbjIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.4.1",
+      "version_name": "7.4.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFemIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.4.10",
+      "version_name": "7.4.10",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFgSIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.4.11",
+      "version_name": "7.4.11",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFgwIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.4.12",
+      "version_name": "7.4.12",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFhkIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.4.13",
+      "version_name": "7.4.13",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFiSIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.4.14",
+      "version_name": "7.4.14",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFj3IAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.4.15",
+      "version_name": "7.4.15",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFjWIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.4.16",
+      "version_name": "7.4.16",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFk4IAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.4.17",
+      "version_name": "7.4.17",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFkmIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.4.18",
+      "version_name": "7.4.18",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFlNIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.4.19",
+      "version_name": "7.4.19",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFc9IAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.4.2",
+      "version_name": "7.4.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfG1NIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.4.20",
+      "version_name": "7.4.20",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfG1oIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.4.21",
+      "version_name": "7.4.21",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfG2QIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.4.22",
+      "version_name": "7.4.22",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfG35IAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.4.23",
+      "version_name": "7.4.23",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000M3y9RIAR",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.4.24",
+      "version_name": "7.4.24",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000M3y9SIAR",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.4.25",
+      "version_name": "7.4.25",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFceIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.4.3",
+      "version_name": "7.4.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFdVIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.4.4",
+      "version_name": "7.4.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFdDIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.4.5",
+      "version_name": "7.4.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFeMIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.4.6",
+      "version_name": "7.4.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFebIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.4.7",
+      "version_name": "7.4.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFf8IAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.4.8",
+      "version_name": "7.4.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFfXIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 7.4.9",
+      "version_name": "7.4.9",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000M6ne8IAB",
+      "name": "Red Hat JBoss Enterprise Application Platform 8.0",
+      "version_name": "8.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFj1IAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 8.0.0",
+      "version_name": "8.0.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFjBIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 8.0.1",
+      "version_name": "8.0.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfG5YIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 8.0.10",
+      "version_name": "8.0.10",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000IHd10IAD",
+      "name": "Red Hat JBoss Enterprise Application Platform 8.0.11",
+      "version_name": "8.0.11",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000IHd11IAD",
+      "name": "Red Hat JBoss Enterprise Application Platform 8.0.12",
+      "version_name": "8.0.12",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFk8IAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 8.0.2",
+      "version_name": "8.0.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFkqIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 8.0.3",
+      "version_name": "8.0.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfG0uIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 8.0.4",
+      "version_name": "8.0.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfG1VIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 8.0.5",
+      "version_name": "8.0.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfG1rIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 8.0.6",
+      "version_name": "8.0.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfG1wIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 8.0.7",
+      "version_name": "8.0.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfG3HIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 8.0.8",
+      "version_name": "8.0.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfG3ZIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 8.0.9",
+      "version_name": "8.0.9",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000M6ne9IAB",
+      "name": "Red Hat JBoss Enterprise Application Platform 8.1",
+      "version_name": "8.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfG3aIAF",
+      "name": "Red Hat JBoss Enterprise Application Platform 8.1.0",
+      "version_name": "8.1.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfG5XIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 8.1.1",
+      "version_name": "8.1.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfG6KIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 8.1.2",
+      "version_name": "8.1.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfG6LIAV",
+      "name": "Red Hat JBoss Enterprise Application Platform 8.1.3",
+      "version_name": "8.1.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HlZBqIAN",
+      "name": "Red Hat JBoss Enterprise Application Platform 8.1.4",
+      "version_name": "8.1.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000IHd12IAD",
+      "name": "Red Hat JBoss Enterprise Application Platform 8.1.5",
+      "version_name": "8.1.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000M3y9TIAR",
+      "name": "Red Hat JBoss Enterprise Application Platform 8.1.6",
+      "version_name": "8.1.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000M3y9UIAR",
+      "name": "Red Hat JBoss Enterprise Application Platform 8.1.7",
+      "version_name": "8.1.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000MVRnGIAX",
+      "name": "Red Hat JBoss Enterprise Application Platform 8.1.8",
+      "version_name": "8.1.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000M6neAIAR",
+      "name": "Red Hat JBoss Enterprise Application Platform 8.2 Beta",
+      "version_name": "8.2 Beta",
+      "family": "",
+      "parent_id": "01tNr00000HfFO9IAN"
+    },
+    {
+      "id": "01tNr00000HfFNxIAN",
+      "name": "Red Hat JBoss Web Server",
+      "version_name": "N/A",
+      "family": "Cloud Native App Dev",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFWOIA3",
+      "name": "Red Hat JBoss Web Server 3.1.9",
+      "version_name": "3.1.9",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFzZIAV",
+      "name": "Red Hat JBoss Web Server 5.0",
+      "version_name": "5.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfG05IAF",
+      "name": "Red Hat JBoss Web Server 5.0.1",
+      "version_name": "5.0.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFRkIAN",
+      "name": "Red Hat JBoss Web Server 5.0.2",
+      "version_name": "5.0.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfERvIAN",
+      "name": "Red Hat JBoss Web Server 5.0.3",
+      "version_name": "5.0.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFRjIAN",
+      "name": "Red Hat JBoss Web Server 5.1.0",
+      "version_name": "5.1.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFUsIAN",
+      "name": "Red Hat JBoss Web Server 5.2.0",
+      "version_name": "5.2.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFWDIA3",
+      "name": "Red Hat JBoss Web Server 5.3.0",
+      "version_name": "5.3.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFWNIA3",
+      "name": "Red Hat JBoss Web Server 5.3.1",
+      "version_name": "5.3.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFX0IAN",
+      "name": "Red Hat JBoss Web Server 5.3.2",
+      "version_name": "5.3.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFaJIAV",
+      "name": "Red Hat JBoss Web Server 5.4.0",
+      "version_name": "5.4.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFb3IAF",
+      "name": "Red Hat JBoss Web Server 5.4.1",
+      "version_name": "5.4.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFZNIA3",
+      "name": "Red Hat JBoss Web Server 5.4.2",
+      "version_name": "5.4.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFa3IAF",
+      "name": "Red Hat JBoss Web Server 5.5.0",
+      "version_name": "5.5.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFblIAF",
+      "name": "Red Hat JBoss Web Server 5.5.1",
+      "version_name": "5.5.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFcHIAV",
+      "name": "Red Hat JBoss Web Server 5.6.0",
+      "version_name": "5.6.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFctIAF",
+      "name": "Red Hat JBoss Web Server 5.6.1",
+      "version_name": "5.6.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFdrIAF",
+      "name": "Red Hat JBoss Web Server 5.6.2",
+      "version_name": "5.6.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFeiIAF",
+      "name": "Red Hat JBoss Web Server 5.7.0",
+      "version_name": "5.7.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFfCIAV",
+      "name": "Red Hat JBoss Web Server 5.7.1",
+      "version_name": "5.7.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFfxIAF",
+      "name": "Red Hat JBoss Web Server 5.7.2",
+      "version_name": "5.7.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFgZIAV",
+      "name": "Red Hat JBoss Web Server 5.7.3",
+      "version_name": "5.7.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFhPIAV",
+      "name": "Red Hat JBoss Web Server 5.7.4",
+      "version_name": "5.7.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFhnIAF",
+      "name": "Red Hat JBoss Web Server 5.7.5",
+      "version_name": "5.7.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFhuIAF",
+      "name": "Red Hat JBoss Web Server 5.7.6",
+      "version_name": "5.7.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFiVIAV",
+      "name": "Red Hat JBoss Web Server 5.7.7",
+      "version_name": "5.7.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFjFIAV",
+      "name": "Red Hat JBoss Web Server 5.7.8",
+      "version_name": "5.7.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFjpIAF",
+      "name": "Red Hat JBoss Web Server 5.8.0",
+      "version_name": "5.8.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFkkIAF",
+      "name": "Red Hat JBoss Web Server 5.8.1",
+      "version_name": "5.8.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfG1aIAF",
+      "name": "Red Hat JBoss Web Server 5.8.2",
+      "version_name": "5.8.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfG27IAF",
+      "name": "Red Hat JBoss Web Server 5.8.3",
+      "version_name": "5.8.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfG2VIAV",
+      "name": "Red Hat JBoss Web Server 5.8.4",
+      "version_name": "5.8.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfG3EIAV",
+      "name": "Red Hat JBoss Web Server 5.8.5",
+      "version_name": "5.8.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfG6CIAV",
+      "name": "Red Hat JBoss Web Server 5.8.6",
+      "version_name": "5.8.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFhvIAF",
+      "name": "Red Hat JBoss Web Server 6.0",
+      "version_name": "6.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFjHIAV",
+      "name": "Red Hat JBoss Web Server 6.0.1",
+      "version_name": "6.0.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFjqIAF",
+      "name": "Red Hat JBoss Web Server 6.0.2",
+      "version_name": "6.0.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFklIAF",
+      "name": "Red Hat JBoss Web Server 6.0.3",
+      "version_name": "6.0.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFlAIAV",
+      "name": "Red Hat JBoss Web Server 6.0.4",
+      "version_name": "6.0.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfG1cIAF",
+      "name": "Red Hat JBoss Web Server 6.0.5",
+      "version_name": "6.0.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfG29IAF",
+      "name": "Red Hat JBoss Web Server 6.1.0",
+      "version_name": "6.1.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfG3GIAV",
+      "name": "Red Hat JBoss Web Server 6.1.1",
+      "version_name": "6.1.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfG3QIAV",
+      "name": "Red Hat JBoss Web Server 6.1.2",
+      "version_name": "6.1.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfG5jIAF",
+      "name": "Red Hat JBoss Web Server 6.1.3",
+      "version_name": "6.1.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000LVHlFIAX",
+      "name": "Red Hat JBoss Web Server 6.2.0",
+      "version_name": "6.2.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000LVHlGIAX",
+      "name": "Red Hat JBoss Web Server 6.2.1",
+      "version_name": "6.2.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000LVHlHIAX",
+      "name": "Red Hat JBoss Web Server 6.2.2",
+      "version_name": "6.2.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000LVHlIIAX",
+      "name": "Red Hat JBoss Web Server 6.2.3",
+      "version_name": "6.2.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000LVHlJIAX",
+      "name": "Red Hat JBoss Web Server 6.2.4",
+      "version_name": "6.2.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFNxIAN"
+    },
+    {
+      "id": "01tNr00000HfFOWIA3",
+      "name": "Red Hat Lightspeed (Insights)",
+      "version_name": "N/A",
+      "family": "Management &amp; Automation",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFh7IAF",
+      "name": "Red Hat Lightspeed (Insights) Advisor",
+      "version_name": "Advisor",
+      "family": "",
+      "parent_id": "01tNr00000HfFOWIA3"
+    },
+    {
+      "id": "01tNr00000HfFh1IAF",
+      "name": "Red Hat Lightspeed (Insights) Compliance",
+      "version_name": "Compliance",
+      "family": "",
+      "parent_id": "01tNr00000HfFOWIA3"
+    },
+    {
+      "id": "01tNr00000HfFhJIAV",
+      "name": "Red Hat Lightspeed (Insights) Content Services",
+      "version_name": "Content Services",
+      "family": "",
+      "parent_id": "01tNr00000HfFOWIA3"
+    },
+    {
+      "id": "01tNr00000HfFhAIAV",
+      "name": "Red Hat Lightspeed (Insights) Drift",
+      "version_name": "Drift",
+      "family": "",
+      "parent_id": "01tNr00000HfFOWIA3"
+    },
+    {
+      "id": "01tNr00000HfFh8IAF",
+      "name": "Red Hat Lightspeed (Insights) Eventing",
+      "version_name": "Eventing",
+      "family": "",
+      "parent_id": "01tNr00000HfFOWIA3"
+    },
+    {
+      "id": "01tNr00000HfFhHIAV",
+      "name": "Red Hat Lightspeed (Insights) Image Builder",
+      "version_name": "Image Builder",
+      "family": "",
+      "parent_id": "01tNr00000HfFOWIA3"
+    },
+    {
+      "id": "01tNr00000HfFh3IAF",
+      "name": "Red Hat Lightspeed (Insights) Insights-Client",
+      "version_name": "Insights-Client",
+      "family": "",
+      "parent_id": "01tNr00000HfFOWIA3"
+    },
+    {
+      "id": "01tNr00000HfFhGIAV",
+      "name": "Red Hat Lightspeed (Insights) Inventory",
+      "version_name": "Inventory",
+      "family": "",
+      "parent_id": "01tNr00000HfFOWIA3"
+    },
+    {
+      "id": "01tNr00000HfFhIIAV",
+      "name": "Red Hat Lightspeed (Insights) Launch",
+      "version_name": "Launch",
+      "family": "",
+      "parent_id": "01tNr00000HfFOWIA3"
+    },
+    {
+      "id": "01tNr00000HfFhCIAV",
+      "name": "Red Hat Lightspeed (Insights) Malware Detection",
+      "version_name": "Malware Detection",
+      "family": "",
+      "parent_id": "01tNr00000HfFOWIA3"
+    },
+    {
+      "id": "01tNr00000HfFh9IAF",
+      "name": "Red Hat Lightspeed (Insights) Notifications",
+      "version_name": "Notifications",
+      "family": "",
+      "parent_id": "01tNr00000HfFOWIA3"
+    },
+    {
+      "id": "01tNr00000HfFkiIAF",
+      "name": "Red Hat Lightspeed (Insights) Other",
+      "version_name": "Other",
+      "family": "",
+      "parent_id": "01tNr00000HfFOWIA3"
+    },
+    {
+      "id": "01tNr00000HfFh6IAF",
+      "name": "Red Hat Lightspeed (Insights) Patch",
+      "version_name": "Patch",
+      "family": "",
+      "parent_id": "01tNr00000HfFOWIA3"
+    },
+    {
+      "id": "01tNr00000HfG2IIAV",
+      "name": "Red Hat Lightspeed (Insights) Planning",
+      "version_name": "Planning",
+      "family": "",
+      "parent_id": "01tNr00000HfFOWIA3"
+    },
+    {
+      "id": "01tNr00000HfFhBIAV",
+      "name": "Red Hat Lightspeed (Insights) Policies",
+      "version_name": "Policies",
+      "family": "",
+      "parent_id": "01tNr00000HfFOWIA3"
+    },
+    {
+      "id": "01tNr00000HfFhEIAV",
+      "name": "Red Hat Lightspeed (Insights) Remediations",
+      "version_name": "Remediations",
+      "family": "",
+      "parent_id": "01tNr00000HfFOWIA3"
+    },
+    {
+      "id": "01tNr00000HfFh4IAF",
+      "name": "Red Hat Lightspeed (Insights) Remote Host Configuration (RHC)",
+      "version_name": "Remote Host Configuration (RHC)",
+      "family": "",
+      "parent_id": "01tNr00000HfFOWIA3"
+    },
+    {
+      "id": "01tNr00000HfFhDIAV",
+      "name": "Red Hat Lightspeed (Insights) Resource Optimization",
+      "version_name": "Resource Optimization",
+      "family": "",
+      "parent_id": "01tNr00000HfFOWIA3"
+    },
+    {
+      "id": "01tNr00000HfFhFIAV",
+      "name": "Red Hat Lightspeed (Insights) Tasks",
+      "version_name": "Tasks",
+      "family": "",
+      "parent_id": "01tNr00000HfFOWIA3"
+    },
+    {
+      "id": "01tNr00000HfFh2IAF",
+      "name": "Red Hat Lightspeed (Insights) Vulnerability",
+      "version_name": "Vulnerability",
+      "family": "",
+      "parent_id": "01tNr00000HfFOWIA3"
+    },
+    {
+      "id": "01tNr00000HfFh5IAF",
+      "name": "Red Hat Lightspeed (Insights) Vulnerability for OCP",
+      "version_name": "Vulnerability for OCP",
+      "family": "",
+      "parent_id": "01tNr00000HfFOWIA3"
+    },
+    {
+      "id": "01tNr00000HfFQfIAN",
+      "name": "Red Hat Offline Knowledge Portal",
+      "version_name": "N/A",
+      "family": "Other",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000J229FIAR",
+      "name": "Red Hat Offline Knowledge Portal 1.2",
+      "version_name": "1.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFQfIAN"
+    },
+    {
+      "id": "01tNr00000HfFP4IAN",
+      "name": "Red Hat Online Learning",
+      "version_name": "N/A",
+      "family": "Other",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFsmIAF",
+      "name": "Red Hat Online Learning 1.0",
+      "version_name": "1.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFP4IAN"
+    },
+    {
+      "id": "01tNr00000HfFPMIA3",
+      "name": "Red Hat OpenShift AI Cloud Service",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFfVIAV",
+      "name": "Red Hat OpenShift AI Cloud Service General Availability",
+      "version_name": "General Availability",
+      "family": "",
+      "parent_id": "01tNr00000HfFPMIA3"
+    },
+    {
+      "id": "01tNr00000HfFPfIAN",
+      "name": "Red Hat OpenShift AI Self-Managed",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HkSvcIAF",
+      "name": "Red Hat OpenShift AI Self-Managed 3.2",
+      "version_name": "3.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFPfIAN"
+    },
+    {
+      "id": "01tNr00000I4sPHIAZ",
+      "name": "Red Hat OpenShift AI Self-Managed 3.3",
+      "version_name": "3.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFPfIAN"
+    },
+    {
+      "id": "01tNr00000K7jEbIAJ",
+      "name": "Red Hat OpenShift AI Self-Managed 3.4",
+      "version_name": "3.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFPfIAN"
+    },
+    {
+      "id": "01tNr00000MJxHUIA1",
+      "name": "Red Hat OpenShift AI Self-Managed 3.5",
+      "version_name": "3.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFPfIAN"
+    },
+    {
+      "id": "01tNr00000HfFPOIA3",
+      "name": "Red Hat OpenShift API Management",
+      "version_name": "N/A",
+      "family": "Cloud Native App Dev",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFaLIAV",
+      "name": "Red Hat OpenShift API Management 1.0.0",
+      "version_name": "1.0.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFPOIA3"
+    },
+    {
+      "id": "01tNr00000HfFOYIA3",
+      "name": "Red Hat OpenShift Cluster Manager",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFRPIA3",
+      "name": "Red Hat OpenShift Cluster Manager Online",
+      "version_name": "Online",
+      "family": "",
+      "parent_id": "01tNr00000HfFOYIA3"
+    },
+    {
+      "id": "01tNr00000HfFPXIA3",
+      "name": "Red Hat OpenShift Data Foundation",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFhbIAF",
+      "name": "Red Hat OpenShift Data Foundation 4.14",
+      "version_name": "4.14",
+      "family": "",
+      "parent_id": "01tNr00000HfFPXIA3"
+    },
+    {
+      "id": "01tNr00000HfFkjIAF",
+      "name": "Red Hat OpenShift Data Foundation 4.15",
+      "version_name": "4.15",
+      "family": "",
+      "parent_id": "01tNr00000HfFPXIA3"
+    },
+    {
+      "id": "01tNr00000HfFjQIAV",
+      "name": "Red Hat OpenShift Data Foundation 4.16",
+      "version_name": "4.16",
+      "family": "",
+      "parent_id": "01tNr00000HfFPXIA3"
+    },
+    {
+      "id": "01tNr00000HfG0tIAF",
+      "name": "Red Hat OpenShift Data Foundation 4.17",
+      "version_name": "4.17",
+      "family": "",
+      "parent_id": "01tNr00000HfFPXIA3"
+    },
+    {
+      "id": "01tNr00000HfG2lIAF",
+      "name": "Red Hat OpenShift Data Foundation 4.18",
+      "version_name": "4.18",
+      "family": "",
+      "parent_id": "01tNr00000HfFPXIA3"
+    },
+    {
+      "id": "01tNr00000HfG39IAF",
+      "name": "Red Hat OpenShift Data Foundation 4.19",
+      "version_name": "4.19",
+      "family": "",
+      "parent_id": "01tNr00000HfFPXIA3"
+    },
+    {
+      "id": "01tNr00000HfG5wIAF",
+      "name": "Red Hat OpenShift Data Foundation 4.20",
+      "version_name": "4.20",
+      "family": "",
+      "parent_id": "01tNr00000HfFPXIA3"
+    },
+    {
+      "id": "01tNr00000I7uvxIAB",
+      "name": "Red Hat OpenShift Data Foundation 4.21",
+      "version_name": "4.21",
+      "family": "",
+      "parent_id": "01tNr00000HfFPXIA3"
+    },
+    {
+      "id": "01tNr00000KgMgXIAV",
+      "name": "Red Hat OpenShift Data Foundation 4.22",
+      "version_name": "4.22",
+      "family": "",
+      "parent_id": "01tNr00000HfFPXIA3"
+    },
+    {
+      "id": "01tNr00000HfFPcIAN",
+      "name": "Red Hat OpenShift Dev Spaces",
+      "version_name": "N/A",
+      "family": "",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000IHqeBIAT",
+      "name": "Red Hat OpenShift Dev Spaces 3.26",
+      "version_name": "3.26",
+      "family": "",
+      "parent_id": "01tNr00000HfFPcIAN"
+    },
+    {
+      "id": "01tNr00000HfFQmIAN",
+      "name": "Red Hat OpenShift GitOps",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfG6fIAF",
+      "name": "Red Hat OpenShift GitOps 1.17",
+      "version_name": "1.17",
+      "family": "",
+      "parent_id": "01tNr00000HfFQmIAN"
+    },
+    {
+      "id": "01tNr00000HfG6eIAF",
+      "name": "Red Hat OpenShift GitOps 1.18",
+      "version_name": "1.18",
+      "family": "",
+      "parent_id": "01tNr00000HfFQmIAN"
+    },
+    {
+      "id": "01tNr00000HfG6dIAF",
+      "name": "Red Hat OpenShift GitOps 1.19",
+      "version_name": "1.19",
+      "family": "",
+      "parent_id": "01tNr00000HfFQmIAN"
+    },
+    {
+      "id": "01tNr00000KWHBxIAP",
+      "name": "Red Hat OpenShift GitOps 1.20",
+      "version_name": "1.20",
+      "family": "",
+      "parent_id": "01tNr00000HfFQmIAN"
+    },
+    {
+      "id": "01tNr00000KWHByIAP",
+      "name": "Red Hat OpenShift GitOps 1.21",
+      "version_name": "1.21",
+      "family": "",
+      "parent_id": "01tNr00000HfFQmIAN"
+    },
+    {
+      "id": "01tNr00000KWLQoIAP",
+      "name": "Red Hat OpenShift Pipelines",
+      "version_name": "N/A",
+      "family": "Management &amp; Automation",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000KWHBuIAP",
+      "name": "Red Hat OpenShift Pipelines 1.15",
+      "version_name": "1.15",
+      "family": "",
+      "parent_id": "01tNr00000KWLQoIAP"
+    },
+    {
+      "id": "01tNr00000Lw4OwIAJ",
+      "name": "Red Hat OpenShift Pipelines 1.23",
+      "version_name": "1.23",
+      "family": "",
+      "parent_id": "01tNr00000KWLQoIAP"
+    },
+    {
+      "id": "01tNr00000HfFOeIAN",
+      "name": "Red Hat OpenShift Serverless",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfG6aIAF",
+      "name": "Red Hat OpenShift Serverless 1.37.0",
+      "version_name": "1.37.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFOeIAN"
+    },
+    {
+      "id": "01tNr00000HfFPyIAN",
+      "name": "Red Hat OpenShift Service Mesh",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFk1IAF",
+      "name": "Red Hat OpenShift Service Mesh 2.3",
+      "version_name": "2.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFPyIAN"
+    },
+    {
+      "id": "01tNr00000HfFk3IAF",
+      "name": "Red Hat OpenShift Service Mesh 2.4",
+      "version_name": "2.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFPyIAN"
+    },
+    {
+      "id": "01tNr00000HfFk2IAF",
+      "name": "Red Hat OpenShift Service Mesh 2.5",
+      "version_name": "2.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFPyIAN"
+    },
+    {
+      "id": "01tNr00000HfG1xIAF",
+      "name": "Red Hat OpenShift Service Mesh 3.0",
+      "version_name": "3.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFPyIAN"
+    },
+    {
+      "id": "01tNr00000HfFPNIA3",
+      "name": "Red Hat OpenShift Service on AWS",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFPmIAN",
+      "name": "Red Hat OpenShift Service on AWS Hosted Control Planes",
+      "version_name": "N/A",
+      "family": "",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFgDIAV",
+      "name": "Red Hat OpenShift Service on AWS Hosted Control Planes Online",
+      "version_name": "Online",
+      "family": "",
+      "parent_id": "01tNr00000HfFPmIAN"
+    },
+    {
+      "id": "01tNr00000HfFaKIAV",
+      "name": "Red Hat OpenShift Service on AWS Online",
+      "version_name": "Online",
+      "family": "",
+      "parent_id": "01tNr00000HfFPNIA3"
+    },
+    {
+      "id": "01tNr00000HfFO1IAN",
+      "name": "Red Hat OpenStack Platform",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFuSIAV",
+      "name": "Red Hat OpenStack Platform 10.0",
+      "version_name": "10.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO1IAN"
+    },
+    {
+      "id": "01tNr00000HfFzWIAV",
+      "name": "Red Hat OpenStack Platform 13.0",
+      "version_name": "13.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFO1IAN"
+    },
+    {
+      "id": "01tNr00000HfFWfIAN",
+      "name": "Red Hat OpenStack Platform 16.1",
+      "version_name": "16.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO1IAN"
+    },
+    {
+      "id": "01tNr00000HfFbtIAF",
+      "name": "Red Hat OpenStack Platform 16.2",
+      "version_name": "16.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFO1IAN"
+    },
+    {
+      "id": "01tNr00000HfFgzIAF",
+      "name": "Red Hat OpenStack Platform 17.1",
+      "version_name": "17.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFO1IAN"
+    },
+    {
+      "id": "01tNr00000HfFkHIAV",
+      "name": "Red Hat OpenStack Platform 4.16",
+      "version_name": "4.16",
+      "family": "",
+      "parent_id": "01tNr00000HfFO1IAN"
+    },
+    {
+      "id": "01tNr00000HfFQ0IAN",
+      "name": "Red Hat Openstack Services on Openshift",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFkpIAF",
+      "name": "Red Hat Openstack Services on Openshift 18.0",
+      "version_name": "18.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFQ0IAN"
+    },
+    {
+      "id": "01tNr00000HfFOTIA3",
+      "name": "Red Hat Quay",
+      "version_name": "N/A",
+      "family": "Hybrid Cloud Infrastructure",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFjVIAV",
+      "name": "Red Hat Quay 3.11",
+      "version_name": "3.11",
+      "family": "",
+      "parent_id": "01tNr00000HfFOTIA3"
+    },
+    {
+      "id": "01tNr00000HfG0gIAF",
+      "name": "Red Hat Quay 3.13",
+      "version_name": "3.13",
+      "family": "",
+      "parent_id": "01tNr00000HfFOTIA3"
+    },
+    {
+      "id": "01tNr00000HfG2EIAV",
+      "name": "Red Hat Quay 3.14",
+      "version_name": "3.14",
+      "family": "",
+      "parent_id": "01tNr00000HfFOTIA3"
+    },
+    {
+      "id": "01tNr00000HfG3LIAV",
+      "name": "Red Hat Quay 3.15",
+      "version_name": "3.15",
+      "family": "",
+      "parent_id": "01tNr00000HfFOTIA3"
+    },
+    {
+      "id": "01tNr00000HfG6GIAV",
+      "name": "Red Hat Quay 3.16",
+      "version_name": "3.16",
+      "family": "",
+      "parent_id": "01tNr00000HfFOTIA3"
+    },
+    {
+      "id": "01tNr00000JGBm9IAH",
+      "name": "Red Hat Quay 3.17",
+      "version_name": "3.17",
+      "family": "",
+      "parent_id": "01tNr00000HfFOTIA3"
+    },
+    {
+      "id": "01tNr00000LxXVLIA3",
+      "name": "Red Hat Quay 3.18",
+      "version_name": "3.18",
+      "family": "",
+      "parent_id": "01tNr00000HfFOTIA3"
+    },
+    {
+      "id": "01tNr00000HfFO7IAN",
+      "name": "Red Hat Satellite",
+      "version_name": "N/A",
+      "family": "Management &amp; Automation",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFg3IAF",
+      "name": "Red Hat Satellite 6.13",
+      "version_name": "6.13",
+      "family": "",
+      "parent_id": "01tNr00000HfFO7IAN"
+    },
+    {
+      "id": "01tNr00000HfFi3IAF",
+      "name": "Red Hat Satellite 6.14",
+      "version_name": "6.14",
+      "family": "",
+      "parent_id": "01tNr00000HfFO7IAN"
+    },
+    {
+      "id": "01tNr00000HfFjgIAF",
+      "name": "Red Hat Satellite 6.15",
+      "version_name": "6.15",
+      "family": "",
+      "parent_id": "01tNr00000HfFO7IAN"
+    },
+    {
+      "id": "01tNr00000HfG0vIAF",
+      "name": "Red Hat Satellite 6.16",
+      "version_name": "6.16",
+      "family": "",
+      "parent_id": "01tNr00000HfFO7IAN"
+    },
+    {
+      "id": "01tNr00000HfG2RIAV",
+      "name": "Red Hat Satellite 6.17",
+      "version_name": "6.17",
+      "family": "",
+      "parent_id": "01tNr00000HfFO7IAN"
+    },
+    {
+      "id": "01tNr00000HfG5iIAF",
+      "name": "Red Hat Satellite 6.18",
+      "version_name": "6.18",
+      "family": "",
+      "parent_id": "01tNr00000HfFO7IAN"
+    },
+    {
+      "id": "01tNr00000JGBmAIAX",
+      "name": "Red Hat Satellite 6.19",
+      "version_name": "6.19",
+      "family": "",
+      "parent_id": "01tNr00000HfFO7IAN"
+    },
+    {
+      "id": "01tNr00000HfFPpIAN",
+      "name": "Red Hat Service Interconnect",
+      "version_name": "N/A",
+      "family": "Cloud Native App Dev",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfG15IAF",
+      "name": "Red Hat Service Interconnect 1.8.2",
+      "version_name": "1.8.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFPpIAN"
+    },
+    {
+      "id": "01tNr00000HfFOAIA3",
+      "name": "Red Hat Single Sign-On",
+      "version_name": "N/A",
+      "family": "Cloud Native App Dev",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfE9GIAV",
+      "name": "Red Hat Single Sign-On 7.0.0",
+      "version_name": "7.0.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFuuIAF",
+      "name": "Red Hat Single Sign-On 7.1.0",
+      "version_name": "7.1.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFvQIAV",
+      "name": "Red Hat Single Sign-On 7.1.1",
+      "version_name": "7.1.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFvlIAF",
+      "name": "Red Hat Single Sign-On 7.1.2",
+      "version_name": "7.1.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFxhIAF",
+      "name": "Red Hat Single Sign-On 7.1.3",
+      "version_name": "7.1.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFyKIAV",
+      "name": "Red Hat Single Sign-On 7.1.4",
+      "version_name": "7.1.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFyPIAV",
+      "name": "Red Hat Single Sign-On 7.2.0",
+      "version_name": "7.2.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFyVIAV",
+      "name": "Red Hat Single Sign-On 7.2.1",
+      "version_name": "7.2.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFz5IAF",
+      "name": "Red Hat Single Sign-On 7.2.2",
+      "version_name": "7.2.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFzTIAV",
+      "name": "Red Hat Single Sign-On 7.2.3",
+      "version_name": "7.2.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFzlIAF",
+      "name": "Red Hat Single Sign-On 7.2.4",
+      "version_name": "7.2.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfG0WIAV",
+      "name": "Red Hat Single Sign-On 7.2.5",
+      "version_name": "7.2.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfESwIAN",
+      "name": "Red Hat Single Sign-On 7.2.6",
+      "version_name": "7.2.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfETKIA3",
+      "name": "Red Hat Single Sign-On 7.2.7",
+      "version_name": "7.2.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfESSIA3",
+      "name": "Red Hat Single Sign-On 7.3.0",
+      "version_name": "7.3.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfETJIA3",
+      "name": "Red Hat Single Sign-On 7.3.1",
+      "version_name": "7.3.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFRYIA3",
+      "name": "Red Hat Single Sign-On 7.3.2",
+      "version_name": "7.3.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfESFIA3",
+      "name": "Red Hat Single Sign-On 7.3.3",
+      "version_name": "7.3.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFSVIA3",
+      "name": "Red Hat Single Sign-On 7.3.4",
+      "version_name": "7.3.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFUwIAN",
+      "name": "Red Hat Single Sign-On 7.3.5",
+      "version_name": "7.3.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFVYIA3",
+      "name": "Red Hat Single Sign-On 7.3.6",
+      "version_name": "7.3.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFVwIAN",
+      "name": "Red Hat Single Sign-On 7.3.7",
+      "version_name": "7.3.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFRyIAN",
+      "name": "Red Hat Single Sign-On 7.3.8",
+      "version_name": "7.3.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFW2IAN",
+      "name": "Red Hat Single Sign-On 7.4.0",
+      "version_name": "7.4.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFWgIAN",
+      "name": "Red Hat Single Sign-On 7.4.1",
+      "version_name": "7.4.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFcRIAV",
+      "name": "Red Hat Single Sign-On 7.4.10",
+      "version_name": "7.4.10",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFX4IAN",
+      "name": "Red Hat Single Sign-On 7.4.2",
+      "version_name": "7.4.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFZ3IAN",
+      "name": "Red Hat Single Sign-On 7.4.3",
+      "version_name": "7.4.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFaYIAV",
+      "name": "Red Hat Single Sign-On 7.4.4",
+      "version_name": "7.4.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFawIAF",
+      "name": "Red Hat Single Sign-On 7.4.5",
+      "version_name": "7.4.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFZBIA3",
+      "name": "Red Hat Single Sign-On 7.4.6",
+      "version_name": "7.4.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFZmIAN",
+      "name": "Red Hat Single Sign-On 7.4.7",
+      "version_name": "7.4.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFaEIAV",
+      "name": "Red Hat Single Sign-On 7.4.8",
+      "version_name": "7.4.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFbdIAF",
+      "name": "Red Hat Single Sign-On 7.4.9",
+      "version_name": "7.4.9",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFbgIAF",
+      "name": "Red Hat Single Sign-On 7.5.0",
+      "version_name": "7.5.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFcYIAV",
+      "name": "Red Hat Single Sign-On 7.5.1",
+      "version_name": "7.5.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFdlIAF",
+      "name": "Red Hat Single Sign-On 7.5.2",
+      "version_name": "7.5.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFecIAF",
+      "name": "Red Hat Single Sign-On 7.5.3",
+      "version_name": "7.5.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFeFIAV",
+      "name": "Red Hat Single Sign-On 7.6.0",
+      "version_name": "7.6.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFekIAF",
+      "name": "Red Hat Single Sign-On 7.6.1",
+      "version_name": "7.6.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFkwIAF",
+      "name": "Red Hat Single Sign-On 7.6.10",
+      "version_name": "7.6.10",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFl3IAF",
+      "name": "Red Hat Single Sign-On 7.6.11",
+      "version_name": "7.6.11",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfG3CIAV",
+      "name": "Red Hat Single Sign-On 7.6.12",
+      "version_name": "7.6.12",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFfjIAF",
+      "name": "Red Hat Single Sign-On 7.6.2",
+      "version_name": "7.6.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFgCIAV",
+      "name": "Red Hat Single Sign-On 7.6.3",
+      "version_name": "7.6.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFgkIAF",
+      "name": "Red Hat Single Sign-On 7.6.4",
+      "version_name": "7.6.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFhNIAV",
+      "name": "Red Hat Single Sign-On 7.6.5",
+      "version_name": "7.6.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFiNIAV",
+      "name": "Red Hat Single Sign-On 7.6.6",
+      "version_name": "7.6.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFj6IAF",
+      "name": "Red Hat Single Sign-On 7.6.7",
+      "version_name": "7.6.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFjeIAF",
+      "name": "Red Hat Single Sign-On 7.6.8",
+      "version_name": "7.6.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFk5IAF",
+      "name": "Red Hat Single Sign-On 7.6.9",
+      "version_name": "7.6.9",
+      "family": "",
+      "parent_id": "01tNr00000HfFOAIA3"
+    },
+    {
+      "id": "01tNr00000HfFPsIAN",
+      "name": "Red Hat Trusted Application Pipeline",
+      "version_name": "N/A",
+      "family": "",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFjOIAV",
+      "name": "Red Hat Trusted Application Pipeline 1.0",
+      "version_name": "1.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFPsIAN"
+    },
+    {
+      "id": "01tNr00000HfG2MIAV",
+      "name": "Red Hat Trusted Application Pipeline 1.5",
+      "version_name": "1.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFPsIAN"
+    },
+    {
+      "id": "01tNr00000HfFPvIAN",
+      "name": "Red Hat Trusted Artifact Signer",
+      "version_name": "N/A",
+      "family": "Other",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfG5UIAV",
+      "name": "Red Hat Trusted Artifact Signer 1.3",
+      "version_name": "1.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFPvIAN"
+    },
+    {
+      "id": "01tNr00000J52npIAB",
+      "name": "Red Hat Trusted Artifact Signer 1.4",
+      "version_name": "1.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFPvIAN"
+    },
+    {
+      "id": "01tNr00000MWoBZIA1",
+      "name": "Red Hat Trusted Artifact Signer 1.5",
+      "version_name": "1.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFPvIAN"
+    },
+    {
+      "id": "01tNr00000JwM0PIAV",
+      "name": "Red Hat Trusted Libraries",
+      "version_name": "N/A",
+      "family": "Other",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000JwHbqIAF",
+      "name": "Red Hat Trusted Libraries CLOUD",
+      "version_name": "CLOUD",
+      "family": "",
+      "parent_id": "01tNr00000JwM0PIAV"
+    },
+    {
+      "id": "01tNr00000HfFPwIAN",
+      "name": "Red Hat Trusted Profile Analyzer",
+      "version_name": "N/A",
+      "family": "Other",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfG2NIAV",
+      "name": "Red Hat Trusted Profile Analyzer 2.0",
+      "version_name": "2.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFPwIAN"
+    },
+    {
+      "id": "01tNr00000HfG61IAF",
+      "name": "Red Hat Trusted Profile Analyzer 2.2",
+      "version_name": "2.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFPwIAN"
+    },
+    {
+      "id": "01tNr00000LBs5pIAD",
+      "name": "Red Hat Trusted Profile Analyzer 3.0",
+      "version_name": "3.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFPwIAN"
+    },
+    {
+      "id": "01tNr00000LJtsjIAD",
+      "name": "Red Hat Trusted Profile Analyzer 3.1",
+      "version_name": "3.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFPwIAN"
+    },
+    {
+      "id": "01tNr00000HfFOZIA3",
+      "name": "Red Hat Update Infrastructure",
+      "version_name": "N/A",
+      "family": "Management &amp; Automation",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFcGIAV",
+      "name": "Red Hat Update Infrastructure 4.0",
+      "version_name": "4.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFOZIA3"
+    },
+    {
+      "id": "01tNr00000HfFdWIAV",
+      "name": "Red Hat Update Infrastructure 4.1",
+      "version_name": "4.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFOZIA3"
+    },
+    {
+      "id": "01tNr00000HfFlPIAV",
+      "name": "Red Hat Update Infrastructure 4.10",
+      "version_name": "4.10",
+      "family": "",
+      "parent_id": "01tNr00000HfFOZIA3"
+    },
+    {
+      "id": "01tNr00000HfFehIAF",
+      "name": "Red Hat Update Infrastructure 4.2",
+      "version_name": "4.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFOZIA3"
+    },
+    {
+      "id": "01tNr00000HfFfgIAF",
+      "name": "Red Hat Update Infrastructure 4.3",
+      "version_name": "4.3",
+      "family": "",
+      "parent_id": "01tNr00000HfFOZIA3"
+    },
+    {
+      "id": "01tNr00000HfFhiIAF",
+      "name": "Red Hat Update Infrastructure 4.4",
+      "version_name": "4.4",
+      "family": "",
+      "parent_id": "01tNr00000HfFOZIA3"
+    },
+    {
+      "id": "01tNr00000HfFhjIAF",
+      "name": "Red Hat Update Infrastructure 4.5",
+      "version_name": "4.5",
+      "family": "",
+      "parent_id": "01tNr00000HfFOZIA3"
+    },
+    {
+      "id": "01tNr00000HfFhwIAF",
+      "name": "Red Hat Update Infrastructure 4.6",
+      "version_name": "4.6",
+      "family": "",
+      "parent_id": "01tNr00000HfFOZIA3"
+    },
+    {
+      "id": "01tNr00000HfFlCIAV",
+      "name": "Red Hat Update Infrastructure 4.7",
+      "version_name": "4.7",
+      "family": "",
+      "parent_id": "01tNr00000HfFOZIA3"
+    },
+    {
+      "id": "01tNr00000HfFlDIAV",
+      "name": "Red Hat Update Infrastructure 4.8",
+      "version_name": "4.8",
+      "family": "",
+      "parent_id": "01tNr00000HfFOZIA3"
+    },
+    {
+      "id": "01tNr00000HfFlEIAV",
+      "name": "Red Hat Update Infrastructure 4.9",
+      "version_name": "4.9",
+      "family": "",
+      "parent_id": "01tNr00000HfFOZIA3"
+    },
+    {
+      "id": "01tNr00000HfG69IAF",
+      "name": "Red Hat Update Infrastructure 5.0",
+      "version_name": "5.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFOZIA3"
+    },
+    {
+      "id": "01tNr00000HfFOOIA3",
+      "name": "Streams for Apache Kafka",
+      "version_name": "N/A",
+      "family": "Cloud Native App Dev",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfG3JIAV",
+      "name": "Streams for Apache Kafka 3.0.0",
+      "version_name": "3.0.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFOOIA3"
+    },
+    {
+      "id": "01tNr00000HfG3oIAF",
+      "name": "Streams for Apache Kafka 3.0.1",
+      "version_name": "3.0.1",
+      "family": "",
+      "parent_id": "01tNr00000HfFOOIA3"
+    },
+    {
+      "id": "01tNr00000HfG6DIAV",
+      "name": "Streams for Apache Kafka 3.1.0",
+      "version_name": "3.1.0",
+      "family": "",
+      "parent_id": "01tNr00000HfFOOIA3"
+    },
+    {
+      "id": "01tNr00000JIo3TIAT",
+      "name": "Streams for Apache Kafka 3.2",
+      "version_name": "3.2",
+      "family": "",
+      "parent_id": "01tNr00000HfFOOIA3"
+    },
+    {
+      "id": "01tNr00000HfFOjIAN",
+      "name": "Subscription Watch",
+      "version_name": "N/A",
+      "family": "Management &amp; Automation",
+      "parent_id": null
+    },
+    {
+      "id": "01tNr00000HfFUzIAN",
+      "name": "Subscription Watch Online",
+      "version_name": "Online",
+      "family": "",
+      "parent_id": "01tNr00000HfFOjIAN"
+    }
+  ]
+}
