@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import os
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from typing import Any
 
 from rh_support_lib.api import extract_jwt_username
@@ -630,6 +631,10 @@ class CaseService:
         limit: int | None = None,
         use_cache: bool = True,
     ) -> list[Case]:
+        if first <= 0 or (limit is not None and limit < 0):
+            raise ValueError("Case page size must be positive and limit nonnegative.")
+        if limit == 0:
+            return []
         cache_key = self.cache_service.compute_list_cache_key(
             account=account,
             status=status,
@@ -643,7 +648,11 @@ class CaseService:
         if use_cache and not after and not query and self.cache_service.enabled:
             cached_list = self.cache_service.get_case_list(cache_key)
             if cached_list is not None:
-                return cached_list
+                return (
+                    cached_list[:limit]
+                    if limit is not None
+                    else (cached_list if all_pages else cached_list[:first])
+                )
 
         cases = self._list_cases_graphql(
             account=account,
@@ -680,6 +689,10 @@ class CaseService:
         all_pages: bool = False,
         limit: int | None = None,
     ) -> list[Case]:
+        if first <= 0 or (limit is not None and limit < 0):
+            raise ValueError("Case page size must be positive and limit nonnegative.")
+        if limit == 0:
+            return []
         where: dict[str, Any] = {}
 
         if account:
@@ -721,6 +734,7 @@ class CaseService:
         user = self.get_current_user()
         tracked_map = self.state_service.get_tracked_cases(user)
         current_after = after
+        seen_cursors = {after} if after else set()
 
         while True:
             batch_size = min(first, limit - len(cases)) if limit else first
@@ -784,10 +798,19 @@ class CaseService:
                 break
             if not all_pages and (limit is None or len(cases) >= limit):
                 break
+            if limit is not None and len(cases) >= limit:
+                break
+            if end_cursor in seen_cursors:
+                raise ValueError("Case pagination cursor did not advance.")
+            seen_cursors.add(end_cursor)
 
             current_after = end_cursor
 
-        return cases
+        return (
+            cases[:limit]
+            if limit is not None
+            else (cases if all_pages else cases[:first])
+        )
 
     @staticmethod
     def _matches_case_filters(
@@ -970,17 +993,28 @@ class CaseService:
         use_cache: bool = True,
         known_last_modified: str | None = None,
     ) -> CaseDetails | None:
+        if first_comments <= 0:
+            raise ValueError("first_comments must be positive.")
+        if max_comments is not None and max_comments < 0:
+            raise ValueError("max_comments must be nonnegative.")
+        comment_limit = (
+            max_comments
+            if max_comments is not None
+            else (None if all_comments else first_comments)
+        )
         c_num = str(case_number).strip()
         if use_cache and self.cache_service.enabled:
             record = self.cache_service.get_case_record(c_num)
-            cached = self.cache_service.get_case_details(c_num)
+            # Coverage and contents must come from the same atomic cache snapshot.
+            cached = self.cache_service._get_case_details_from_record(c_num, record)
             if cached and record:
                 cached_details, _cached_atts, cached_lmd = cached
+                covered = self.cache_service._covers_comments(record, comment_limit)
                 cached_status = record.get("status", "")
                 cached_cid = record.get("latest_comment_id", "")
                 cached_cdate = record.get("latest_comment_date", "")
 
-                probe = self.check_case_last_modified(c_num)
+                probe = self.check_case_last_modified(c_num) if covered else None
                 if probe:
                     _pid, p_lmd, p_status, p_cid, p_cdate = probe
                     lmd_match = (not p_lmd) or (p_lmd == cached_lmd)
@@ -989,16 +1023,23 @@ class CaseService:
                     cdate_match = (not p_cdate) or (p_cdate == cached_cdate)
 
                     if lmd_match and status_match and cid_match and cdate_match:
-                        return cached_details
+                        return replace(
+                            cached_details,
+                            comments=cached_details.comments[:comment_limit],
+                        )
+        coverage = {}
         details = self._get_case_details_graphql(
             case_number=c_num,
             first_comments=first_comments,
             all_comments=all_comments,
             max_comments=max_comments,
+            _coverage=coverage,
         )
         if details and use_cache and self.cache_service.enabled:
             lmd = details.case.last_modified_date if details.case else ""
-            self.cache_service.set_case_details(c_num, details, last_modified_date=lmd)
+            self.cache_service._set_case_details(
+                c_num, details, last_modified_date=lmd, comment_coverage=coverage
+            )
         return details
 
     def _get_case_details_graphql(
@@ -1007,10 +1048,22 @@ class CaseService:
         first_comments: int = 200,
         all_comments: bool = True,
         max_comments: int | None = None,
+        _coverage: dict[str, Any] | None = None,
     ) -> CaseDetails | None:
+        if first_comments <= 0:
+            raise ValueError("first_comments must be positive.")
+        if max_comments is not None and max_comments < 0:
+            raise ValueError("max_comments must be nonnegative.")
+        comment_limit = (
+            max_comments
+            if max_comments is not None
+            else (None if all_comments else first_comments)
+        )
         variables = {
             "caseNumber": str(case_number),
-            "first": first_comments,
+            "first": min(first_comments, comment_limit)
+            if comment_limit is not None
+            else first_comments,
             "after": None,
         }
 
@@ -1045,15 +1098,15 @@ class CaseService:
         page_info = comments_container.get("pageInfo") or {}
         has_next = page_info.get("hasNextPage", False)
         end_cursor = page_info.get("endCursor")
+        seen_cursors = set()
 
-        while (
-            has_next
-            and end_cursor
-            and (all_comments or (max_comments and len(comments) < max_comments))
-        ):
+        while has_next and (comment_limit is None or len(comments) < comment_limit):
+            if not end_cursor or end_cursor in seen_cursors:
+                raise ValueError("Comment pagination cursor did not advance.")
+            seen_cursors.add(end_cursor)
             batch_size = (
-                min(first_comments, max_comments - len(comments))
-                if max_comments
+                min(first_comments, comment_limit - len(comments))
+                if comment_limit is not None
                 else first_comments
             )
             c_filter = {"Case__c": {"eq": str(case_obj.id or node.get("Id", ""))}}
@@ -1082,6 +1135,7 @@ class CaseService:
                         comments.append(self._normalize_comment_node(c_node))
 
                     next_page_info = next_comments_container.get("pageInfo") or {}
+                    page_info = next_page_info
                     has_next = next_page_info.get("hasNextPage", False)
                     end_cursor = next_page_info.get("endCursor")
             except Exception:  # noqa: BLE001
@@ -1113,10 +1167,18 @@ class CaseService:
                         comments.append(self._normalize_comment_node(c_node))
 
                     next_page_info = next_comments_container.get("pageInfo") or {}
+                    page_info = next_page_info
                     has_next = next_page_info.get("hasNextPage", False)
                     end_cursor = next_page_info.get("endCursor")
                 except Exception:  # noqa: BLE001
                     break
+        truncated = comment_limit is not None and len(comments) > comment_limit
+        comments = comments[:comment_limit]
+        if _coverage is not None:
+            _coverage.update(
+                complete=page_info.get("hasNextPage") is False and not truncated,
+                available_prefix=len(comments),
+            )
         return CaseDetails(
             case=case_obj,
             description=description or "",
@@ -1293,6 +1355,7 @@ class CaseService:
     ) -> list[ProductItem]:
         products = []
         current_after = None
+        seen_cursors = set()
 
         while True:
             variables = {"first": first, "after": current_after}
@@ -1348,6 +1411,9 @@ class CaseService:
 
             if not all_pages or not has_next or not end_cursor:
                 break
+            if end_cursor in seen_cursors:
+                raise ValueError("Product pagination cursor did not advance.")
+            seen_cursors.add(end_cursor)
 
             current_after = end_cursor
 

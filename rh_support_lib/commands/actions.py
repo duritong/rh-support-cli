@@ -106,8 +106,6 @@ def cmd_comment(args, api_client):
             try:
                 details = case_service.get_case_details(
                     args.case,
-                    first_comments=args.include_previous_comments,
-                    all_comments=False,
                 )
                 comments = details.comments if details else []
 

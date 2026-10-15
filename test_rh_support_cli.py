@@ -4903,8 +4903,14 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 },
             ):
                 app = SupportApp(client, config={"tui": {"poll_interval": 0}})
-                app.case_service.cache_service.set_case_details(
-                    "12345", details, last_modified_date="2023-01-02T10:00:00Z"
+                app.case_service.cache_service._set_case_details(
+                    "12345",
+                    details,
+                    last_modified_date="2023-01-02T10:00:00Z",
+                    comment_coverage={
+                        "complete": True,
+                        "available_prefix": len(details.comments),
+                    },
                 )
                 async with app.run_test() as pilot:
                     await pilot.pause()
@@ -7366,7 +7372,12 @@ class TestTuiOperationSafety(unittest.TestCase):
 def load_tests(loader, standard_tests, pattern):
     standard_tests.addTests(
         loader.loadTestsFromNames(
-            ["test_p2_filters", "test_p2_state", "test_p2_polling"]
+            [
+                "test_p2_filters",
+                "test_p2_state",
+                "test_p2_polling",
+                "test_p2_pagination",
+            ]
         )
     )
     return standard_tests

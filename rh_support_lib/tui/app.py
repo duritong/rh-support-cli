@@ -1148,7 +1148,7 @@ class SupportApp(App):
         # SWR: If details exist in local disk cache, render immediately without waiting
         self.selected_case_id = next_case_id
         cached_rec = self.case_service.cache_service.get_case_details(
-            next_case_id, ttl=0
+            next_case_id, ttl=0, require_complete=True
         )
         if cached_rec:
             cached_details, cached_atts, _ = cached_rec

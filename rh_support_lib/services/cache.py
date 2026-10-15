@@ -164,15 +164,46 @@ class CacheService:
         return records
 
     def get_case_details(
-        self, case_number: str, ttl: int | None = None
+        self, case_number: str, ttl: int | None = None, require_complete: bool = False
     ) -> tuple[CaseDetails, list[Attachment], str] | None:
         """Loads and reconstructs CaseDetails, Attachments, and last_modified_date from cache."""
         record = self.get_case_record(case_number)
+        if require_complete and not self._covers_comments(record):
+            return None
+        return self._get_case_details_from_record(case_number, record, ttl)
+
+    @staticmethod
+    def _covers_comments(record, limit=None):
+        if not isinstance(record, dict) or not isinstance(record.get("comments"), list):
+            return False
+        coverage = record.get("_comment_coverage")
+        if not isinstance(coverage, dict):
+            return False
+        available = coverage.get("available_prefix")
+        return (
+            isinstance(available, int)
+            and not isinstance(available, bool)
+            and available == len(record["comments"])
+            and (
+                coverage.get("complete") is True
+                or (limit is not None and available >= limit)
+            )
+        )
+
+    def _get_case_details_from_record(
+        self,
+        case_number: str,
+        record: dict[str, Any] | None,
+        ttl: int | None = None,
+    ) -> tuple[CaseDetails, list[Attachment], str] | None:
         if not record:
             return None
 
         max_age = ttl if ttl is not None else self.case_ttl
-        cached_at = float(record.get("cached_at", 0))
+        try:
+            cached_at = float(record.get("cached_at", 0))
+        except (TypeError, ValueError, OverflowError):
+            return None
         if max_age > 0 and (time.time() - cached_at) > max_age:
             return None
         try:
@@ -255,6 +286,16 @@ class CacheService:
         last_modified_date: str | None = None,
     ) -> None:
         """Saves CaseDetails, comments, attachments, and last_modified timestamp to disk cache."""
+        self._set_case_details(case_number, details, attachments, last_modified_date)
+
+    def _set_case_details(
+        self,
+        case_number: str,
+        details: CaseDetails,
+        attachments: list[Attachment] | None = None,
+        last_modified_date: str | None = None,
+        comment_coverage: dict[str, Any] | None = None,
+    ) -> None:
         if not self.enabled:
             return
         c_num = str(case_number).strip()
@@ -278,6 +319,8 @@ class CacheService:
             "attachments": [asdict(a) for a in (attachments or details.attachments)],
             "notified_users": details.notified_users,
         }
+        if comment_coverage is not None:
+            record["_comment_coverage"] = dict(comment_coverage)
         self._write_json_atomic(path, record)
 
     def invalidate_case(self, case_number: str) -> None:

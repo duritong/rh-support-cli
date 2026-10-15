@@ -106,6 +106,8 @@ rh-support-cli --debug-file /tmp/rh_debug.log show -c 12345678
 ```
 
 ### Global Cache Control (`--no-cache`)
+Comment limits are honored on cached and fresh results. A cached partial thread cannot satisfy a full-thread request or appear as the instant full TUI view. Previous-comment editor context selects the latest requested comments rather than the beginning of a long thread.
+
 Product-scoped bookmarks and combined account/status/severity/owner filters also apply to followed-case lists in the CLI and TUI. Combined case/KCS search keeps case-specific filters on its case results. Locally cached case search honors owner restrictions as well.
 
 Private case lists and threads are isolated by the selected credential and backend. Older unscoped case caches are not reused; fetch cases again to populate the isolated cache. Changing an offline token selects a new cache, even if it belongs to the same user.
