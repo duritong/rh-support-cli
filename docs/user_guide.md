@@ -91,9 +91,12 @@ You can specify an alternate configuration file using `--config-file` or the `RH
 rh-support-cli --config-file /path/to/custom_config.yaml list
 ```
 
-### Debugging & HTTP Logging (`--debug` / `--debug-file`)
+### Authentication And Editing
+Editor commands honor quoted arguments in `$EDITOR` consistently for comments and descriptions. A failed launch, nonzero editor exit, or unreadable draft stops submission with a nonzero error and retains the recovery file. Empty file-fed or edited comments/descriptions cannot create comments, cases, or status changes; generated recovery drafts are retained on failure. Explicit cancellation remains cancellation, not a failed API operation.
+
 Authentication failures produce a nonzero CLI error without printing raw SSO responses. An explicitly selected empty or unreadable credential does not silently fall back to a different source. Library consumers receive exceptions instead of a process exit. Automatic authentication retries preserve seekable body offsets; a non-replayable body fails rather than resubmitting empty content.
 
+### Debugging & HTTP Logging (`--debug` / `--debug-file`)
 Inspect network communication and API payloads:
 * `--debug`: Prints redacted HTTP requests and responses directly to `stderr`.
 * `--debug-file <path>`: Logs full, untruncated redacted JSON requests and non-streamed responses to the specified file while keeping console output clean.

@@ -7397,6 +7397,7 @@ def load_tests(loader, standard_tests, pattern):
                 "test_p2_auth",
                 "test_p2_search",
                 "test_p2_auth_errors",
+                "test_p2_editor",
             ]
         )
     )

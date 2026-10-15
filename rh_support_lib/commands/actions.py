@@ -4,7 +4,7 @@ import sys
 from rh_support_lib.api import AuthenticationError
 from rh_support_lib.constants import STATUS_MAP
 from rh_support_lib.services.cases import CaseService
-from rh_support_lib.utils import open_editor, strip_header_comments
+from rh_support_lib.utils import EditorError, open_editor, strip_header_comments
 
 
 def cmd_attach(args, api_client):
@@ -93,8 +93,11 @@ def cmd_comment(args, api_client, config=None):
     elif args.file:
         if not os.path.isfile(args.file):
             sys.exit(f"Error: File '{args.file}' does not exist.")
-        with open(args.file, "r") as f:
-            lines = f.readlines()
+        try:
+            with open(args.file, "r") as f:
+                lines = f.readlines()
+        except (OSError, UnicodeError):
+            sys.exit("Error: Unable to read comment file. No changes submitted.")
         file_content = strip_header_comments(lines).strip()
 
     case_service = CaseService(api_client, config=config)
@@ -133,20 +136,23 @@ def cmd_comment(args, api_client, config=None):
                 print(f"Warning: Failed to fetch previous comments: {e}")
 
         # Open Editor (using file_content as initial body if provided)
-        comment_body, temp_file_path = open_editor(
-            args.case,
-            final_status,
-            header_content=header_content,
-            initial_body=file_content,
-        )
-        if not comment_body:
-            print("Aborted: Empty comment.")
-            if temp_file_path and os.path.exists(temp_file_path):
-                os.remove(temp_file_path)
-            sys.exit(0)
+        try:
+            comment_body, temp_file_path = open_editor(
+                args.case,
+                final_status,
+                header_content=header_content,
+                initial_body=file_content,
+            )
+        except EditorError as error:
+            sys.exit(f"Editor Error: {error}")
     else:
         # Non-interactive mode (File only, no edit)
         comment_body = file_content
+
+    if not comment_body.strip():
+        if temp_file_path:
+            print(f"Draft comment preserved at: {temp_file_path}", file=sys.stderr)
+        sys.exit("Error: Empty comment. No comment or status change submitted.")
 
     # 1. Post Comment and update status via CaseService
     print(f"Posting comment to Case #{args.case}...")

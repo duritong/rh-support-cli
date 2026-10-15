@@ -267,13 +267,47 @@ def strip_header_comments(lines):
     return "".join(lines[first_content_idx:])
 
 
+class EditorError(RuntimeError):
+    """Editor failure with a safe reason and the path to the recoverable draft."""
+
+    def __init__(self, draft_path: str, reason: str):
+        self.draft_path = os.fspath(draft_path)
+        self.reason = reason
+        super().__init__(f"{reason} Draft path: {self.draft_path}")
+
+
+def edit_file(path: str) -> None:
+    """Edit an existing file once; failures never remove the draft or approve it."""
+    path = os.fspath(path)
+    try:
+        cmd = shlex.split(os.environ.get("EDITOR", "vi"))
+    except ValueError:
+        raise EditorError(path, "Invalid EDITOR command; check quoting.") from None
+    if not cmd or not cmd[0] or any("\x00" in arg for arg in cmd):
+        raise EditorError(path, "Invalid EDITOR command; specify an executable.")
+
+    try:
+        returncode = subprocess.call(cmd + [path])
+    except FileNotFoundError:
+        raise EditorError(
+            path, "Editor executable not found; check EDITOR and PATH."
+        ) from None
+    except (OSError, ValueError):
+        raise EditorError(
+            path, "Could not launch editor; check EDITOR and executable permissions."
+        ) from None
+    if returncode != 0:
+        raise EditorError(
+            path, f"Editor exited unsuccessfully (exit status {returncode})."
+        )
+
+
 def open_editor(case_number, status_label, header_content=None, initial_body=None):
     """
     Opens the system default editor for interactive comment entry.
-    Returns the content of the comment and the path to the temporary file.
+    Returns the content (possibly empty) and the path to the temporary file.
+    Raises EditorError on editing or reading failure, preserving the draft.
     """
-    editor = os.environ.get("EDITOR", "vi")
-
     # Create temp file but do NOT delete it automatically here
     with tempfile.NamedTemporaryFile(mode="w+", suffix=".tmp", delete=False) as tf:
         tf.write(f"# Enter comment for Case {case_number}.\n")
@@ -296,21 +330,17 @@ def open_editor(case_number, status_label, header_content=None, initial_body=Non
 
         tf_path = tf.name
 
+    edit_file(tf_path)
     try:
-        cmd = shlex.split(editor)
-        cmd.append(tf_path)
-        subprocess.call(cmd)
-
         with open(tf_path, "r") as f:
             lines = f.readlines()
+    except (OSError, UnicodeError):
+        raise EditorError(
+            tf_path, "Could not read edited draft; check file permissions and encoding."
+        ) from None
 
-        content = strip_header_comments(lines)
-        return content.strip(), tf_path
-    except Exception:
-        # If something goes wrong during editing, try to clean up
-        if os.path.exists(tf_path):
-            os.remove(tf_path)
-        raise
+    content = strip_header_comments(lines)
+    return content.strip(), tf_path
 
 
 def format_structured_output(data: Any, fmt: str = "json") -> str:

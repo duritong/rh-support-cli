@@ -1,6 +1,5 @@
 import json
 import os
-import subprocess
 import sys
 import tempfile
 
@@ -9,7 +8,13 @@ import yaml
 from rh_support_lib.services.attachments import AttachmentService
 from rh_support_lib.services.cases import CaseService
 from rh_support_lib.templates import TemplateEngine, resolve_templates_dir
-from rh_support_lib.utils import prompt_text, select_from_list, strip_header_comments
+from rh_support_lib.utils import (
+    EditorError,
+    edit_file,
+    prompt_text,
+    select_from_list,
+    strip_header_comments,
+)
 
 
 def cmd_create(args, api_client, config):
@@ -85,15 +90,19 @@ def cmd_create(args, api_client, config):
     if args.description_file:
         if not os.path.isfile(args.description_file):
             sys.exit(f"Error: Description file '{args.description_file}' not found.")
-        with open(args.description_file, "r") as f:
-            lines = f.readlines()
+        try:
+            with open(args.description_file, "r") as f:
+                lines = f.readlines()
+        except (OSError, UnicodeError):
+            sys.exit("Error: Unable to read description file. No case created.")
         description = strip_header_comments(lines).strip()
+        if not description:
+            sys.exit("Error: Empty description file. No case created.")
     else:
         description = defaults.get("description", "")
 
     if not description:
         # If not provided, use editor
-        editor = os.environ.get("EDITOR", "vi")
         with tempfile.NamedTemporaryFile(mode="w+", suffix=".tmp", delete=False) as tf:
             tf.write("# Enter description for new case.\n")
             tf.write("# Leading lines starting with '#' will be ignored.\n\n")
@@ -102,21 +111,22 @@ def cmd_create(args, api_client, config):
 
         print("Opening editor for description...")
         try:
-            subprocess.call([editor, tf_path])
+            edit_file(tf_path)
             with open(tf_path, "r") as f:
                 lines = f.readlines()
             description = strip_header_comments(lines).strip()
 
-        except Exception:
-            if os.path.exists(tf_path):
-                os.remove(tf_path)
-            raise
+        except EditorError as error:
+            sys.exit(f"Editor Error: {error}")
+        except (OSError, UnicodeError):
+            sys.exit(
+                f"Editor Error: Unable to read edited description. Draft path: {tf_path}"
+            )
 
     if not description:
-        print("Aborted: Empty description.")
-        if temp_desc_path and os.path.exists(temp_desc_path):
-            os.remove(temp_desc_path)
-        sys.exit(0)
+        if temp_desc_path:
+            print(f"Draft description preserved at: {temp_desc_path}", file=sys.stderr)
+        sys.exit("Error: Empty description. No case created.")
 
     # Attachments
     attachments = args.attachment or []

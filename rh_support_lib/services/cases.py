@@ -1219,6 +1219,10 @@ class CaseService:
         body_format: str = "markdown",
     ) -> CaseComment:
         """Adds a comment to an existing support case and optionally updates case status."""
+        if not isinstance(body, str) or not body.strip():
+            raise ValueError(
+                "A nonempty comment body is required; no changes submitted."
+            )
         return self._add_comment_graphql(
             case_number=case_number,
             body=body,
@@ -1527,6 +1531,15 @@ class CaseService:
         body_format: str = "markdown",
     ) -> str:
         """Creates a new Red Hat support case using the GraphQL API."""
+        if (
+            not isinstance(summary, str)
+            or not summary.strip()
+            or not isinstance(description, str)
+            or not description.strip()
+        ):
+            raise ValueError(
+                "Nonempty summary and description are required; no case created."
+            )
         return self._create_case_graphql(
             summary=summary,
             description=description,
