@@ -53,8 +53,10 @@ class TemplateEngine:
         try:
             with open(path, "r") as f:
                 data = yaml.safe_load(f)
-        except (OSError, yaml.YAMLError, UnicodeError) as e:
-            raise ValueError(f"Failed to load template '{path}': {e}") from e
+        except (OSError, yaml.YAMLError, UnicodeError):
+            raise ValueError(
+                f"Failed to load template '{path}': unreadable or invalid YAML."
+            ) from None
         data = {} if data is None else data
         if not isinstance(data, dict) or any(not isinstance(key, str) for key in data):
             raise ValueError(

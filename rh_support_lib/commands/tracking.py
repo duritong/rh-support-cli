@@ -69,12 +69,20 @@ def cmd_sync(args, api_client, config=None):
 
 def cmd_updates(args, api_client, config=None):
     """Displays unread updates and new comments across tracked cases."""
+    from rh_support_lib.utils import format_structured_output
+
+    fmt = getattr(args, "format", "text")
+    is_structured = fmt in ("json", "yaml") or getattr(args, "json", False)
+    output_format = "yaml" if fmt == "yaml" else "json"
     case_service = CaseService(api_client, config=config)
     user = getattr(args, "user", None) or case_service.get_current_user()
     state_service = case_service.state_service
 
     all_tracked = state_service.get_tracked_cases(user)
     if not all_tracked:
+        if is_structured:
+            print(format_structured_output([], fmt=output_format))
+            return
         print(
             "No cases currently tracked. Follow cases with 'rh-support-cli follow <case>'."
         )
@@ -85,6 +93,9 @@ def cmd_updates(args, api_client, config=None):
     if target_case:
         target_case = str(target_case).strip()
         if target_case not in all_tracked:
+            if is_structured:
+                print(format_structured_output([], fmt=output_format))
+                return
             print(f"Case #{target_case} is not currently tracked.")
             return
         cases_to_check = [all_tracked[target_case]]
@@ -101,20 +112,12 @@ def cmd_updates(args, api_client, config=None):
             or tc.latest_known.status_changed
         ]
     mark_read_flag = bool(getattr(args, "mark_read", False))
-    fmt = getattr(args, "format", "text")
-    is_structured = fmt in ("json", "yaml") or getattr(args, "json", False)
-
     if is_structured:
-        from rh_support_lib.utils import format_structured_output
-
-        print(
-            format_structured_output(
-                cases_to_check, fmt="yaml" if fmt == "yaml" else "json"
-            )
-        )
+        output = format_structured_output(cases_to_check, fmt=output_format)
         if mark_read_flag:
             for tc in cases_to_check:
                 state_service.mark_case_read(user, tc.case_number)
+        print(output)
         return
 
     if not cases_to_check:

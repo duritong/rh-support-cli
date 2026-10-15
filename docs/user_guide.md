@@ -115,6 +115,8 @@ rh-support-cli --debug-file /tmp/rh_debug.log show -c 12345678
 ```
 
 ### Read Failures
+For commands supporting structured output, successful stdout contains only the requested JSON/YAML result. Empty `updates` results, including an untracked requested case, produce `[]`. Warnings and progress go to stderr; failures exit nonzero without a partial structured payload. `apply --json` / `--format yaml` emits a plan/result containing `case_number`, `dry_run`, `changes`, and `applied`; no-op plans have empty changes and dry runs never mutate. Template listing skips invalid metadata with a stderr warning while preserving a parseable list of valid entries.
+
 Unavailable case histories, KCS searches, and attachment lists produce nonzero errors rather than successful empty results. A missing case is reported separately from an unavailable read. Failed structured queries leave stdout empty and put diagnostics on stderr.
 
 The TUI retains its last complete view and draft and shows a warning. If a newly selected case cannot load, the retained view still identifies the old case; detail actions require a matching loaded selection. Failed refreshes cancel automatic read marking and prevent manual acknowledgement until data is successfully retrieved or revalidated. Optional editor context is omitted with a warning if history retrieval fails; authentication failures still stop submission.

@@ -358,7 +358,7 @@ def format_structured_output(data: Any, fmt: str = "json") -> str:
     converted = _convert(data)
     if fmt == "yaml":
         return yaml.dump(converted, sort_keys=False, default_flow_style=False)
-    return json.dumps(converted, indent=2, default=str)
+    return json.dumps(converted, indent=2, default=str, allow_nan=False)
 
 
 def parse_iso_datetime(dt_str: str | None) -> datetime | None:
