@@ -204,6 +204,8 @@ The interactive dashboard (`rh_support_lib/tui/app.py`) is implemented using Tex
   Network operations run on background threads via `self.run_worker(lambda: fn(), thread=True)`. UI updates are dispatched back to the main thread loop using thread-safe callbacks. Active tasks are visually reported in the header bar via `track_job(description)`.
 * **Operation Targets and Detail Generations**:
   Comment, upload, template, and download actions capture their case identifier before scheduling a worker. Selection and refresh requests carry a monotonically increasing detail generation. Loading, result, and error callbacks check the target and generation on the UI thread before changing the detail pane, including when navigating away and back to the same case. Mutation refreshes and errors only affect the pane while its original target remains selected.
+* **Draft Ownership**:
+  Composer generations distinguish submitted drafts from newer drafts, including navigation back to the same case. Posting retains the editor until confirmed success and guards duplicate Post events before worker scheduling. Completion releases submission bookkeeping regardless of selection; it clears only the unchanged submitted draft. Refresh failures after posting do not restore it as unsent. Draft persistence writes unique private files in a worker, then performs UI cleanup/navigation/quit on the UI thread only if the saved draft still owns the composer. No worker sleeps or performs widget mutations during file I/O.
 * **Stale-While-Revalidate (SWR)**:
   When a row is selected, cached details render immediately (0 ms) from disk cache while a background worker validates remote freshness.
 

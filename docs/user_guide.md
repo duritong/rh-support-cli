@@ -513,6 +513,8 @@ rh-support-cli tui
 | **`r`** | Contextual refresh |
 | **`q`** | Quit TUI |
 
+Comment text and the selected status remain available if submission fails; the TUI never automatically retries a failed submission. If a timeout or a later status update fails, check the case before retrying because the comment may already exist remotely. Closing the composer, navigating away, or quitting with a draft offers the existing Save/Discard/Cancel choices. Saving preserves the complete draft in a unique file under `~/.config/rh-support-cli/drafts/`; navigation or exit proceeds only after a successful save. If you edit the draft while a save or submission is running, newer text is not cleared by the older operation.
+
 *For internal TUI architecture, Textual view-swapping, and threading details, see the [Developer Guide](developer_guide.md).*
 
 ---

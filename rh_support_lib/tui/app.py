@@ -4,8 +4,8 @@ import contextlib
 import os
 import pathlib
 import re
+import tempfile
 import threading
-import time
 from typing import Any, ClassVar, Optional
 
 from rich.box import ROUNDED
@@ -640,6 +640,8 @@ class SupportApp(App):
         self.cases: list[Case] = []
         self.selected_case_id: str | None = None
         self._detail_generation = 0
+        self._comment_generation = 0
+        self._pending_comments: set[int] = set()
         self.current_details: CaseDetails | None = None
         self.current_attachments: list[Attachment] = []
         self.active_jobs: list[str] = []
@@ -1015,8 +1017,8 @@ class SupportApp(App):
         # Check if commenting is open and holds dirty text
         if self.screen.has_class("commenting"):
             text_area = self.query_one("#tui-comment-textarea", TextArea)
-            comment_text = text_area.text.strip()
-            if comment_text:
+            comment_text = text_area.text
+            if comment_text.strip():
                 self.prompt_unsaved_changes_on_navigation(comment_text, next_case_id)
                 return
             else:
@@ -1065,27 +1067,37 @@ class SupportApp(App):
     @on(Button.Pressed, "#tui-comment-post-btn")
     def on_comment_post_click(self) -> None:
         text_area = self.query_one("#tui-comment-textarea", TextArea)
-        comment_body = text_area.text.strip()
-        if not comment_body:
+        raw_body = text_area.text
+        if not raw_body.strip():
             self.show_error("Comment body cannot be empty.")
             return
 
         select = self.query_one("#tui-comment-status-select", Select)
         target_status = select.value
         case_id = self.selected_case_id
+        generation = self._comment_generation
+        if generation in self._pending_comments:
+            return
+        self._pending_comments.add(generation)
+        self.query_one("#tui-comment-post-btn").disabled = True
 
-        self.run_worker(
-            lambda: self.execute_comment_submission(
-                case_id, comment_body, target_status
-            ),
-            thread=True,
-        )
+        try:
+            self.run_worker(
+                lambda: self.execute_comment_submission(
+                    case_id, raw_body, target_status, generation
+                ),
+                thread=True,
+            )
+        except Exception:
+            self._pending_comments.discard(generation)
+            self.query_one("#tui-comment-post-btn").disabled = False
+            raise
 
     @on(Button.Pressed, "#tui-comment-save-btn")
     def on_comment_save_click(self) -> None:
         text_area = self.query_one("#tui-comment-textarea", TextArea)
-        comment_text = text_area.text.strip()
-        if not comment_text:
+        comment_text = text_area.text
+        if not comment_text.strip():
             self.show_error("Comment draft is empty.")
             return
         self.save_comment_to_file(comment_text)
@@ -1538,6 +1550,8 @@ class SupportApp(App):
             return
 
         # Show the inline comment pane
+        if not self.screen.has_class("commenting"):
+            self._comment_generation += 1
         self.screen.add_class("commenting")
         self.compose_comment_pane()
 
@@ -1552,6 +1566,9 @@ class SupportApp(App):
         container = self.query_one("#comment-pane-container")
         if len(container.children) > 0:
             self.update_comment_status_dropdown()
+            self.query_one("#tui-comment-post-btn").disabled = (
+                self._comment_generation in self._pending_comments
+            )
             return
 
         case = (
@@ -1618,28 +1635,35 @@ class SupportApp(App):
             select.value = target_status
 
     def execute_comment_submission(
-        self, case_id: str, comment_body: str, target_status: str
+        self, case_id: str, raw_body: str, target_status: str, generation: int
     ) -> None:
         with self.track_job(f"Posting comment on #{case_id}..."):
-
-            def show_posting():
-                self.screen.remove_class("commenting")
-                with contextlib.suppress(Exception):
-                    self.query_one("#tui-comment-textarea", TextArea).text = ""
-                with contextlib.suppress(Exception):
-                    container = self.query_one("#case-detail-container")
-                    container.query("*").remove()
-                    container.mount(Static("Posting comment..."))
-
-            self._safe_call(self._call_for_case, case_id, None, show_posting)
             try:
                 self.case_service.add_comment(
                     case_id,
-                    comment_body,
+                    raw_body.strip(),
                     is_public=True,
                     status=target_status if target_status else None,
                 )
-
+            except Exception as e:  # noqa: BLE001
+                self._safe_call(
+                    self._finish_comment_submission,
+                    case_id,
+                    raw_body,
+                    target_status,
+                    generation,
+                    str(e),
+                )
+                return
+            self._safe_call(
+                self._finish_comment_submission,
+                case_id,
+                raw_body,
+                target_status,
+                generation,
+                None,
+            )
+            try:
                 self._safe_call(
                     self._call_for_case,
                     case_id,
@@ -1649,11 +1673,32 @@ class SupportApp(App):
                     True,
                 )
                 self.fetch_cases(force=True)
-
             except Exception as e:  # noqa: BLE001
                 self._safe_call(
-                    self._call_for_case, case_id, None, self.show_error, str(e)
+                    self._call_for_case,
+                    case_id,
+                    None,
+                    self.show_error,
+                    f"Comment posted, but refresh failed: {e}",
                 )
+
+    def _finish_comment_submission(
+        self, case_id, raw_body, target_status, generation, error
+    ) -> None:
+        self._pending_comments.discard(generation)
+        if self.selected_case_id != case_id or self._comment_generation != generation:
+            return
+        with contextlib.suppress(Exception):
+            self.query_one("#tui-comment-post-btn").disabled = False
+            editor = self.query_one("#tui-comment-textarea", TextArea)
+            if error:
+                self.show_error(error)
+                return
+            status = self.query_one("#tui-comment-status-select", Select).value
+            if editor.text == raw_body and status == target_status:
+                self.screen.remove_class("commenting")
+                editor.text = ""
+                self._comment_generation += 1
 
     def action_exit_commenting(self) -> None:
         """Hides the comment pane, checking for unsaved changes if needed."""
@@ -1661,9 +1706,9 @@ class SupportApp(App):
             return
 
         text_area = self.query_one("#tui-comment-textarea", TextArea)
-        comment_text = text_area.text.strip()
+        comment_text = text_area.text
 
-        if comment_text:
+        if comment_text.strip():
             self.prompt_unsaved_changes(comment_text)
         else:
             self.screen.remove_class("commenting")
@@ -1672,6 +1717,7 @@ class SupportApp(App):
     def prompt_unsaved_changes(self, comment_text: str) -> None:
         def handle_choice(choice: str) -> None:
             if choice == "discard":
+                self._comment_generation += 1
                 self.screen.remove_class("commenting")
                 self.query_one("#tui-comment-textarea", TextArea).text = ""
             elif choice == "save":
@@ -1684,6 +1730,7 @@ class SupportApp(App):
     ) -> None:
         def handle_choice(choice: str) -> None:
             if choice == "discard":
+                self._comment_generation += 1
                 self.screen.remove_class("commenting")
                 self.query_one("#tui-comment-textarea", TextArea).text = ""
                 self.selected_case_id = next_case_id
@@ -1694,36 +1741,76 @@ class SupportApp(App):
         self.push_screen(UnsavedChangesModal(comment_text), handle_choice)
 
     def save_comment_to_file(
-        self, comment_text: str, next_case_id: str | None = None
+        self, comment_text: str, next_case_id: str | None = None, on_saved=None
     ) -> None:
         drafts_dir = os.path.expanduser("~/.config/rh-support-cli/drafts")
-        try:
-            pathlib.Path(drafts_dir).mkdir(parents=True, exist_ok=True)
-            timestamp = int(time.time())
-            filename = f"comment_draft_{self.selected_case_id}_{timestamp}.txt"
-            path = os.path.join(drafts_dir, filename)
-            with open(path, "w") as f:
-                f.write(comment_text)
+        case_id = self.selected_case_id
+        generation = self._comment_generation
 
-            # Inform user of file location
-            def show_saved():
+        def show_saved(path):
+            if (
+                self.selected_case_id != case_id
+                or self._comment_generation != generation
+            ):
+                self.notify(f"Draft saved to {path}")
+                return
+            editor = self.query_one("#tui-comment-textarea", TextArea)
+            if editor.text != comment_text:
+                self.notify(f"Draft saved to {path}; newer edits remain unsaved.")
+                return
+            self.screen.remove_class("commenting")
+            editor.text = ""
+            self._comment_generation += 1
+            if next_case_id:
+                self.selected_case_id = next_case_id
+                self._request_case_details(next_case_id)
+            else:
                 container = self.query_one("#case-detail-container")
                 container.query("*").remove()
                 container.mount(
                     Static(f"[bold green]Success:[/] Draft saved to {path}")
                 )
+            if on_saved:
+                on_saved()
 
-            self.call_from_thread(show_saved)
+        def save():
+            path = None
+            try:
+                pathlib.Path(drafts_dir).mkdir(parents=True, exist_ok=True)
+                with tempfile.NamedTemporaryFile(
+                    mode="w",
+                    encoding="utf-8",
+                    dir=drafts_dir,
+                    prefix=f"comment_draft_{case_id}_",
+                    suffix=".txt",
+                    delete=False,
+                ) as draft:
+                    path = draft.name
+                    draft.write(comment_text)
+            except OSError as e:
+                if path:
+                    with contextlib.suppress(OSError):
+                        os.remove(path)
+                self._safe_call(self.show_error, f"Failed to save draft to file: {e}")
+                return
+            self._safe_call(show_saved, path)
 
-            self.screen.remove_class("commenting")
-            self.query_one("#tui-comment-textarea", TextArea).text = ""
+        self.run_worker(save, thread=True)
 
-            if next_case_id:
-                time.sleep(1)
-                self.selected_case_id = next_case_id
-                self._request_case_details(next_case_id)
-        except OSError as e:
-            self.show_error(f"Failed to save draft to file: {e}")
+    def action_quit(self) -> None:
+        if self.screen.has_class("commenting"):
+            text = self.query_one("#tui-comment-textarea", TextArea).text
+            if text.strip():
+
+                def handle_choice(choice):
+                    if choice == "discard":
+                        self.exit()
+                    elif choice == "save":
+                        self.save_comment_to_file(text, on_saved=self.exit)
+
+                self.push_screen(UnsavedChangesModal(text), handle_choice)
+                return
+        self.exit()
 
     def action_add_attachment(self) -> None:
         if not self.selected_case_id:

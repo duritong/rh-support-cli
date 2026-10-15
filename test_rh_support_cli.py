@@ -4971,7 +4971,10 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
                     # Post comment
                     app.execute_comment_submission(
-                        "12345", "New comment from test", "Waiting on Customer"
+                        "12345",
+                        "New comment from test",
+                        "Waiting on Customer",
+                        app._comment_generation,
                     )
                     await app.workers.wait_for_complete()
                     await pilot.pause()
@@ -6090,6 +6093,240 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             shutil.rmtree(temp_dir)
 
 
+class TestTuiDraftSafety(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+
+        from rh_support_lib.tui.app import SupportApp
+
+        self.home = tempfile.TemporaryDirectory()
+        self.addCleanup(self.home.cleanup)
+        for patcher in (
+            mock.patch.dict(os.environ, {"HOME": self.home.name}),
+            mock.patch("rh_support_lib.tui.app.CaseService"),
+            mock.patch("rh_support_lib.tui.app.AttachmentService"),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.app = SupportApp("test-token", config={"tui": {"poll_interval": 0}})
+        self.app.fetch_cases = mock.Mock()
+        self.app.fetch_case_details = mock.Mock()
+        self.app.selected_case_id = "A"
+
+    def test_failed_post_retains_exact_draft_and_prevents_duplicate_submission(self):
+        import asyncio
+
+        from textual.widgets import Select, TextArea
+
+        async def exercise():
+            async with self.app.run_test() as pilot:
+                self.app.action_add_comment()
+                await pilot.pause()
+                editor = self.app.query_one("#tui-comment-textarea", TextArea)
+                status = self.app.query_one("#tui-comment-status-select", Select).value
+                raw = "  Incident update\n\n```\n<xml/>\n```\n "
+                editor.text = raw
+                self.app.case_service.add_comment.side_effect = RuntimeError(
+                    "Connection failed"
+                )
+                self.app.on_comment_post_click()
+                self.app.on_comment_post_click()
+                await self.app.workers.wait_for_complete()
+                await pilot.pause()
+                self.assertEqual(editor.text, raw)
+                self.assertTrue(self.app.screen.has_class("commenting"))
+                self.assertEqual(
+                    self.app.query_one("#tui-comment-status-select", Select).value,
+                    status,
+                )
+                self.assertFalse(self.app.query_one("#tui-comment-post-btn").disabled)
+                self.app.case_service.add_comment.assert_called_once()
+
+        asyncio.run(exercise())
+
+    def test_save_draft_from_ui_thread_is_exact_and_unique(self):
+        import asyncio
+        from pathlib import Path
+
+        from textual.widgets import TextArea
+
+        async def exercise():
+            async with self.app.run_test() as pilot:
+                for raw in ("  first draft\n", "second draft\n\n"):
+                    self.app.action_add_comment()
+                    await pilot.pause()
+                    self.app.query_one("#tui-comment-textarea", TextArea).text = raw
+                    self.app.on_comment_save_click()
+                    await self.app.workers.wait_for_complete()
+                    await pilot.pause()
+                    self.assertFalse(self.app.screen.has_class("commenting"))
+                files = list(
+                    Path(self.home.name).glob(
+                        ".config/rh-support-cli/drafts/comment_draft_A_*.txt"
+                    )
+                )
+                self.assertEqual(len(files), 2)
+                self.assertEqual(
+                    {path.read_text() for path in files},
+                    {"  first draft\n", "second draft\n\n"},
+                )
+
+        asyncio.run(exercise())
+
+    def test_late_submission_failure_does_not_restore_discarded_draft(self):
+        import asyncio
+
+        started, release = threading.Event(), threading.Event()
+
+        def fail(*args, **kwargs):
+            started.set()
+            if not release.wait(5):
+                raise TimeoutError("Test did not release submission")
+            raise RuntimeError("Late failure")
+
+        self.app.case_service.add_comment.side_effect = fail
+
+        async def exercise():
+            async with self.app.run_test() as pilot:
+                self.app.action_add_comment()
+                await pilot.pause()
+                self.app.query_one("#tui-comment-textarea").text = "draft A"
+                self.app.on_comment_post_click()
+                try:
+                    self.assertTrue(await asyncio.to_thread(started.wait, 5))
+                    self.app.prompt_unsaved_changes_on_navigation("draft A", "B")
+                    await pilot.pause()
+                    await pilot.click("#discard-btn")
+                    self.app.action_add_comment()
+                    await pilot.pause()
+                    self.app.query_one("#tui-comment-textarea").text = "new draft B"
+                finally:
+                    release.set()
+                await self.app.workers.wait_for_complete()
+                await pilot.pause()
+                self.assertEqual(
+                    self.app.query_one("#tui-comment-textarea").text, "new draft B"
+                )
+                self.assertTrue(self.app.screen.has_class("commenting"))
+                self.assertFalse(self.app.query_one("#tui-comment-post-btn").disabled)
+                self.assertFalse(self.app._pending_comments)
+
+        asyncio.run(exercise())
+
+    def test_successful_post_is_not_restored_when_refresh_fails(self):
+        import asyncio
+
+        async def exercise():
+            async with self.app.run_test() as pilot:
+                self.app.action_add_comment()
+                await pilot.pause()
+                self.app.query_one("#tui-comment-textarea").text = "posted"
+                self.app.fetch_cases.side_effect = RuntimeError("Refresh failed")
+                self.app.on_comment_post_click()
+                await self.app.workers.wait_for_complete()
+                await pilot.pause()
+                self.assertEqual(self.app.query_one("#tui-comment-textarea").text, "")
+                self.assertFalse(self.app.screen.has_class("commenting"))
+                self.app.case_service.add_comment.assert_called_once()
+
+        asyncio.run(exercise())
+
+    def test_successful_post_keeps_edits_made_during_submission(self):
+        import asyncio
+
+        started, release = threading.Event(), threading.Event()
+
+        def post(*args, **kwargs):
+            started.set()
+            if not release.wait(5):
+                raise TimeoutError("Test did not release submission")
+
+        self.app.case_service.add_comment.side_effect = post
+
+        async def exercise():
+            async with self.app.run_test() as pilot:
+                self.app.action_add_comment()
+                await pilot.pause()
+                editor = self.app.query_one("#tui-comment-textarea")
+                editor.text = "submitted"
+                self.app.on_comment_post_click()
+                try:
+                    self.assertTrue(await asyncio.to_thread(started.wait, 5))
+                    editor.text = "newer edits"
+                finally:
+                    release.set()
+                await self.app.workers.wait_for_complete()
+                await pilot.pause()
+                self.assertEqual(editor.text, "newer edits")
+                self.assertTrue(self.app.screen.has_class("commenting"))
+                self.assertFalse(self.app.query_one("#tui-comment-post-btn").disabled)
+
+        asyncio.run(exercise())
+
+    def test_quit_saves_before_exiting_and_q_remains_editor_input(self):
+        import asyncio
+        from pathlib import Path
+
+        async def exercise():
+            async with self.app.run_test() as pilot:
+                self.app.action_add_comment()
+                await pilot.pause()
+                await pilot.press("q")
+                self.assertEqual(self.app.query_one("#tui-comment-textarea").text, "q")
+                with mock.patch.object(self.app, "exit") as exit_app:
+                    await self.app.run_action("quit")
+                    await pilot.pause()
+                    exit_app.assert_not_called()
+                    await pilot.click("#save-btn")
+                    await self.app.workers.wait_for_complete()
+                    await pilot.pause()
+                    exit_app.assert_called_once()
+                    files = list(
+                        Path(self.home.name).glob(".config/rh-support-cli/drafts/*.txt")
+                    )
+                    self.assertEqual([path.read_text() for path in files], ["q"])
+
+        asyncio.run(exercise())
+
+    def test_quit_uses_existing_save_discard_cancel_modal(self):
+        import asyncio
+
+        from rh_support_lib.tui.app import UnsavedChangesModal
+
+        async def exercise():
+            async with self.app.run_test() as pilot:
+                self.app.action_add_comment()
+                await pilot.pause()
+                self.app.query_one("#tui-comment-textarea").text = "keep me"
+                with mock.patch.object(self.app, "exit") as exit_app:
+                    await self.app.run_action("quit")
+                    await pilot.pause()
+                    self.assertIsInstance(self.app.screen, UnsavedChangesModal)
+                    await pilot.click("#cancel-btn")
+                    self.assertEqual(
+                        self.app.query_one("#tui-comment-textarea").text, "keep me"
+                    )
+                    exit_app.assert_not_called()
+                    await self.app.run_action("quit")
+                    await pilot.pause()
+                    with mock.patch(
+                        "pathlib.Path.mkdir", side_effect=OSError("No space")
+                    ):
+                        await pilot.click("#save-btn")
+                        await self.app.workers.wait_for_complete()
+                        await pilot.pause()
+                    exit_app.assert_not_called()
+                    self.assertEqual(
+                        self.app.query_one("#tui-comment-textarea").text, "keep me"
+                    )
+                    await self.app.run_action("quit")
+                    await pilot.pause()
+                    await pilot.click("#discard-btn")
+                    exit_app.assert_called_once()
+
+        asyncio.run(exercise())
+
+
 class TestDebugLoggingSafety(unittest.TestCase):
     def test_transport_debug_logs_do_not_bypass_redaction(self):
         import logging
@@ -6260,6 +6497,7 @@ class TestTuiOperationSafety(unittest.TestCase):
             side_effect=lambda selector, *args: {
                 "#tui-comment-textarea": SimpleNamespace(text="Draft for A"),
                 "#tui-comment-status-select": SimpleNamespace(value="In Progress"),
+                "#tui-comment-post-btn": SimpleNamespace(disabled=False),
             }[selector]
         )
         self.app.fetch_case_details = mock.Mock()
