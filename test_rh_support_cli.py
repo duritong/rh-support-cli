@@ -6090,6 +6090,49 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             shutil.rmtree(temp_dir)
 
 
+class TestCommentContentFidelity(unittest.TestCase):
+    def test_literal_markup_and_entities_in_html(self):
+        from rh_support_lib.utils import clean_comment_body
+
+        for source, expected in (
+            (
+                "<pre><code>&lt;root&gt;value&lt;/root&gt;</code></pre>",
+                "```\n<root>value</root>\n```",
+            ),
+            ("<p>Use <code>&lt;b&gt;x&lt;/b&gt;</code></p>", "Use `<b>x</b>`"),
+            ("<pre><code>&amp;lt;root&amp;gt;</code></pre>", "```\n&lt;root&gt;\n```"),
+            ("<p>Literal &lt;b&gt;text&lt;/b&gt;</p>", "Literal <b>text</b>"),
+            ("<div>&lt;b&gt;text&lt;/b&gt;</div>", "<b>text</b>"),
+        ):
+            with self.subTest(source=source):
+                self.assertEqual(clean_comment_body(source), expected)
+
+    def test_preformatted_whitespace_and_markdown_roundtrip(self):
+        from rh_support_lib.utils import clean_comment_body, format_body_for_portal
+
+        source = '<root attr="one & two">\n\n\n  <child/>\n</root>'
+        markdown = "```\n" + source + "\n```"
+        self.assertEqual(clean_comment_body(format_body_for_portal(markdown)), markdown)
+        self.assertEqual(clean_comment_body("plain\n\n\ntext"), "plain\n\n\ntext")
+        self.assertEqual(
+            clean_comment_body(
+                "<p>before</p>\n\n\n<pre><code>first\n\n\nlast\n</code></pre><p>after</p>"
+            ),
+            "before\n\n```\nfirst\n\n\nlast\n```\n\nafter",
+        )
+
+    def test_transport_encoded_html_preserves_code(self):
+        import html
+
+        from rh_support_lib.utils import clean_comment_body
+
+        source = "<div><pre><code>&lt;root/&gt;</code></pre></div>"
+        for depth in range(3):
+            with self.subTest(depth=depth):
+                self.assertEqual(clean_comment_body(source), "```\n<root/>\n```")
+            source = html.escape(source)
+
+
 class TestTuiOperationSafety(unittest.TestCase):
     def setUp(self):
         import contextlib

@@ -27,6 +27,8 @@ class HTMLToMarkdownParser(HTMLParser):
         self.list_stack = []
         self.current_href = None
         self.current_link_text = []
+        self.preformatted_ranges = []
+        self.preformatted_start = None
 
     def handle_starttag(self, tag, attrs):
         tag = tag.lower()
@@ -57,6 +59,7 @@ class HTMLToMarkdownParser(HTMLParser):
         elif tag == "pre":
             self._ensure_newline(2)
             self.result.append("```\n")
+            self.preformatted_start = len(self.result)
         elif tag == "ul":
             self._ensure_newline(1)
             self.list_stack.append(("ul", 0))
@@ -103,6 +106,11 @@ class HTMLToMarkdownParser(HTMLParser):
             if not self._in_tag("pre"):
                 self.result.append("`")
         elif tag == "pre":
+            if self.preformatted_start is not None:
+                self.preformatted_ranges.append(
+                    (self.preformatted_start, len(self.result))
+                )
+                self.preformatted_start = None
             self._ensure_newline(1)
             self.result.append("```\n\n")
         elif tag in ("ul", "ol"):
@@ -144,24 +152,36 @@ class HTMLToMarkdownParser(HTMLParser):
         return any(t == tag_name for t, _ in self.tag_stack)
 
     def get_markdown(self):
-        text = "".join(self.result).strip()
-        text = re.sub(r"\n{3,}", "\n\n", text)
-        return text
+        parts = []
+        end = 0
+        for start, stop in self.preformatted_ranges:
+            parts.append(re.sub(r"\n{3,}", "\n\n", "".join(self.result[end:start])))
+            parts.append("".join(self.result[start:stop]))
+            end = stop
+        parts.append(re.sub(r"\n{3,}", "\n\n", "".join(self.result[end:])))
+        return "".join(parts).strip()
 
 
 def clean_comment_body(body: str) -> str:
     """
     Cleans up a case comment or description body:
-    1. Unescapes HTML entities (including double-encoded entities from CRM).
+    1. Decodes up to two transport-encoding layers to recognize CRM HTML.
     2. Strips outer wrapping <div>...</div> tags (e.g. legacy-comment-plaintext, legacy-comment-markdown).
     3. If the content contains HTML elements, converts them into clean, human-readable Markdown.
     """
     if not body:
         return ""
 
-    text = html.unescape(body)
-    if re.search(r"&(?:amp;|lt;|gt;|quot;|#\d+;|#x[0-9a-fA-F]+;)", text):
-        text = html.unescape(text)
+    html_elements = r"<(?:p|h[1-6]|br|ul|ol|li|a|strong|b|em|i|pre|code|blockquote|hr|div|span|table|img|del|s)\b"
+    text = body
+    # Stop before decoding HTML text entities; the parser must see them as data.
+    for _ in range(2):
+        if re.search(html_elements, text, re.IGNORECASE):
+            break
+        decoded = html.unescape(text)
+        if decoded == text:
+            break
+        text = decoded
 
     stripped = text.strip()
     div_match = re.match(
@@ -170,16 +190,12 @@ def clean_comment_body(body: str) -> str:
     if div_match:
         stripped = div_match.group(1).strip()
 
-    if re.search(
-        r"<(?:p|h[1-6]|br|ul|ol|li|a|strong|b|em|i|pre|code|blockquote|hr|div|span|table|img|del|s)\b",
-        stripped,
-        re.IGNORECASE,
-    ):
+    if re.search(html_elements, stripped, re.IGNORECASE):
         parser = HTMLToMarkdownParser()
         parser.feed(stripped)
         return parser.get_markdown()
 
-    return stripped
+    return html.unescape(stripped) if div_match else stripped
 
 
 def colorize(text, color, simple_output=False):

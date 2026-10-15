@@ -150,6 +150,8 @@ Terminal Display (Markdown) ◄── HTMLToMarkdownParser ◄──────
 2. **Inbound Conversion (`clean_comment_body` / `HTMLToMarkdownParser`)**:
    * Scans for HTML elements (`<p>`, `<pre>`, `<code>`, `<a>`, `<ul>`, etc.).
    * Translates HTML back into clean terminal Markdown for Rich and Textual rendering.
+   * Decodes at most two outer transport-encoding layers, stopping as soon as HTML is recognized. Text entities inside actual HTML are decoded by the parser, not reparsed as markup, preserving literal XML/HTML examples and entity spellings in code.
+   * Normalizes extra prose spacing without collapsing blank lines inside preformatted code blocks. Entirely escaped HTML without format metadata remains heuristically interpreted as legacy CRM HTML.
 
 ---
 
