@@ -298,6 +298,8 @@ rh-support-cli comment -c 12345678 -f /var/log/messages --format plain
 ```
 
 ### 5.8 Attachment Management (`attachment` / `attach` / `download`)
+Downloads reject unsafe remote filenames and never overwrite an existing destination, including symlinks. If the output path already exists, choose another `-o` filename. The final file becomes visible only after the transfer completes; failed or interrupted transfers remove their temporary files.
+
 Manage diagnostic archives and log bundles attached to support cases:
 
 ```bash

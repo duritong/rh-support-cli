@@ -128,6 +128,9 @@ This ensures the final chunk accounts for all remainder bytes and eliminates fil
 ### Abort Lifecycle on Interruption
 If an upload is aborted, cancelled (`Ctrl+C`), or encounters a connection drop during multipart transfer, `AttachmentService.upload_attachment` traps the exception and calls `DELETE /v3/cases/attachments/upload/abort` to release storage session resources on the server.
 
+### Safe Download Publication
+Remote filenames must be single safe path components. Downloads stream into a private temporary file in the destination directory, validate an unencoded response's declared length, flush it, then publish it with `os.link`. This requires a filesystem supporting hard links and atomically refuses destination collisions, including a file or symlink created during the transfer. The response is closed and the temporary file removed on success, failure, callback exceptions, and interruption. No overwrite or copy-based fallback is used.
+
 ---
 
 ## 5. Rich Text & Comment Formatting Engine

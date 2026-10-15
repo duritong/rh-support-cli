@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import os
 import re
+import tempfile
 from collections.abc import Callable
 from typing import ClassVar
 
@@ -169,23 +170,64 @@ class AttachmentService:
             raise RuntimeError("No presigned download URL returned by server.")
 
         filename = data.get("fileName", f"attachment_{attachment_id}.bin")
+        if (
+            not isinstance(filename, str)
+            or not filename
+            or filename in (".", "..")
+            or any(char in filename for char in ("/", "\\", "\x00"))
+            or re.match(r"^[a-zA-Z]:", filename)
+        ):
+            raise ValueError("Unsafe attachment filename returned by server.")
         dest_path = target_path or filename
         if os.path.isdir(dest_path):
             dest_path = os.path.join(dest_path, filename)
+        if os.path.lexists(dest_path):
+            raise FileExistsError(
+                f"Destination already exists: {dest_path}. Choose another output path."
+            )
 
         # Download from storage using the presigned URL directly
-        down_resp = requests.get(download_url, stream=True, timeout=60)
-        down_resp.raise_for_status()
-        total_size = int(down_resp.headers.get("Content-Length", 0))
-        downloaded = 0
-
-        with open(dest_path, "wb") as f:
-            for chunk in down_resp.iter_content(chunk_size=65536):
-                if chunk:
-                    f.write(chunk)
-                    downloaded += len(chunk)
-                    if progress_callback and total_size > 0:
-                        progress_callback(downloaded, total_size)
+        partial_path = None
+        try:
+            with contextlib.closing(
+                requests.get(download_url, stream=True, timeout=60)
+            ) as down_resp:
+                down_resp.raise_for_status()
+                length = down_resp.headers.get("Content-Length")
+                total_size = int(length) if length is not None else 0
+                downloaded = 0
+                with tempfile.NamedTemporaryFile(
+                    mode="wb",
+                    dir=os.path.dirname(os.path.abspath(dest_path)),
+                    prefix=".rh-support-download-",
+                    suffix=".part",
+                    delete=False,
+                ) as output:
+                    partial_path = output.name
+                    for chunk in down_resp.iter_content(chunk_size=65536):
+                        if chunk:
+                            output.write(chunk)
+                            downloaded += len(chunk)
+                            if progress_callback and total_size > 0:
+                                progress_callback(downloaded, total_size)
+                    if (
+                        length is not None
+                        and down_resp.headers.get(
+                            "Content-Encoding", "identity"
+                        ).lower()
+                        == "identity"
+                        and downloaded != total_size
+                    ):
+                        raise OSError(
+                            "Downloaded length does not match Content-Length."
+                        )
+                    output.flush()
+                    os.fsync(output.fileno())
+            # A hard link publishes atomically and fails if any destination appeared.
+            os.link(partial_path, dest_path)
+        finally:
+            if partial_path is not None:
+                os.unlink(partial_path)
 
         return dest_path
 

@@ -6095,6 +6095,103 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
             shutil.rmtree(temp_dir)
 
 
+class TestAttachmentDownloadSafety(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+
+        from rh_support_lib.services.attachments import AttachmentService
+
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.root = Path(self.directory.name)
+        self.target = self.root / "bundle"
+        self.client = mock.Mock()
+        self.client.get.return_value.json.return_value = {
+            "fileName": "bundle",
+            "downloadUrl": "https://storage.example/bundle",
+        }
+        self.service = AttachmentService(self.client)
+        patcher = mock.patch("rh_support_lib.services.attachments.requests.get")
+        self.get = patcher.start()
+        self.addCleanup(patcher.stop)
+        self.response = self.get.return_value
+        self.response.headers = {"Content-Length": "6"}
+        self.response.iter_content.return_value = iter([b"abc", b"def"])
+
+    def download(self, callback=None):
+        return self.service.download_attachment(
+            "100", "att_123", str(self.target), callback
+        )
+
+    def test_existing_file_and_symlinks_are_never_overwritten(self):
+        self.target.write_bytes(b"original")
+        with self.assertRaises(FileExistsError):
+            self.download()
+        self.assertEqual(self.target.read_bytes(), b"original")
+        self.get.assert_not_called()
+        self.target.unlink()
+        victim = self.root / "victim"
+        victim.write_bytes(b"keep")
+        self.target.symlink_to(victim)
+        with self.assertRaises(FileExistsError):
+            self.download()
+        self.assertEqual(victim.read_bytes(), b"keep")
+
+    def test_unsafe_remote_filenames_are_rejected(self):
+        destination = self.root / "safe"
+        destination.mkdir()
+        for filename in (
+            "../escape",
+            str(self.root / "absolute"),
+            "..\\escape",
+            "C:escape",
+            "",
+            None,
+        ):
+            with self.subTest(filename=filename):
+                self.client.get.return_value.json.return_value["fileName"] = filename
+                with self.assertRaisesRegex(ValueError, "filename"):
+                    self.service.download_attachment("100", "att_123", str(destination))
+        self.get.assert_not_called()
+
+    def test_download_is_invisible_until_complete_and_response_is_closed(self):
+        def progress(done, total):
+            self.assertFalse(self.target.exists())
+
+        self.assertEqual(self.download(progress), str(self.target))
+        self.assertEqual(self.target.read_bytes(), b"abcdef")
+        self.assertEqual(list(self.root.iterdir()), [self.target])
+        self.response.close.assert_called_once()
+
+    def test_failure_or_interruption_removes_partial_file(self):
+        for error in (OSError("Transfer interrupted"), KeyboardInterrupt()):
+            with self.subTest(error=type(error).__name__):
+                self.response.iter_content.side_effect = lambda **kwargs: iter([b"abc"])
+
+                def fail(done, total, error=error):
+                    raise error
+
+                with self.assertRaises(type(error)):
+                    self.download(fail)
+                self.assertEqual(list(self.root.iterdir()), [])
+
+    def test_destination_created_during_transfer_is_preserved(self):
+        def race(done, total):
+            self.target.write_bytes(b"created concurrently")
+
+        with self.assertRaises(FileExistsError):
+            self.download(race)
+        self.assertEqual(self.target.read_bytes(), b"created concurrently")
+        self.assertEqual(list(self.root.iterdir()), [self.target])
+
+    def test_short_response_is_not_published(self):
+        self.response.iter_content.return_value = iter([b"abc"])
+        with self.assertRaisesRegex(OSError, "length"):
+            self.download()
+        self.assertEqual(list(self.root.iterdir()), [])
+
+
 class TestContentCacheIsolation(unittest.TestCase):
     def setUp(self):
         import tempfile
