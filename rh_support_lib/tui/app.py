@@ -172,7 +172,7 @@ class TemplateModal(ModalScreen[str]):
             Select(
                 choices,
                 prompt="Select a template",
-                value=initial_value,
+                **({"value": initial_value} if initial_value is not None else {}),
                 id="template-select",
             ),
             Horizontal(
@@ -186,7 +186,7 @@ class TemplateModal(ModalScreen[str]):
     @on(Button.Pressed, "#apply-btn")
     def apply(self) -> None:
         select = self.query_one("#template-select", Select)
-        if select.value and select.value != "none":
+        if isinstance(select.value, str) and select.value != "none":
             self.dismiss(select.value)
         else:
             self.dismiss("")
@@ -211,9 +211,9 @@ class BookmarkModal(ModalScreen[str]):
             choices.append((name, name))
 
         initial_value = None
-        for name, _ in choices:
-            if name == self.active_bookmark:
-                initial_value = name
+        for _, value in choices:
+            if value == self.active_bookmark:
+                initial_value = value
                 break
 
         yield Grid(
@@ -221,7 +221,7 @@ class BookmarkModal(ModalScreen[str]):
             Select(
                 choices,
                 prompt="Select a bookmark",
-                value=initial_value,
+                **({"value": initial_value} if initial_value is not None else {}),
                 id="bookmark-select",
             ),
             Horizontal(
@@ -235,7 +235,7 @@ class BookmarkModal(ModalScreen[str]):
     @on(Button.Pressed, "#select-btn")
     def apply_bk(self) -> None:
         select = self.query_one("#bookmark-select", Select)
-        if select.value:
+        if isinstance(select.value, str):
             self.dismiss(select.value)
         else:
             self.dismiss("")
@@ -411,6 +411,8 @@ class SupportApp(App):
         ("a", "add_attachment", "Attach File"),
         ("d", "download_attachment", "Download"),
         ("t", "apply_template", "Apply Template"),
+        Binding("b", "select_bookmark", "Bookmark", priority=False),
+        Binding("f", "focus_pane", "Focus Pane", priority=False),
         ("w", "toggle_follow", "Follow"),
         ("m", "mark_read", "Mark Read"),
         ("o", "toggle_comment_order", "Order (New/Old)"),
@@ -643,6 +645,8 @@ class SupportApp(App):
         self.cases: list[Case] = []
         self.selected_case_id: str | None = None
         self._detail_generation = 0
+        self._read_generation = 0
+        self._read_timer = None
         self._list_generation = 0
         self._poll_in_flight = False
         self._comment_generation = 0
@@ -710,6 +714,7 @@ class SupportApp(App):
             fn(*args)
 
     def _request_case_details(self, case_id: str, force: bool = False) -> None:
+        self._cancel_read_dwell()
         self._detail_generation += 1
         generation = self._detail_generation
         self.run_worker(
@@ -904,6 +909,7 @@ class SupportApp(App):
         )
         if probe and all(probe[:3]) and probe == metadata:
             return None
+        self._cancel_read_dwell()
         self._detail_generation += 1
         return self._detail_generation
 
@@ -1123,6 +1129,7 @@ class SupportApp(App):
                     break
 
     def show_error(self, msg: str) -> None:
+        self._cancel_read_dwell()
         container = self.query_one("#case-detail-container")
         container.query("*").remove()
         clean_msg = re.sub(r"^(?:Error:\s*)+", "", str(msg).strip())
@@ -1272,6 +1279,7 @@ class SupportApp(App):
     def render_case_details(
         self, details: CaseDetails, attachments: list[Attachment]
     ) -> None:
+        self._cancel_read_dwell()
         self.current_details = details
         self.current_attachments = attachments
         detail_container = self.query_one("#case-detail-container")
@@ -1498,17 +1506,30 @@ class SupportApp(App):
             self.call_after_refresh(scroll_to_divider)
 
         if tc and (status_changed or unread_indices):
-            self.set_timer(
+            generation = self._read_generation
+            self._read_timer = self.set_timer(
                 2.5,
-                lambda: self._auto_mark_read_dwell(str(num)),
+                lambda: self._auto_mark_read_dwell(str(num), generation, details),
                 name=f"dwell_read_{num}",
             )
 
-    def _auto_mark_read_dwell(self, case_num: str) -> None:
+    def _cancel_read_dwell(self) -> None:
+        self._read_generation += 1
+        if self._read_timer is not None:
+            self._read_timer.stop()
+            self._read_timer = None
+
+    def _auto_mark_read_dwell(
+        self, case_num: str, generation: int, details: CaseDetails
+    ) -> None:
+        # A stopped timer may already have queued its callback on the event loop.
+        if generation != self._read_generation or self.current_details is not details:
+            return
         if str(self.selected_case_id) != str(case_num) and str(
             self.selected_case_id
         ).lstrip("0") != str(case_num).lstrip("0"):
             return
+        self._cancel_read_dwell()
         user = self.case_service.get_current_user()
         status = None
         severity = None
@@ -2232,7 +2253,8 @@ class SupportApp(App):
             "Newest First" if self.comments_order == "newest" else "Oldest First"
         )
         self.notify(f"Comments Order: {order_desc}")
-        self._update_case_details_view()
+        if self.current_details is not None:
+            self.render_case_details(self.current_details, self.current_attachments)
 
 
 def cmd_tui(args, api_client, config):

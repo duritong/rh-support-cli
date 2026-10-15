@@ -4343,6 +4343,7 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
 
     def test_tui_layout_horizontal_mailbox_and_persistence(self):
         """Test TUI horizontal split (mailbox) layout initialization, toggle action, and persistence."""
+        import asyncio
         import shutil
         import tempfile
 
@@ -4368,6 +4369,8 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
         async def run_layout_test():
             app = SupportApp(token="mock_access_token_123", config={})
             async with app.run_test() as pilot:
+                await app.workers.wait_for_complete()
+                await pilot.pause()
                 self.assertEqual(app.layout, "horizontal")
                 self.assertNotIn("layout-vertical", app.screen.classes)
 
@@ -4404,6 +4407,16 @@ summary: "Ver: {{ currentDoc.version }} Date: {{ 'next friday' | parse_date }}"
                 await pilot.pause()
                 self.assertEqual(app.layout, "horizontal")
                 self.assertNotIn("layout-vertical", app.screen.classes)
+
+        with (
+            mock.patch("rh_support_lib.tui.app.CaseService") as service,
+            mock.patch("rh_support_lib.tui.app.AttachmentService"),
+        ):
+            service.return_value.state_service.get_tui_layout.return_value = (
+                "horizontal"
+            )
+            service.return_value.list_cases.return_value = []
+            asyncio.run(run_layout_test())
 
     def test_tui_mark_read_removes_visual_unread_indicator(self):
         """Test that pressing 'm' in TUI removes the unread indicator from table and details divider."""
@@ -7379,6 +7392,7 @@ def load_tests(loader, standard_tests, pattern):
                 "test_p2_pagination",
                 "test_p2_attachments",
                 "test_p2_parser",
+                "test_p2_tui_actions",
             ]
         )
     )

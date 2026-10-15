@@ -232,6 +232,8 @@ The interactive dashboard (`rh_support_lib/tui/app.py`) is implemented using Tex
   When a row is selected, cached details render immediately (0 ms) from disk cache while a background worker validates remote freshness.
 * **Polling Ownership and Freshness**:
   List requests capture filters, selection, and request generations on the UI thread before I/O. Only current results/loading/errors may update the UI, and an empty result is a valid list replacement. Background polls remain single-flight through list, probe, and detail I/O. Selected details are compared with displayed metadata, not cache TTL; unchanged list metadata triggers the existing lightweight case/comment probe, including when the selected case leaves the active filter. Changed or unknown metadata permits a guarded full fetch. Draft contents remain independent of these refreshes.
+* **Actions and Read Dwell**:
+  Template/bookmark modals leave absent selections to Textual's constructor default and match option values, avoiding version-specific sentinel names. Bookmark and focus shortcuts are non-priority bindings, preserving printable editor input. Order toggling rerenders the existing details locally. A single read-dwell timer is tied to a read generation and the exact displayed details object; navigation, detail refresh, rerender, and error replacement invalidate it, including already queued callbacks. A list-only refresh leaves the displayed version's dwell intact. Regression tests mount the controls, press actual keys, and execute controlled timer callbacks; the historical layout coroutine is now actually run.
 
 ---
 
