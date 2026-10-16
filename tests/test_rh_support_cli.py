@@ -1086,13 +1086,15 @@ class TestRhSupportCli(unittest.TestCase):
         cls.server_port = cls.server.server_port
         cls.base_url = f"http://{MOCK_HOST}:{cls.server_port}"
         cls.sso_url = f"{cls.base_url}/auth/token"
+        ready_event = threading.Event()
 
-        cls.server_thread = threading.Thread(target=cls.server.serve_forever)
-        cls.server_thread.daemon = True
+        def run_server():
+            ready_event.set()
+            cls.server.serve_forever()
+
+        cls.server_thread = threading.Thread(target=run_server, daemon=True)
         cls.server_thread.start()
-
-        # Give the server a moment to start
-        time.sleep(0.1)
+        ready_event.wait(timeout=5)
 
     @classmethod
     def tearDownClass(cls):
