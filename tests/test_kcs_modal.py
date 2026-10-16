@@ -165,3 +165,30 @@ class KcsModalTests(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
             row = modal.query_one(DataTable).get_row_at(0)
             self.assertEqual(row[1], Text("No KCS solutions found for '[/]'."))
+
+    async def test_results_and_controls_fit_standard_terminal_sizes(self):
+        self.app.search_service.search_kcs.return_value = [
+            KCSSearchResult(str(index), f"Solution {index}") for index in range(20)
+        ]
+        async with self.app.run_test() as pilot:
+            for width, height in ((80, 24), (120, 40)):
+                await pilot.resize_terminal(width, height)
+                callback = Mock()
+                modal = KCSSearchModal(self.app.search_service, initial_query="query")
+                self.app.push_screen(modal, callback)
+                await pilot.pause()
+                await self.app.workers.wait_for_complete()
+                await pilot.pause()
+                table = modal.query_one(DataTable)
+                self.assertGreaterEqual(table.content_region.height, 4)
+                self.assertTrue(modal.region.contains_region(table.region))
+                self.assertTrue(
+                    modal.region.contains_region(
+                        modal.query_one("#modal-buttons").region
+                    )
+                )
+                await pilot.click("#insert-btn")
+                await pilot.pause()
+                callback.assert_called_once_with(
+                    ("insert", "https://access.redhat.com/solutions/0", "Solution 0")
+                )

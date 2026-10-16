@@ -796,15 +796,23 @@ class SupportApp(App):
         border: thick $primary 80%;
         background: $surface;
     }
+    KCSSearchModal {
+        layout: vertical;
+        align: center middle;
+    }
     #kcs-modal-grid {
+        layout: vertical;
         padding: 1 2;
         width: 85;
+        max-width: 100%;
         height: 24;
+        max-height: 100%;
         border: thick $primary 80%;
         background: $surface;
     }
     #kcs-results-table {
-        height: 12;
+        height: 1fr;
+        min-height: 3;
         margin: 1 0;
     }
     #unsaved-label {

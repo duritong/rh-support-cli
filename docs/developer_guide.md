@@ -247,6 +247,8 @@ Deferred KCS-link insertion requires matching displayed/selected case details an
 
 KCS table metadata and query-bearing messages use literal Rich `Text` rather than markup strings, preserving bracketed diagnostics and preventing externally supplied titles/products from being parsed as terminal markup.
 
+The KCS modal overrides the workspace screen grid with a centered vertical layout. Its bounded container and flexible result-table height keep results and action buttons visible at standard 80x24 and 120x40 terminal sizes; mounted tests resize the terminal and click the visible controls.
+
 The interactive dashboard (`rh_support_lib/tui/app.py`) is implemented using Textual:
 
 * **Dual-Layout Topologies**:
