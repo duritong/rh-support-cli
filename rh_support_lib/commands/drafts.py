@@ -134,20 +134,25 @@ def cmd_drafts(args: Any, config: dict | None = None) -> int:
                 "Error: Draft identifier or filename is required (run 'rh-support-cli drafts list')."
             )
 
-        # Search by exact filename, partial filename, or case number
+        # Never let a partial filename select a different case over an exact ID.
         drafts = find_drafts(drafts_dir=drafts_dir)
-        match = None
-        for d in drafts:
-            if (
-                d["file"] == identifier
-                or identifier in d["file"]
-                or d["case_number"] == identifier
-            ):
-                match = d
-                break
-
-        if not match:
+        matches = [d for d in drafts if d["file"] == identifier]
+        if not matches:
+            matches = [
+                d
+                for d in drafts
+                if (d["case_number"].lstrip("0") or "0")
+                == (identifier.lstrip("0") or "0")
+            ]
+        if not matches:
+            matches = [d for d in drafts if identifier in d["file"]]
+        if len(matches) > 1:
+            sys.exit(
+                f"Error: Ambiguous draft identifier '{identifier}'; use an exact filename."
+            )
+        if not matches:
             sys.exit(f"Error: No draft matching '{identifier}' found in {drafts_dir}")
+        match = matches[0]
 
         if is_json:
             print(json.dumps(match, indent=2))

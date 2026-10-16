@@ -43,6 +43,24 @@ class DraftsCliTests(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertIn("No saved comment drafts found", stdout)
 
+    def test_show_precedence_and_ambiguity(self):
+        from pathlib import Path
+
+        for name in ("comment_draft_12345_new.txt", "comment_draft_123_old.txt"):
+            (Path(self.drafts_dir) / name).write_text(name)
+        rc, stdout, _ = self._run_cli("drafts", "show", "000123", "--json")
+        self.assertEqual(rc, 0)
+        self.assertEqual(json.loads(stdout)["case_number"], "123")
+        (Path(self.drafts_dir) / "comment_draft_123_other.txt").write_text("other")
+        rc, _, stderr = self._run_cli("drafts", "show", "123")
+        self.assertNotEqual(rc, 0)
+        self.assertIn("Ambiguous", stderr)
+        rc, stdout, _ = self._run_cli(
+            "drafts", "show", "comment_draft_123_old.txt", "--json"
+        )
+        self.assertEqual(rc, 0)
+        self.assertEqual(json.loads(stdout)["file"], "comment_draft_123_old.txt")
+
     def test_drafts_discovery_filtering_and_show(self):
         """Verify drafts list, filtering by case, and drafts show preview."""
         # Create 2 drafts
