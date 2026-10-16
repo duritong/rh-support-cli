@@ -7,6 +7,7 @@ setup(
     author="Your Name",
     author_email="your.email@example.com",
     packages=find_packages(exclude=("tests", "tests.*")),
+    python_requires=">=3.9",
     install_requires=[
         "requests",
         "requests-toolbelt",
@@ -16,6 +17,7 @@ setup(
         "argcomplete",
         "rich",
         "textual",
+        "markdown-it-py",
     ],
     package_data={
         "rh_support_lib": ["data/*.json"],
