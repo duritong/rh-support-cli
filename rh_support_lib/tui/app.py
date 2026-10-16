@@ -41,6 +41,7 @@ from rh_support_lib.constants import (
 from rh_support_lib.models import Attachment, Case, CaseDetails
 from rh_support_lib.services.attachments import AttachmentService
 from rh_support_lib.services.cases import CaseService
+from rh_support_lib.services.search import SearchService
 from rh_support_lib.statuses import (
     determine_reply_status,
     get_status_choices_for_case,
@@ -396,6 +397,52 @@ class CaseJumpModal(ModalScreen[str]):
         self.dismiss("")
 
 
+class CaseSearchModal(ModalScreen[str]):
+    """Modal screen for searching support cases by query keywords."""
+
+    def __init__(self, initial_query: str = ""):
+        super().__init__()
+        self.initial_query = initial_query
+
+    def compose(self) -> ComposeResult:
+        yield Grid(
+            Label("Search Support Cases", id="modal-title"),
+            Label("Enter search query (keywords, summary, or case number):"),
+            Input(
+                value=self.initial_query,
+                placeholder="e.g. kernel panic or OOM",
+                id="case-search-input",
+            ),
+            Horizontal(
+                Button("Search", variant="success", id="search-btn"),
+                Button("Clear", variant="default", id="clear-btn"),
+                Button("Cancel", variant="error", id="cancel-btn"),
+                id="modal-buttons",
+            ),
+            id="template-modal-grid",
+        )
+
+    def on_mount(self) -> None:
+        self.query_one("#case-search-input", Input).focus()
+
+    @on(Button.Pressed, "#search-btn")
+    def do_search(self) -> None:
+        inp = self.query_one("#case-search-input", Input)
+        self.dismiss(inp.value.strip())
+
+    @on(Button.Pressed, "#clear-btn")
+    def do_clear(self) -> None:
+        self.dismiss("__CLEAR__")
+
+    @on(Input.Submitted, "#case-search-input")
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        self.dismiss(event.value.strip())
+
+    @on(Button.Pressed, "#cancel-btn")
+    def cancel_search(self) -> None:
+        self.dismiss("")
+
+
 class FocusableContainer(VerticalScroll):
     """A scrollable container that can receive keyboard focus and handles keyboard scrolling."""
 
@@ -441,11 +488,12 @@ class SupportApp(App):
         ("t", "apply_template", "Apply Template"),
         Binding("b", "select_bookmark", "Bookmark", priority=False),
         Binding("f", "focus_pane", "Focus Pane", priority=False),
-        ("w", "toggle_follow", "Follow"),
         ("m", "mark_read", "Mark Read"),
         ("o", "toggle_comment_order", "Order (New/Old)"),
         ("g", "jump_to_case", "Jump to Case"),
         Binding(":", "jump_to_case", "Jump to Case", show=False),
+        ("/", "search_cases", "Search Cases"),
+        Binding("s", "search_cases", "Search Cases", show=False),
         ("v", "toggle_layout", "Split (H/V)"),
         Binding("l", "toggle_layout", "Toggle Layout", show=False),
         Binding("ctrl+down", "focus_bottom", "Focus Bottom", priority=True),
@@ -686,6 +734,10 @@ class SupportApp(App):
         self.active_jobs: list[str] = []
         self.case_service = CaseService(self.api_client, config=config)
         self.attachment_service = AttachmentService(self.api_client)
+        self.search_service = SearchService(
+            self.api_client, case_service=self.case_service, config=config
+        )
+        self.active_search_query: str | None = None
         cache_cfg = (config.get("cache") or {}) if config else {}
         tui_cfg = (config.get("tui") or {}) if config else {}
         try:
@@ -775,6 +827,8 @@ class SupportApp(App):
         if self.active_jobs:
             jobs_str = " | ".join(self.active_jobs)
             self.sub_title = f"⟳ {jobs_str}"
+        elif self.active_search_query:
+            self.sub_title = f"Search: '{self.active_search_query}' (Esc to clear)"
         else:
             self.sub_title = ""
 
@@ -832,14 +886,17 @@ class SupportApp(App):
             self.selected_case_id,
             self._detail_generation,
             self.current_details,
+            self.active_search_query,
         )
 
     def _list_request_current(self, snapshot):
         generation, params, bookmark, no_default = snapshot[:4]
+        search_query = snapshot[7] if len(snapshot) > 7 else None
         return (
             generation == self._list_generation
             and bookmark == self.active_bookmark
             and no_default == self.no_default_bookmark
+            and search_query == self.active_search_query
             and params
             == build_filter_params(
                 self.config, self.active_bookmark, self.no_default_bookmark
@@ -874,7 +931,18 @@ class SupportApp(App):
             self._safe_call(show_loading)
             try:
                 params = snapshot[1]
-                if params.get("following"):
+                search_query = snapshot[7] if len(snapshot) > 7 else None
+                if search_query:
+                    cases = self.search_service.search_cases(
+                        query=search_query,
+                        account=params.get("account"),
+                        status=params.get("status"),
+                        severity=params.get("severity"),
+                        owner=params.get("owner"),
+                        product=params.get("product"),
+                        limit=50,
+                    )
+                elif params.get("following"):
                     cases = self.case_service.list_followed_cases(
                         **{k: v for k, v in params.items() if k != "following"}
                     )
@@ -2253,6 +2321,8 @@ class SupportApp(App):
         def handle_bookmark(bookmark_name: str) -> None:
             if bookmark_name:
                 self.active_bookmark = bookmark_name
+                self.active_search_query = None
+                self._sync_header_status()
                 self._request_cases()
 
         self.push_screen(
@@ -2371,6 +2441,36 @@ class SupportApp(App):
         # 2. Otherwise, if we are in commenting mode, exit commenting!
         if self.screen.has_class("commenting"):
             self.action_exit_commenting()
+            return
+
+        # 3. If an active search query is set, clear search and restore regular case list!
+        if self.active_search_query is not None:
+            self.action_clear_search()
+            return
+
+    def action_search_cases(self) -> None:
+        """Opens modal to search support cases."""
+
+        def handle_search(query: str) -> None:
+            if query == "__CLEAR__":
+                self.action_clear_search()
+            elif query:
+                self.active_search_query = query
+                self._sync_header_status()
+                self._request_cases(force=True)
+
+        self.push_screen(
+            CaseSearchModal(initial_query=self.active_search_query or ""),
+            handle_search,
+        )
+
+    def action_clear_search(self) -> None:
+        """Clears active search and restores regular case list."""
+        if self.active_search_query is not None:
+            self.active_search_query = None
+            self._sync_header_status()
+            self.notify("Search cleared.")
+            self._request_cases(force=True)
 
     def action_toggle_comment_order(self) -> None:
         """Toggles comment display order between oldest first and newest first."""

@@ -427,3 +427,39 @@ class TuiActionTests(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
             self.assertIsInstance(self.app.screen, UnsavedChangesModal)
             self.assertEqual(self.app.selected_case_id, "1")
+
+    async def test_case_search_modal_filters_table_and_escape_clears(self):
+        from rh_support_lib.tui.app import CaseSearchModal
+
+        async with self.app.run_test() as pilot:
+            # 1. Action opens CaseSearchModal
+            self.app.action_search_cases()
+            await pilot.pause()
+            self.assertIsInstance(self.app.screen, CaseSearchModal)
+
+            # 2. Dismiss with search query
+            matching_case = Case(
+                "999",
+                "Kernel panic on NVMe",
+                "Waiting on Red Hat",
+                "1",
+                id="internal-999",
+            )
+            with patch.object(
+                self.app.search_service, "search_cases", return_value=[matching_case]
+            ) as mock_search:
+                self.app.screen.dismiss("kernel panic")
+                await pilot.pause()
+                self.assertEqual(self.app.active_search_query, "kernel panic")
+                self.assertIn("Search: 'kernel panic'", self.app.sub_title)
+                mock_search.assert_called_once()
+                self.assertEqual(len(self.app.cases), 1)
+                self.assertEqual(self.app.cases[0].case_number, "999")
+
+            # 3. Escape key clears search and restores full queue
+            with patch.object(self.app, "_request_cases") as mock_req:
+                await pilot.press("escape")
+                await pilot.pause()
+                self.assertIsNone(self.app.active_search_query)
+                self.assertEqual(self.app.sub_title, "")
+                mock_req.assert_called_once_with(force=True)
