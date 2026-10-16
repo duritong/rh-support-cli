@@ -9,8 +9,11 @@ from rh_support_lib.services.cases import CaseService
 from rh_support_lib.utils import (
     EditorError,
     draft_body,
+    draft_identity,
     format_structured_output,
     open_editor,
+    read_draft,
+    remove_draft,
 )
 
 
@@ -99,6 +102,7 @@ def _cmd_comment(args, api_client, config, output):
     # Get Content
     comment_body = ""
     temp_file_path = None
+    resumed_draft = None
     file_content = ""
 
     if template_content:
@@ -168,6 +172,7 @@ def _cmd_comment(args, api_client, config, output):
                             f"Resuming saved draft for Case #{args.case} ({latest_draft['modified']})..."
                         )
                         file_content = extracted
+                        resumed_draft = latest_draft
 
         # Open Editor (using file_content as initial body if provided)
         try:
@@ -190,6 +195,13 @@ def _cmd_comment(args, api_client, config, output):
         sys.exit("Error: Empty comment. No comment or status change submitted.")
 
     # 1. Post Comment and update status via CaseService
+    submitted_identity = None
+    if temp_file_path:
+        try:
+            _, info = read_draft(temp_file_path)
+            submitted_identity = draft_identity(info)
+        except (OSError, UnicodeError):
+            pass
     print(f"Posting comment to Case #{args.case}...")
     partial_error = None
     try:
@@ -220,11 +232,19 @@ def _cmd_comment(args, api_client, config, output):
             "before retrying; do not blindly repost the comment."
         )
 
-    if temp_file_path and os.path.exists(temp_file_path):
-        try:
-            os.remove(temp_file_path)
-        except OSError:
-            print(f"Submitted comment copy remains at: {temp_file_path}")
+    if (
+        temp_file_path
+        and os.path.exists(temp_file_path)
+        and (
+            submitted_identity is None
+            or not remove_draft(temp_file_path, submitted_identity)
+        )
+    ):
+        print(f"Submitted comment copy remains at: {temp_file_path}")
+    if resumed_draft and not remove_draft(
+        resumed_draft["path"], resumed_draft["identity"]
+    ):
+        print(f"Submitted source copy changed or remains at: {resumed_draft['path']}")
     status_confirmed = (
         partial_error.status_confirmed if partial_error else bool(final_status)
     )

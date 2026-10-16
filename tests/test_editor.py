@@ -163,6 +163,56 @@ class EditorTests(unittest.TestCase):
 
 
 class EditorCommandTests(unittest.TestCase):
+    def test_resume_retires_distinct_source_only_after_confirmed_post(self):
+        from rh_support_lib.commands.actions import cmd_comment
+        from rh_support_lib.errors import (
+            CommentOutcomeUnknownError,
+            PartialCommentError,
+        )
+
+        drafts = self.root / "resume"
+        drafts.mkdir()
+        source = drafts / "comment_draft_123_source.txt"
+        for outcome in (None, "partial", "unknown", "failure", "new_edits"):
+            with self.subTest(outcome=outcome):
+                for path in drafts.glob("*.txt"):
+                    path.unlink()
+                source.write_text("# Heading\nSaved body")
+                edited_paths = []
+
+                def edit(argv, edited_paths=edited_paths):
+                    edited_paths.append(Path(argv[-1]))
+                    self.assertNotEqual(edited_paths[-1], source)
+                    return 0
+
+                def post(*args, outcome=outcome, edited_paths=edited_paths, **kw):
+                    if outcome == "partial":
+                        raise PartialCommentError("123", Mock(id="c1"), "Waiting")
+                    if outcome == "unknown":
+                        raise CommentOutcomeUnknownError("123")
+                    if outcome == "failure":
+                        raise RuntimeError("failed")
+                    if outcome == "new_edits":
+                        source.write_text("new source edits")
+                        edited_paths[-1].write_text("new editor edits")
+                    return Mock(id="c1")
+
+                with (
+                    patch("rh_support_lib.utils.subprocess.call", side_effect=edit),
+                    patch("rh_support_lib.commands.actions.CaseService") as service,
+                ):
+                    service.return_value.add_comment.side_effect = post
+                    if outcome in ("partial", "unknown", "failure"):
+                        with self.assertRaises(SystemExit):
+                            cmd_comment(
+                                self.args(), Mock(), {"drafts_dir": str(drafts)}
+                            )
+                    else:
+                        cmd_comment(self.args(), Mock(), {"drafts_dir": str(drafts)})
+                keep = outcome in ("unknown", "failure", "new_edits")
+                self.assertEqual(source.exists(), keep)
+                self.assertEqual(edited_paths[-1].exists(), keep)
+
     def setUp(self):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)

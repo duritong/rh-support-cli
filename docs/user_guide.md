@@ -578,6 +578,7 @@ Retrying a generated recovery file with `comment --file` removes its editor guid
 Listing and automatic resume order drafts by full filesystem modification precision, not the rounded timestamp displayed in the table. JSON includes `mtime_ns`.
 CLI editing, TUI saving, and draft discovery use the same directory: the string setting `drafts_dir`, then `RH_SUPPORT_DRAFTS`, then `drafts` beside `RH_SUPPORT_CONFIG`, then `$XDG_CONFIG_HOME/rh-support-cli/drafts`, falling back to `~/.config/rh-support-cli/drafts`.
 Discovery ignores symlinks, nonregular files, files owned by another user, and entries that disappear or change during reading. Cleanup checks the captured file identity again after confirmation and preserves changed/replaced files.
+Confirmed posting retires both the automatically resumed source and the new editor copy, including when a later status change fails. Copies changed since reading/submission remain recoverable. Failed or unknown posts retain both copies; check the portal before retrying an unknown outcome.
 
 Discovers, previews, and purges preserved comment drafts stored when editing or posting was interrupted:
 
