@@ -10,14 +10,14 @@ setup(
     python_requires=">=3.9",
     install_requires=[
         "requests>=2.25.0",
-        "requests-toolbelt>=0.9.1",
+        "requests-toolbelt>=1.0.0",
         "pyyaml>=5.4.1",
         "jinja2>=3.0.0",
         "dateparser>=1.0.0",
         "argcomplete>=1.12.0",
-        "rich>=12.0.0",
-        "textual>=0.40.0",
-        "markdown-it-py>=2.0.0",
+        "rich>=13.3.3",
+        "textual>=6.0.0",
+        "markdown-it-py>=2.2.0",
     ],
     package_data={
         "rh_support_lib": ["data/*.json"],

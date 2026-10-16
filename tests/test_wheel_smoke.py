@@ -76,7 +76,8 @@ class WheelSmokeTests(unittest.TestCase):
                 n for n in cls.wheel_members if n.endswith("/METADATA")
             )
             cls.metadata_text = zf.read(metadata_name).decode("utf-8")
-        venv.EnvBuilder(with_pip=True).create(cls.install_dir)
+        # Use the provisioned pip, including on runtimes with older ensurepip bundles.
+        venv.EnvBuilder(with_pip=False, symlinks=True).create(cls.install_dir)
         cls.installed_python = os.path.join(cls.install_dir, "bin", "python")
         cls.console_script = os.path.join(cls.install_dir, "bin", "rh-support-cli")
         site_packages = os.path.join(
@@ -89,9 +90,11 @@ class WheelSmokeTests(unittest.TestCase):
         copy_runtime_dependencies(requirements, site_packages)
         result = subprocess.run(
             [
-                cls.installed_python,
+                sys.executable,
                 "-m",
                 "pip",
+                "--python",
+                cls.installed_python,
                 "install",
                 "--no-index",
                 "--no-deps",
@@ -188,6 +191,7 @@ print("GUARDED")
         """Verify installed wheel can import rh_support_lib and read bundled catalog without git repo."""
         code = """
 import rh_support_lib
+import requests_toolbelt
 from rh_support_lib.completers import DEFAULT_FALLBACK_PRODUCTS, product_completer
 import os
 import sys

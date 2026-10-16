@@ -332,10 +332,12 @@ The direct dynamic-completer test temporarily overrides HOME, cache/state locati
 
 ### Running Tests and Linting
 
-Provision `pip`, `setuptools`, and `wheel` in the test environment before running
+Provision `pip>=22.3`, `setuptools`, and `wheel` in the test environment before running
 the suite (`python -m pip install pip setuptools wheel`). CI installs these
 explicitly on every Python version. Wheel verification is mandatory: missing
-build tools fail rather than skip. Builds use a temporary source copy with
+build tools fail rather than skip. The provisioned pip installs into the clean
+venv with `--python`; symlinked interpreters also support relocatable uv runtimes.
+Builds use a temporary source copy with
 `--no-index --no-deps --no-build-isolation`, leaving no checkout build artifacts.
 
 ```bash
@@ -379,6 +381,28 @@ uv pip install --python /tmp/rh-support-py39/bin/python pip setuptools wheel -e 
 Runtime and dependency installation require network access; the canonical test command activates the same offline sandbox on every supported Python version. Allow at least ten minutes for the full suite on slower runtimes. Keep the environment until validation is complete so failures can be reproduced with the same resolved dependencies.
 
 TUI tests that construct modal widgets must run inside an active event loop, using `unittest.IsolatedAsyncioTestCase` and an async test method. On Python 3.9, asyncio locks bind to a loop during construction. Callbacks passed to Textual must also have introspectable Python signatures; wrap built-ins such as `threading.get_ident` in a Python function or lambda when testing UI-thread dispatch.
+
+### Verified Dependency Floors
+
+The supported UI floor is Textual 6.0.0, Rich 13.3.3, and markdown-it-py 2.2.0.
+These are tested compatible versions, not a claim about the earliest historical
+versions with each API. Textual 0.40.0 fails the installed CLI import because it
+has no `textual.content.Content`. Requests-toolbelt 0.9.1 fails to import with
+urllib3 2.x (`contrib.appengine` was removed); its tested floor is 1.0.0.
+
+Clean Python 3.9.25 validation used the exact direct floors: Requests 2.25.0,
+requests-toolbelt 1.0.0, PyYAML 5.4.1, Jinja2 3.0.0, dateparser 1.0.0,
+argcomplete 1.12.0, Rich 13.3.3, Textual 6.0.0, and markdown-it-py 2.2.0
+(resolved urllib3 1.26.20). The full run reached 473 tests; four existing doctor
+HTTPError-close subcases failed under Python 3.9, independently of dependencies.
+Installed-wheel tests passed. Python 3.14.7 wheel validation also exercises the UI
+and toolbelt floors with modern Requests/PyYAML/urllib3; those newer binary/runtime
+dependencies are not an exact-all-minima claim for Python 3.14.
+
+To repeat the floor setup, provision a separate environment with `pip setuptools
+wheel` and pin every direct version listed above, then run `python -B -m tests -q`.
+Do not downgrade the development environment. All test execution uses the offline
+sandbox; only initial dependency/runtime provisioning accesses the package index.
 
 ---
 
