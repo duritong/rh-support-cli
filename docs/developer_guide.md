@@ -34,6 +34,7 @@ rh-support-cli/
     │   ├── apply_template.py   # apply, list-templates
     │   ├── attachments.py      # attachment subcommands (list, upload, download, delete, status)
     │   ├── create_case.py      # create subcommand
+    │   ├── doctor.py           # doctor diagnostic health check command
     │   ├── list_cases.py       # list subcommand (Rich Table rendering)
     │   ├── search.py           # search subcommand (Cases and KCS Knowledgebase)
     │   ├── show_case.py        # show subcommand (Rich Panels and Markdown paging)

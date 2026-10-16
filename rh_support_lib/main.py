@@ -817,6 +817,17 @@ Authentication:
         default=8080,
         help="Local TCP port to bind the server to (default: 8080)",
     )
+    # Doctor Subcommand
+    parser_doctor = subparsers.add_parser(
+        "doctor",
+        help="Inspect local environment, credentials, permissions, and configuration health",
+    )
+    parser_doctor.add_argument(
+        "--online",
+        action="store_true",
+        help="Perform live connectivity probes to Red Hat API endpoints",
+    )
+
     content_format_parsers = {
         parser_create,
         parser_comment,
@@ -824,6 +835,7 @@ Authentication:
         parser_systemd,
         parser_install_sys,
         p_sys_install,
+        parser_doctor,
     }
     # Child defaults must not overwrite options already parsed by a parent.
     for p in set(subparsers.choices.values()) | set(attachment_parsers):
@@ -907,6 +919,11 @@ Authentication:
     elif args.command in ["list-templates", "list-template"]:
         cmd_list_templates(args, config)
         sys.exit(0)
+    elif args.command == "doctor":
+        from rh_support_lib.commands.doctor import cmd_doctor
+
+        rc = cmd_doctor(args, config=config)
+        sys.exit(rc)
     elif args.command in ["systemd", "install-systemd", "install-timer"]:
         from rh_support_lib.commands.systemd import cmd_install_systemd, cmd_systemd
 

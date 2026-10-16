@@ -545,6 +545,23 @@ Pressing `<TAB>` automatically suggests context-relevant values:
 * **Case Numbers (`-c` / `--case`)**: Suggests tracked, followed, and recently viewed case numbers from `~/.local/state/rh-support-cli/state.yaml`.
 * **File Paths (`-f` / `-o` / `--token-file`)**: Tab-completes local files and directories via `FilesCompleter`.
 
+### 5.17 Environment & Health Diagnostics (`doctor`)
+Runs automated local diagnostic health checks inspecting credentials, configuration, directory permissions, and background sync timers:
+
+```bash
+# Run local diagnostic health checks:
+rh-support-cli doctor
+
+# Output in plain text (for scripts or CI):
+rh-support-cli doctor --simple-output
+
+# Machine-readable JSON summary:
+rh-support-cli doctor --json
+
+# Perform optional bounded online connectivity probe:
+rh-support-cli doctor --online
+```
+
 ## 6. Interactive TUI Mode (`tui`)
 
 Launch an interactive split-pane terminal dashboard:
