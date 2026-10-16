@@ -1028,14 +1028,22 @@ class SupportApp(App):
             user_str = self.user_identity or "Local"
             ident_label.update(f"User: {user_str}")
 
-            if self.active_search_query:
-                scope_label.update(f'Search: "{self.active_search_query}"')
-            elif self.active_bookmark:
-                scope_label.update(f"Bookmark: {self.active_bookmark}")
-            else:
-                scope_label.update("Bookmark: None")
-
+            scope_label.update(self._scope_label())
             fresh_label.update(self._freshness_label())
+
+    def _scope_label(self) -> str:
+        if self.active_search_query:
+            return f'Search: "{self.active_search_query}"'
+        if self.active_bookmark == "none":
+            return "Bookmark: None"
+        if self.active_bookmark:
+            return f"Bookmark: {self.active_bookmark}"
+        defaults = self.config.get("default_bookmark")
+        if defaults and not self.no_default_bookmark:
+            names = [defaults] if isinstance(defaults, str) else defaults
+            prefix = "Bookmark" if len(names) == 1 else "Bookmarks"
+            return f"{prefix}: {', '.join(names)} (default)"
+        return "Bookmark: None"
 
     def _freshness_label(self) -> str:
         timestamp = self.last_refreshed_at or "Never"
@@ -1068,15 +1076,6 @@ class SupportApp(App):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        scope_init = (
-            f'Search: "{self.active_search_query}"'
-            if self.active_search_query
-            else (
-                f"Bookmark: {self.active_bookmark}"
-                if self.active_bookmark
-                else "Bookmark: None"
-            )
-        )
         yield Horizontal(
             Label(
                 f"User: {self.user_identity or 'Local'}",
@@ -1084,7 +1083,12 @@ class SupportApp(App):
                 classes="header-chip",
                 markup=False,
             ),
-            Label(scope_init, id="chip-scope", classes="header-chip", markup=False),
+            Label(
+                self._scope_label(),
+                id="chip-scope",
+                classes="header-chip",
+                markup=False,
+            ),
             Label(
                 self._freshness_label(),
                 id="chip-freshness",

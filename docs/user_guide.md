@@ -616,7 +616,7 @@ Automatic refresh continues when caching is disabled or cached details expire. E
 ### Status Bar & Header Chips:
 The top status bar provides real-time, non-blocking operational context:
 * **Identity Chip (`User: <name>`)**: Shows the authenticated SSO username or local user.
-* **Scope Chip (`Bookmark: <name>` or `Search: "<query>"`)**: Displays the currently active filter bookmark or search query. Updates immediately upon bookmark selection (`b`) or case search (`/`), restoring to `Bookmark: None` when search is cleared (`Esc`).
+* **Scope Chip**: Displays the selected bookmark, or configured default bookmark(s) with a `(default)` suffix when no explicit selection overrides them. Multiple defaults appear in their configured merge order. `--no-default-bookmark` and the bookmark modal's clear option show `Bookmark: None`; an explicit selection replaces defaults. Search temporarily shows `Search: "<query>"`; clearing it (`Esc`) restores the actual underlying bookmark scope, including defaults. Brackets in queries, bookmark names, and user names display literally, not as formatting.
 * **Freshness Chip**: `Refreshed: <time>` indicates a remotely validated list. Cache hits show `Cached; Last live: <time>` and do not advance the last live timestamp. Search results with additional cached matches show `Mixed live/cached`; their last live time covers only the remote portion. Empty followed lists are local, not evidence of API health. Manual forced refresh and background polling validate remotely; failures and obsolete completions retain the last good list and freshness state.
 ### Options:
 * `-l <layout>` / `--layout <layout>`: Split layout (`horizontal` / `mailbox` default or `vertical` side-by-side).

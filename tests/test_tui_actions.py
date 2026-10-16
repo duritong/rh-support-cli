@@ -21,7 +21,12 @@ from rh_support_lib.models import (
 from rh_support_lib.services.cache import CacheService
 from rh_support_lib.services.cases import CaseService
 from rh_support_lib.services.search import SearchService
-from rh_support_lib.tui.app import BookmarkModal, SupportApp, TemplateModal
+from rh_support_lib.tui.app import (
+    BookmarkModal,
+    SupportApp,
+    TemplateModal,
+    build_filter_params,
+)
 
 
 def details(number="1", comment="c1", status="Waiting on Red Hat"):
@@ -639,6 +644,87 @@ class TuiActionTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIn(
                     "Refreshed:", str(self.app.query_one("#chip-freshness").render())
                 )
+
+    async def test_scope_chip_matches_resolved_defaults_and_search_clear(self):
+        for defaults, no_default, explicit, expected, expected_params in (
+            ("team", False, None, "Bookmark: team (default)", {"status": ["Closed"]}),
+            (
+                ["team", "product"],
+                False,
+                None,
+                "Bookmarks: team, product (default)",
+                {"status": ["Closed"], "product": "RHEL"},
+            ),
+            ("team", True, None, "Bookmark: None", {"status": None}),
+            (
+                "team",
+                False,
+                "product",
+                "Bookmark: product",
+                {"status": None, "product": "RHEL"},
+            ),
+            ("team", False, "none", "Bookmark: None", {"status": None}),
+        ):
+            with self.subTest(
+                defaults=defaults, no_default=no_default, explicit=explicit
+            ):
+                app = SupportApp(
+                    Mock(spec=RedHatAPIClient),
+                    config={
+                        "default_bookmark": defaults,
+                        "bookmarks": {
+                            "team": {"status": "Closed"},
+                            "product": {"product": "RHEL"},
+                        },
+                    },
+                    bookmark=explicit,
+                    no_default_bookmark=no_default,
+                )
+                async with app.run_test() as pilot:
+                    chip = app.query_one("#chip-scope")
+                    self.assertEqual(str(chip.render()), expected)
+                    params = build_filter_params(
+                        app.config, app.active_bookmark, app.no_default_bookmark
+                    )
+                    for key, value in expected_params.items():
+                        self.assertEqual(params[key], value)
+                    app.active_search_query = "[bold]kernel[/bold]"
+                    app._sync_header_status()
+                    self.assertEqual(
+                        str(chip.render()), 'Search: "[bold]kernel[/bold]"'
+                    )
+                    with patch.object(app, "_request_cases"):
+                        app.action_clear_search()
+                        await pilot.pause()
+                    self.assertEqual(str(chip.render()), expected)
+
+    async def test_scope_chip_explicit_selection_clear_and_literal_metadata(self):
+        self.app.config["default_bookmark"] = "team"
+        self.app.config["bookmarks"]["[bold]literal[/bold]"] = {"product": "RHEL"}
+        self.app.user_identity = "[red]offline[/red]"
+        async with self.app.run_test() as pilot:
+            self.assertEqual(
+                str(self.app.query_one("#chip-identity").render()),
+                "User: [red]offline[/red]",
+            )
+            with patch.object(self.app, "_request_cases"):
+                for value, expected in (
+                    ("[bold]literal[/bold]", "Bookmark: [bold]literal[/bold]"),
+                    ("none", "Bookmark: None"),
+                ):
+                    self.app.action_select_bookmark()
+                    await pilot.pause()
+                    self.app.screen.query_one(Select).value = value
+                    await pilot.click("#select-btn")
+                    await pilot.pause()
+                    self.assertEqual(
+                        str(self.app.query_one("#chip-scope").render()), expected
+                    )
+                    self.app.active_search_query = "[red]query[/red]"
+                    self.app.action_clear_search()
+                    self.assertEqual(
+                        str(self.app.query_one("#chip-scope").render()), expected
+                    )
 
     async def test_tui_header_status_chips_update_on_scope_and_freshness(self):
         """Test visible identity, scope, and freshness chips in the TUI header."""
