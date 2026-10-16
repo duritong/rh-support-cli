@@ -454,6 +454,7 @@ def open_editor(
     *,
     config=None,
     draft_stack=None,
+    approval_info=None,
 ):
     """Return (approved body, recovery path), holding ownership while editing.
 
@@ -475,14 +476,15 @@ def open_editor(
                 raise EditorError(path, "Draft is active in another process.")
         edit_file(path)
         try:
-            with open(path, "r") as stream:
-                lines = stream.readlines()
+            content, info = read_draft(path)
         except (OSError, UnicodeError):
             raise EditorError(
                 path,
                 "Could not read edited draft; check file permissions and encoding.",
             ) from None
-        return strip_header_comments(lines).strip(), path
+        if approval_info is not None:
+            approval_info["identity"] = draft_identity(info)
+        return strip_header_comments(content.splitlines(keepends=True)).strip(), path
 
 
 def format_structured_output(data: Any, fmt: str = "json") -> str:

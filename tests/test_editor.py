@@ -146,7 +146,7 @@ class EditorTests(unittest.TestCase):
             with self.subTest(failure=type(failure).__name__):
                 self.editor.reset_mock()
                 with (
-                    patch("rh_support_lib.utils.open", side_effect=failure),
+                    patch("rh_support_lib.utils.read_draft", side_effect=failure),
                     self.assertRaises(utils.EditorError) as caught,
                 ):
                     utils.open_editor("123", None, initial_body="Recoverable body")
@@ -196,6 +196,39 @@ class EditorTests(unittest.TestCase):
 
 
 class EditorCommandTests(unittest.TestCase):
+    def test_editor_replacement_after_approval_read_is_not_retired_as_submitted(self):
+        from rh_support_lib.commands.actions import cmd_comment
+
+        source = self.root / "body.txt"
+        source.write_text("Approved body")
+        edited = []
+
+        def editor(*args, **kwargs):
+            body, path = utils.open_editor(*args, **kwargs)
+            edited.append(Path(path))
+            replacement = Path(path).with_suffix(".new")
+            replacement.write_text("# New unsubmitted heading\nApproved body")
+            replacement.replace(path)
+            return body, path
+
+        with (
+            patch("rh_support_lib.utils.subprocess.call", return_value=0),
+            patch("rh_support_lib.commands.actions.open_editor", side_effect=editor),
+            patch("rh_support_lib.commands.actions.CaseService") as service,
+        ):
+            service.return_value.add_comment.return_value = Mock(id="c1")
+            cmd_comment(
+                self.args(file=str(source), edit=True),
+                Mock(),
+                {"drafts_dir": str(self.root / "drafts")},
+            )
+        self.assertEqual(
+            service.return_value.add_comment.call_args.args[1], "Approved body"
+        )
+        self.assertEqual(
+            edited[0].read_text(), "# New unsubmitted heading\nApproved body"
+        )
+
     def test_cleanup_cannot_delete_source_or_atomically_replaced_editor_during_post(
         self,
     ):

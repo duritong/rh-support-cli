@@ -297,6 +297,8 @@ The interactive dashboard (`rh_support_lib/tui/app.py`) is implemented using Tex
 
 ## 9. Test Suite & Mock Architecture
 
+Comment cleanup uses a caller-owned `approval_info` snapshot captured by `open_editor` together with the approved body in one stable, no-follow read. The public `(body, path)` return remains unchanged. Atomic replacements or new edits after approval are preserved after posting rather than retired as submitted content.
+
 All tests live in the `tests/` package. The test suite is organized into focused modular suites inheriting from `MockServerTestCase` (`tests/support/mock_server.py`):
 * `tests/test_cli_cases.py`: Case listing, show, incident export, and pagination.
 * `tests/test_cli_auth.py`: Authentication, token priority, offline tokens, and token cache identity.

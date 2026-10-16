@@ -103,6 +103,7 @@ def _cmd_comment(args, api_client, config, output, draft_stack):
     # Get Content
     comment_body = ""
     temp_file_path = None
+    approval_info = {}
     resumed_draft = None
     file_content = ""
 
@@ -203,6 +204,7 @@ def _cmd_comment(args, api_client, config, output, draft_stack):
                 initial_body=file_content,
                 config=config,
                 draft_stack=draft_stack,
+                approval_info=approval_info,
             )
         except EditorError as error:
             sys.exit(f"Editor Error: {error}")
@@ -216,13 +218,7 @@ def _cmd_comment(args, api_client, config, output, draft_stack):
         sys.exit("Error: Empty comment. No comment or status change submitted.")
 
     # 1. Post Comment and update status via CaseService
-    submitted_identity = None
-    if temp_file_path:
-        try:
-            _, info = read_draft(temp_file_path)
-            submitted_identity = draft_identity(info)
-        except (OSError, UnicodeError):
-            pass
+    submitted_identity = approval_info.get("identity")
     print(f"Posting comment to Case #{args.case}...")
     partial_error = None
     try:

@@ -15,6 +15,7 @@ from rh_support_lib.commands.actions import cmd_comment
 from rh_support_lib.errors import CommentOutcomeUnknownError, PartialCommentError
 from rh_support_lib.models import CaseComment
 from rh_support_lib.tui.app import SupportApp
+from rh_support_lib.utils import draft_identity
 
 
 class CommentPresenterTests(unittest.TestCase):
@@ -28,6 +29,13 @@ class CommentPresenterTests(unittest.TestCase):
                 ):
                     draft = Path(directory) / "draft.txt"
                     draft.write_text("body")
+
+                    def approve(*args, draft=draft, **kwargs):
+                        kwargs["approval_info"]["identity"] = draft_identity(
+                            draft.stat()
+                        )
+                        return "body", str(draft)
+
                     args = SimpleNamespace(
                         case="123",
                         template=None,
@@ -46,7 +54,7 @@ class CommentPresenterTests(unittest.TestCase):
                         ) as service,
                         mock.patch(
                             "rh_support_lib.commands.actions.open_editor",
-                            return_value=("body", str(draft)),
+                            side_effect=approve,
                         ),
                         contextlib.redirect_stdout(stdout),
                         contextlib.redirect_stderr(stderr),
