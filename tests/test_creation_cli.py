@@ -22,7 +22,7 @@ class CreationCLITests(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         self.root = Path(directory.name)
         self.description = self.root / "description.txt"
-        self.description.write_text("# Header\nCase description", encoding="utf-8")
+        self.description.write_text("Case description", encoding="utf-8")
         self.file = self.root / "diagnostics.txt"
         self.file.write_text("diagnostics", encoding="utf-8")
         self.client = Mock()
