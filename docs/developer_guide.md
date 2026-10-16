@@ -235,6 +235,8 @@ Private lists and case records live under `private/<opaque-context-hash>/{lists,
 
 ## 8. TUI Architecture (Textual Framework)
 
+KCS result selection stops its table event at the modal. The application's case-selection handler is scoped to `#case-table`, so other result tables cannot change the active case or initiate case-detail reads.
+
 The interactive dashboard (`rh_support_lib/tui/app.py`) is implemented using Textual:
 
 * **Dual-Layout Topologies**:

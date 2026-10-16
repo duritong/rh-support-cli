@@ -525,7 +525,8 @@ class KCSSearchModal(ModalScreen[Optional[tuple[str, str, str]]]):
         return (self.results[0].url, self.results[0].title) if self.results else None
 
     @on(DataTable.RowSelected, "#kcs-results-table")
-    def on_table_selected(self) -> None:
+    def on_table_selected(self, event: DataTable.RowSelected) -> None:
+        event.stop()
         item = self._selected_kcs_item()
         if item:
             self.dismiss(("open", item[0], item[1]))
@@ -1437,7 +1438,7 @@ class SupportApp(App):
 
         self._request_case_details(clean_id)
 
-    @on(DataTable.RowSelected)
+    @on(DataTable.RowSelected, "#case-table")
     def on_row_selected(self, event: DataTable.RowSelected) -> None:
         next_case_id = str(event.row_key.value)
         self.select_case_by_id(next_case_id)
