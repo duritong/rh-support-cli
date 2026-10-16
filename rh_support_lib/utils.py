@@ -284,6 +284,7 @@ def strip_header_comments(lines):
 
     return "".join(lines[first_content_idx:])
 
+
 class EditorError(RuntimeError):
     """Editor failure with a safe reason and the path to the recoverable draft."""
 
@@ -325,8 +326,17 @@ def open_editor(case_number, status_label, header_content=None, initial_body=Non
     Returns the content (possibly empty) and the path to the temporary file.
     Raises EditorError on editing or reading failure, preserving the draft.
     """
-    # Create temp file but do NOT delete it automatically here
-    with tempfile.NamedTemporaryFile(mode="w+", suffix=".tmp", delete=False) as tf:
+    from rh_support_lib.config import resolve_drafts_dir
+
+    drafts_dir = resolve_drafts_dir()
+    os.makedirs(drafts_dir, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        mode="w+",
+        dir=drafts_dir,
+        prefix=f"comment_draft_{case_number}_",
+        suffix=".txt",
+        delete=False,
+    ) as tf:
         tf.write(f"# Enter comment for Case {case_number}.\n")
         if status_label:
             tf.write(f"# Status will be set to: '{status_label}'\n")

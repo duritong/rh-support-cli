@@ -149,6 +149,28 @@ def _cmd_comment(args, api_client, config, output):
                     file=sys.stderr,
                 )
 
+        # Check for existing draft to resume if initial_body is empty
+        if not file_content:
+            from rh_support_lib.commands.drafts import find_drafts
+            from rh_support_lib.config import resolve_drafts_dir
+            from rh_support_lib.utils import strip_header_comments
+
+            existing_drafts = find_drafts(
+                case_number=args.case, drafts_dir=resolve_drafts_dir(config)
+            )
+            if existing_drafts:
+                latest_draft = existing_drafts[0]
+                draft_content = latest_draft.get("content", "").strip()
+                if draft_content:
+                    extracted = strip_header_comments(
+                        draft_content.splitlines(keepends=True)
+                    ).strip()
+                    if extracted:
+                        print(
+                            f"Resuming saved draft for Case #{args.case} ({latest_draft['modified']})..."
+                        )
+                        file_content = extracted
+
         # Open Editor (using file_content as initial body if provided)
         try:
             comment_body, temp_file_path = open_editor(

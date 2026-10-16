@@ -35,8 +35,7 @@ rh-support-cli/
     │   ├── attachments.py      # attachment subcommands (list, upload, download, delete, status)
     │   ├── create_case.py      # create subcommand
     │   ├── doctor.py           # doctor diagnostic health check command
-    │   ├── list_cases.py       # list subcommand (Rich Table rendering)
-    │   ├── search.py           # search subcommand (Cases and KCS Knowledgebase)
+    │   ├── drafts.py           # drafts discovery, preview, and cleanup commands
     │   ├── show_case.py        # show subcommand (Rich Panels and Markdown paging)
     │   ├── systemd.py          # systemd and install-systemd unit installation/management
     │   ├── tracking.py         # sync and updates subcommands

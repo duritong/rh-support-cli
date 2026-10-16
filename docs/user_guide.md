@@ -562,6 +562,27 @@ rh-support-cli doctor --json
 rh-support-cli doctor --online
 ```
 
+### 5.18 Comment Drafts Discovery & Recovery (`drafts`)
+Discovers, previews, and purges preserved comment drafts stored when editing or posting was interrupted:
+
+```bash
+# List all saved comment drafts:
+rh-support-cli drafts
+
+# Filter drafts by case number:
+rh-support-cli drafts list -c 12345
+
+# Preview a draft's full content by filename or case number:
+rh-support-cli drafts show 12345
+
+# Delete drafts for a specific case:
+rh-support-cli drafts clear -c 12345 -y
+
+# Purge all drafts:
+rh-support-cli drafts clear -y
+```
+
+When invoking `rh-support-cli comment -c <case>` interactively, any previously preserved draft for that case is automatically discovered and resumed in your `$EDITOR`.
 ## 6. Interactive TUI Mode (`tui`)
 
 Launch an interactive split-pane terminal dashboard:

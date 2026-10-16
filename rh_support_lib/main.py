@@ -827,6 +827,29 @@ Authentication:
         action="store_true",
         help="Perform live connectivity probes to Red Hat API endpoints",
     )
+    # Drafts Subcommand Group
+    parser_drafts = subparsers.add_parser(
+        "drafts",
+        help="Discover, preview, and clean up saved comment drafts",
+    )
+    drafts_sub = parser_drafts.add_subparsers(dest="draft_action", help="Drafts action")
+    p_drafts_list = drafts_sub.add_parser(
+        "list", help="List saved comment drafts (default)"
+    )
+    p_drafts_list.add_argument("-c", "--case", help="Filter drafts by case number")
+    p_drafts_show = drafts_sub.add_parser(
+        "show", help="Preview content of a saved comment draft"
+    )
+    p_drafts_show.add_argument(
+        "identifier", help="Draft filename, partial name, or case number"
+    )
+    p_drafts_clear = drafts_sub.add_parser("clear", help="Delete saved comment drafts")
+    p_drafts_clear.add_argument(
+        "-c", "--case", help="Delete drafts only for specific case number"
+    )
+    p_drafts_clear.add_argument(
+        "-y", "--yes", action="store_true", help="Skip confirmation prompt"
+    )
 
     content_format_parsers = {
         parser_create,
@@ -836,9 +859,11 @@ Authentication:
         parser_install_sys,
         p_sys_install,
         parser_doctor,
+        p_drafts_list,
     }
     # Child defaults must not overwrite options already parsed by a parent.
-    for p in set(subparsers.choices.values()) | set(attachment_parsers):
+    draft_parsers = set(drafts_sub.choices.values())
+    for p in set(subparsers.choices.values()) | set(attachment_parsers) | draft_parsers:
         p.add_argument(
             "-j",
             "--json",
@@ -923,6 +948,11 @@ Authentication:
         from rh_support_lib.commands.doctor import cmd_doctor
 
         rc = cmd_doctor(args, config=config)
+        sys.exit(rc)
+    elif args.command == "drafts":
+        from rh_support_lib.commands.drafts import cmd_drafts
+
+        rc = cmd_drafts(args, config=config)
         sys.exit(rc)
     elif args.command in ["systemd", "install-systemd", "install-timer"]:
         from rh_support_lib.commands.systemd import cmd_install_systemd, cmd_systemd
