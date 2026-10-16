@@ -220,8 +220,16 @@ def check_systemd_timer() -> dict[str, Any]:
             capture_output=True,
             text=True,
             check=False,
+            timeout=3.0,
         )
         is_active = res.stdout.strip() == "active"
+    except subprocess.TimeoutExpired:
+        return {
+            "category": "Systemd Timer",
+            "name": "Periodic Sync Timer",
+            "status": "WARN",
+            "message": "systemctl user timer check timed out after 3 seconds; timer status is unknown.",
+        }
     except Exception:  # noqa: BLE001
         is_active = False
 

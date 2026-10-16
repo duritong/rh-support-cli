@@ -555,6 +555,8 @@ Storage diagnostics follow the same paths as normal commands, including `RH_SUPP
 
 Doctor is offline by default. `--online` sends one unauthenticated `HEAD` probe to the configured GraphQL endpoint with a 3-second request timeout. Any HTTP response, including `401`, `403`, `405`, or a server error, proves HTTP reachability and reports `PASS` with the response code. DNS, TLS, connection, and timeout errors report `FAIL`. This does not check SSO, validate credentials, query cases, or establish API service health.
 
+The systemd user-timer check also has a 3-second timeout. A timeout reports `WARN` with unknown timer status, rather than failing or blocking the report. An inactive or uninstalled timer is a warning; a host without `systemctl` reports `INFO`.
+
 ```bash
 # Run local diagnostic health checks:
 rh-support-cli doctor

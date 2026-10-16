@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -226,3 +227,52 @@ class DoctorCheckTests(unittest.TestCase):
         ):
             self.assertEqual(doctor.cmd_doctor(Namespace(json=True)), 0)
         probe.assert_not_called()
+
+    def test_systemd_probe_is_bounded_and_timeout_is_warning_in_full_report(self):
+        os.environ["REDHAT_SUPPORT_OFFLINE_TOKEN"] = "test-token"
+        with (
+            patch("shutil.which", return_value="/sandbox/systemctl"),
+            patch.object(
+                doctor.subprocess,
+                "run",
+                side_effect=subprocess.TimeoutExpired("systemctl", 3.0),
+            ) as process,
+            patch("sys.stdout", new_callable=StringIO) as output,
+        ):
+            self.assertEqual(doctor.cmd_doctor(Namespace(json=True)), 0)
+        process.assert_called_once_with(
+            ["systemctl", "--user", "is-active", "rh-support-sync.timer"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=3.0,
+        )
+        report = json.loads(output.getvalue())
+        self.assertEqual(len(report["checks"]), 7)
+        self.assertEqual(report["summary"]["failures"], 0)
+        timer = next(c for c in report["checks"] if c["category"] == "Systemd Timer")
+        self.assertEqual(timer["status"], "WARN")
+        self.assertIn("timed out", timer["message"])
+
+    def test_systemd_states_are_host_independent(self):
+        with (
+            patch("shutil.which", return_value=None),
+            patch.object(doctor.subprocess, "run") as process,
+        ):
+            self.assertEqual(doctor.check_systemd_timer()["status"], "INFO")
+            process.assert_not_called()
+        for stdout, code, expected in (
+            ("active\n", 0, "PASS"),
+            ("inactive\n", 3, "WARN"),
+            ("", 1, "WARN"),
+        ):
+            with (
+                self.subTest(stdout=stdout, code=code),
+                patch("shutil.which", return_value="/sandbox/systemctl"),
+                patch.object(
+                    doctor.subprocess,
+                    "run",
+                    return_value=subprocess.CompletedProcess([], code, stdout=stdout),
+                ),
+            ):
+                self.assertEqual(doctor.check_systemd_timer()["status"], expected)
