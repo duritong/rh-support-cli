@@ -9,7 +9,7 @@ import sys
 import tempfile
 import unittest
 from argparse import Namespace
-from io import StringIO
+from io import BytesIO, StringIO
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 from urllib.error import HTTPError, URLError
@@ -183,7 +183,7 @@ class DoctorCheckTests(unittest.TestCase):
             response = MagicMock()
             response.__enter__.return_value.status = status
             error = (
-                HTTPError(endpoint, status, "HTTP response", {}, None)
+                HTTPError(endpoint, status, "HTTP response", {}, BytesIO())
                 if status != 200
                 else None
             )
@@ -198,6 +198,8 @@ class DoctorCheckTests(unittest.TestCase):
                 self.assertEqual(result["status"], "PASS")
                 self.assertIn(f"HTTP {status}", result["message"])
                 self.assertIn(endpoint, result["message"])
+                if error is not None:
+                    self.assertTrue(error.fp.closed)
                 request = probe.call_args.args[0]
                 self.assertEqual(request.full_url, endpoint)
                 self.assertEqual(request.get_method(), "HEAD")
