@@ -10,10 +10,111 @@ from rh_support_lib.services.cases import CaseService
 from rh_support_lib.utils import is_comment_newer
 
 
+def format_incident_export(
+    case, description, comments, attachments, fmt="markdown"
+) -> str:
+    """Formats incident shift-handoff summary for Slack, Markdown, or JSON."""
+    fmt = (fmt or "markdown").lower().strip()
+    num = case.case_number or case.id
+    title = case.summary or "Untitled Incident"
+    status = case.status or "Unknown"
+    severity = case.severity or "Unknown"
+    product = f"{case.product or ''} {case.version or ''}".strip() or "Unspecified"
+    account = str(case.account_number or "")
+    portal_url = f"https://access.redhat.com/support/cases/{num}"
+
+    # Find latest Red Hat update
+    rh_comments = [
+        c
+        for c in comments
+        if getattr(c, "is_associate", False) or not getattr(c, "is_customer", True)
+    ]
+    latest_rh = rh_comments[-1] if rh_comments else (comments[-1] if comments else None)
+
+    latest_rh_date = latest_rh.created_date if latest_rh else ""
+    latest_rh_by = (latest_rh.created_by or "Red Hat Support") if latest_rh else "None"
+    latest_rh_text = ""
+    if latest_rh and latest_rh.body:
+        snippet = latest_rh.body.strip().splitlines()[0]
+        latest_rh_text = snippet[:200] + ("..." if len(snippet) > 200 else "")
+
+    # Pending action
+    is_cust_action = "customer" in status.lower()
+    next_step = (
+        "Customer action required (check latest Red Hat request)."
+        if is_cust_action
+        else "Waiting on Red Hat support / engineering investigation."
+    )
+
+    # Attachments summary
+    att_summary = f"{len(attachments)} file(s)"
+    if attachments:
+        names = ", ".join(a.file_name for a in attachments[:3])
+        if len(attachments) > 3:
+            names += f" (+{len(attachments) - 3} more)"
+        att_summary += f" ({names})"
+
+    if fmt == "json":
+        import json
+
+        return json.dumps(
+            {
+                "case_number": str(num),
+                "portal_url": portal_url,
+                "title": title,
+                "status": status,
+                "severity": severity,
+                "product": product,
+                "account": account,
+                "latest_update": {
+                    "author": latest_rh_by,
+                    "date": latest_rh_date,
+                    "snippet": latest_rh_text,
+                },
+                "next_step": next_step,
+                "attachments": [
+                    {"uuid": a.uuid, "name": a.file_name, "size_kb": a.size_kb}
+                    for a in attachments
+                ],
+            },
+            indent=2,
+        )
+
+    if fmt == "slack":
+        lines = [
+            f"*<{portal_url}|Red Hat Case #{num}>* — *{title}*",
+            f"• *Status*: {status} | *Severity*: {severity}",
+            f"• *Product*: {product}" + (f" (Account: {account})" if account else ""),
+        ]
+        if latest_rh:
+            lines.append(f"• *Latest Update* ({latest_rh_by} - {latest_rh_date}):")
+            lines.append(f"> {latest_rh_text}")
+        lines.append(f"• *Next Step*: {next_step}")
+        lines.append(f"• *Attachments*: {att_summary}")
+        return "\n".join(lines)
+
+    # Default: markdown
+    lines = [
+        f"### Red Hat Case #{num}: {title}",
+        f"**Portal Link**: {portal_url}",
+        f"* **Status**: {status} | **Severity**: {severity}",
+        f"* **Product**: {product}" + (f" (Account: {account})" if account else ""),
+    ]
+    if latest_rh:
+        lines.append(f"* **Latest Update** ({latest_rh_by} on {latest_rh_date}):")
+        lines.append(f"> {latest_rh_text}")
+    lines.append(f"* **Next Step**: {next_step}")
+    lines.append(f"* **Attachments**: {att_summary}")
+    return "\n".join(lines)
+
+
 def cmd_show(args, api_client, config: dict | None = None):
     fmt = getattr(args, "format", "text")
-    is_structured = fmt in ("json", "yaml") or getattr(args, "json", False)
-    if not is_structured:
+    export_fmt = getattr(args, "export", None)
+    is_structured = (
+        fmt in ("json", "yaml") or getattr(args, "json", False) or export_fmt == "json"
+    )
+    if not is_structured and not export_fmt:
         print(f"Fetching case {args.case}...")
     service = CaseService(api_client, config=config)
     try:
@@ -71,6 +172,16 @@ def cmd_show(args, api_client, config: dict | None = None):
             last_modified_date=case.last_modified_date,
         )
         tc = service.state_service.get_tracked_cases(user).get(str(num))
+
+    export_fmt = getattr(args, "export", None)
+    if export_fmt:
+        output = format_incident_export(
+            case, description, comments, attachments, fmt=export_fmt
+        )
+        print(output)
+        if getattr(args, "mark_read", False):
+            service.state_service.mark_case_read(user, str(num))
+        return
 
     # Determine comment display order (defaults to 'newest' matching portal default)
     order = "newest"

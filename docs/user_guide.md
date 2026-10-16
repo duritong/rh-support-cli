@@ -244,13 +244,17 @@ rh-support-cli show -c 12345678 --oldest-first
 rh-support-cli show -c 12345678 --order oldest
 # Print directly to stdout without pager:
 rh-support-cli show -c 12345678 --no-pager
-
 # Mark unread updates on this case as read:
 rh-support-cli show -c 12345678 --mark-read
 
+# Export incident shift-handoff summary (Markdown, Slack, or JSON):
+rh-support-cli show -c 12345678 --export
+rh-support-cli show -c 12345678 --export slack
+rh-support-cli show -c 12345678 --export json
+```
+
 ### 5.3 Case Browser Link (`link`)
 Generates the browser URL for a support case (bypasses authentication):
-
 ```bash
 rh-support-cli link -c 12345678
 # Output: https://access.redhat.com/support/cases/12345678

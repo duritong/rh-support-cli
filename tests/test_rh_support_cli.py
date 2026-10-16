@@ -1728,6 +1728,41 @@ class TestRhSupportCli(unittest.TestCase):
         # Check for ANSI escape codes (colors)
         self.assertIn("\033[", result.stdout)
 
+    def test_show_case_incident_export(self):
+        """Test incident shift-handoff export in markdown, slack, and json formats."""
+        import json
+
+        # 1. Default markdown export
+        res_md = self.run_cli(["show", "-c", "12345", "--export"])
+        self.assertEqual(res_md.returncode, 0)
+        self.assertIn("Red Hat Case #12345", res_md.stdout)
+        self.assertIn(
+            "**Portal Link**: https://access.redhat.com/support/cases/12345",
+            res_md.stdout,
+        )
+        self.assertIn("**Status**:", res_md.stdout)
+        self.assertIn("**Next Step**:", res_md.stdout)
+        # 2. Slack formatted export
+        res_slack = self.run_cli(["show", "-c", "12345", "--export", "slack"])
+        self.assertEqual(res_slack.returncode, 0)
+        self.assertIn(
+            "*<https://access.redhat.com/support/cases/12345|Red Hat Case #12345>*",
+            res_slack.stdout,
+        )
+        self.assertIn("• *Status*:", res_slack.stdout)
+        self.assertIn("• *Next Step*:", res_slack.stdout)
+
+        # 3. JSON formatted export
+        res_json = self.run_cli(["show", "-c", "12345", "--export", "json"])
+        self.assertEqual(res_json.returncode, 0)
+        data = json.loads(res_json.stdout)
+        self.assertEqual(data["case_number"], "12345")
+        self.assertEqual(
+            data["portal_url"], "https://access.redhat.com/support/cases/12345"
+        )
+        self.assertIn("next_step", data)
+        self.assertIn("attachments", data)
+
     def test_simple_output(self):
         """Test showing case details with simple output (no colors)"""
         # Global args must come before subcommand

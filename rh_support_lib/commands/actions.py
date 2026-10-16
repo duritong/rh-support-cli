@@ -10,7 +10,6 @@ from rh_support_lib.utils import (
     EditorError,
     format_structured_output,
     open_editor,
-    strip_header_comments,
 )
 
 

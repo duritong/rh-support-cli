@@ -209,9 +209,15 @@ Authentication:
         help="Display comments in chronological order (oldest first)",
     )
     parser_show.add_argument(
+        "--export",
+        nargs="?",
+        const="markdown",
+        choices=["markdown", "json", "slack", "text"],
+        help="Export incident shift-handoff summary (formats: markdown, slack, json, text)",
+    )
+    parser_show.add_argument(
         "--simple-output", action="store_true", help="Disable colored output"
     )
-
     # Link Subcommand
     parser_link = subparsers.add_parser("link", help="Get the browser URL for a case")
     parser_link.add_argument("-c", "--case", required=True, help="Case Number")
@@ -921,7 +927,13 @@ Authentication:
     # Instantiate RedHatAPIClient before running commands
     from rh_support_lib.api import RedHatAPIClient
 
-    if args.command != "tui" and getattr(args, "format", "text") == "text":
+    is_export_json = getattr(args, "export", None) == "json"
+    if (
+        args.command != "tui"
+        and getattr(args, "format", "text") == "text"
+        and not getattr(args, "json", False)
+        and not is_export_json
+    ):
         print("Authenticating...")
     api_client = RedHatAPIClient(args.token_file)
     if args.command == "attach":
