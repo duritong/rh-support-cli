@@ -326,6 +326,12 @@ The direct dynamic-completer test temporarily overrides HOME, cache/state locati
 
 ### Running Tests and Linting
 
+Provision `pip`, `setuptools`, and `wheel` in the test environment before running
+the suite (`python -m pip install pip setuptools wheel`). CI installs these
+explicitly on every Python version. Wheel verification is mandatory: missing
+build tools fail rather than skip. Builds use a temporary source copy with
+`--no-index --no-deps --no-build-isolation`, leaving no checkout build artifacts.
+
 ```bash
 # Run unit test suite (passing-test output is buffered)
 python -m tests
@@ -360,7 +366,7 @@ Use an actual Python 3.9 runtime, not just a syntax check under a newer interpre
 ```bash
 uv python install 3.9
 uv venv --python 3.9 /tmp/rh-support-py39
-uv pip install --python /tmp/rh-support-py39/bin/python -e .
+uv pip install --python /tmp/rh-support-py39/bin/python pip setuptools wheel -e .
 /tmp/rh-support-py39/bin/python -B -m tests
 ```
 

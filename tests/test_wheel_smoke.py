@@ -16,6 +16,7 @@ class WheelSmokeTests(unittest.TestCase):
     def setUpClass(cls):
         cls.repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         cls.temp_dir = tempfile.TemporaryDirectory(prefix="rh-wheel-test-")
+        cls.addClassCleanup(cls.temp_dir.cleanup)
         cls.wheel_dir = os.path.join(cls.temp_dir.name, "wheels")
         cls.install_dir = os.path.join(cls.temp_dir.name, "installed")
         cls.guard_dir = os.path.join(cls.temp_dir.name, "guard")
@@ -25,33 +26,38 @@ class WheelSmokeTests(unittest.TestCase):
                 os.path.join(cls.repo_root, "tests", "support", name), cls.guard_dir
             )
         os.makedirs(cls.wheel_dir, exist_ok=True)
+        build_source = os.path.join(cls.temp_dir.name, "source")
+        os.mkdir(build_source)
+        for name in ("setup.py", "pyproject.toml", "MANIFEST.in"):
+            source = os.path.join(cls.repo_root, name)
+            if os.path.isfile(source):
+                shutil.copy2(source, build_source)
+        shutil.copytree(
+            os.path.join(cls.repo_root, "rh_support_lib"),
+            os.path.join(build_source, "rh_support_lib"),
+            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+        )
         res = subprocess.run(
             [
                 sys.executable,
                 "-m",
                 "pip",
                 "wheel",
+                "--no-index",
                 "--no-build-isolation",
                 "--no-deps",
                 "-w",
                 cls.wheel_dir,
-                cls.repo_root,
+                build_source,
             ],
             capture_output=True,
             text=True,
             check=False,
         )
         if res.returncode != 0:
-            cls.temp_dir.cleanup()
-            if (
-                "Cannot import 'setuptools" in res.stderr
-                or "No module named 'setuptools'" in res.stderr
-            ):
-                raise unittest.SkipTest(
-                    "setuptools/wheel build backend not available in test environment"
-                )
             raise RuntimeError(
-                f"Failed to build wheel:\nSTDOUT: {res.stdout}\nSTDERR: {res.stderr}"
+                "Mandatory wheel build failed; install pip, setuptools and wheel "
+                f"in the test environment.\nSTDOUT: {res.stdout}\nSTDERR: {res.stderr}"
             )
         wheels = [f for f in os.listdir(cls.wheel_dir) if f.endswith(".whl")]
         if not wheels:
@@ -63,10 +69,6 @@ class WheelSmokeTests(unittest.TestCase):
         with zipfile.ZipFile(cls.wheel_path, "r") as zf:
             cls.wheel_members = zf.namelist()
             zf.extractall(cls.install_dir)
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.temp_dir.cleanup()
 
     def _run_installed_python(self, code: str) -> subprocess.CompletedProcess[str]:
         """Runs Python snippet with sys.path pointing exclusively to installed wheel and clean environment."""
