@@ -129,10 +129,9 @@ def _cmd_create(args, api_client, config, output):
             sys.exit(f"Error: Description file '{args.description_file}' not found.")
         try:
             with open(args.description_file, "r") as f:
-                lines = f.readlines()
+                description = f.read().strip()
         except (OSError, UnicodeError):
             sys.exit("Error: Unable to read description file. No case created.")
-        description = strip_header_comments(lines).strip()
         if not description:
             sys.exit("Error: Empty description file. No case created.")
     else:

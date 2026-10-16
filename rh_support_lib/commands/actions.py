@@ -108,11 +108,11 @@ def _cmd_comment(args, api_client, config, output):
             sys.exit(f"Error: File '{args.file}' does not exist.")
         try:
             with open(args.file, "r") as f:
-                lines = f.readlines()
+                file_content = f.read().strip()
         except (OSError, UnicodeError):
             sys.exit("Error: Unable to read comment file. No changes submitted.")
-        file_content = strip_header_comments(lines).strip()
-
+        if not file_content:
+            sys.exit("Error: Empty comment file. No changes submitted.")
     case_service = CaseService(api_client, config=config)
 
     if args.edit or (not args.file and not getattr(args, "template", None)):

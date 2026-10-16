@@ -246,7 +246,7 @@ class EditorCommandTests(unittest.TestCase):
         from rh_support_lib.commands.actions import cmd_close, cmd_comment
 
         source = self.root / "empty.txt"
-        source.write_text("# Header only\n   # another header\n")
+        source.write_text("   \n\t\n")
         for command in (cmd_comment, cmd_close):
             with (
                 self.subTest(command=command.__name__),
@@ -256,6 +256,31 @@ class EditorCommandTests(unittest.TestCase):
                 command(self.args(file=str(source)), Mock())
             service.return_value.add_comment.assert_not_called()
         self.assertTrue(source.exists())
+
+    def test_file_imports_preserve_leading_markdown_headings_verbatim(self):
+        from rh_support_lib.commands.actions import cmd_comment
+        from rh_support_lib.commands.create_case import cmd_create
+
+        source = self.root / "doc.md"
+        source.write_text("# Incident Root Cause\nActual explanation\n")
+
+        with (
+            patch("rh_support_lib.commands.actions.CaseService") as comment_service,
+            patch("rh_support_lib.commands.create_case.CaseService") as create_service,
+            patch("rh_support_lib.commands.create_case.prompt_text", return_value="y"),
+        ):
+            comment_service.return_value.add_comment.return_value = Mock(id="c1")
+            create_service.return_value.create_case.return_value = "1001"
+
+            cmd_comment(self.args(file=str(source)), Mock())
+            comment_body = comment_service.return_value.add_comment.call_args.args[1]
+            self.assertTrue(comment_body.startswith("# Incident Root Cause"))
+
+            cmd_create(self.args(description_file=str(source)), Mock(), {})
+            desc = create_service.return_value.create_case.call_args.kwargs[
+                "description"
+            ]
+            self.assertTrue(desc.startswith("# Incident Root Cause"))
 
     def test_empty_description_file_never_launches_editor_or_creates_case(self):
         from rh_support_lib.commands.create_case import cmd_create

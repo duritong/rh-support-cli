@@ -249,10 +249,28 @@ def prompt_text(prompt, default=None):
 
 
 def strip_header_comments(lines):
+    """Removes generated editor guidance header comments (# Enter comment..., # Leading lines...).
+
+    If a generated boundary marker is present, strips only up to that marker,
+    preserving any legitimate Markdown headings in user content below it.
+    Otherwise falls back to removing leading lines starting with '#'.
     """
-    Removes leading lines that start with '#' (ignoring leading whitespace).
-    Stops at the first line that does not start with '#'.
-    """
+    boundary_marker = "# Leading lines starting with '#' will be ignored."
+    found_boundary = False
+    boundary_idx = -1
+    for i, line in enumerate(lines):
+        if line.strip() == boundary_marker:
+            found_boundary = True
+            boundary_idx = i
+            break
+
+    if found_boundary:
+        content_lines = lines[boundary_idx + 1 :]
+        start_idx = 0
+        while start_idx < len(content_lines) and not content_lines[start_idx].strip():
+            start_idx += 1
+        return "".join(content_lines[start_idx:])
+
     first_content_idx = 0
     found_content = False
     for i, line in enumerate(lines):
@@ -265,7 +283,6 @@ def strip_header_comments(lines):
         return ""
 
     return "".join(lines[first_content_idx:])
-
 
 class EditorError(RuntimeError):
     """Editor failure with a safe reason and the path to the recoverable draft."""
