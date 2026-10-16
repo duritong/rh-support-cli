@@ -537,12 +537,14 @@ class KCSSearchModal(ModalScreen[Optional[tuple[str, str, str]]]):
             table.add_row("-", Text(f"No KCS solutions found for '{query}'."), "-")
             return
 
-        for r in self.results:
+        for index, r in enumerate(self.results):
             kcs_type = getattr(r, "document_kind", "") or (
                 "Solution" if "/solutions/" in r.url else "Article"
             )
             prod_name = getattr(r, "product", "") or ""
-            table.add_row(Text(kcs_type), Text(r.title), Text(prod_name), key=r.url)
+            table.add_row(
+                Text(kcs_type), Text(r.title), Text(prod_name), key=str(index)
+            )
 
     def _selected_kcs_item(self) -> tuple[str, str] | None:
         table = self.query_one("#kcs-results-table", DataTable)
@@ -551,11 +553,11 @@ class KCSSearchModal(ModalScreen[Optional[tuple[str, str, str]]]):
         with contextlib.suppress(Exception):
             cell_key = table.coordinate_to_cell_key(table.cursor_coordinate)
             if cell_key:
-                selected_url = str(cell_key.row_key.value)
-                for r in self.results:
-                    if r.url == selected_url:
-                        return (r.url, r.title)
-        return (self.results[0].url, self.results[0].title) if self.results else None
+                index = int(cell_key.row_key.value)
+                if 0 <= index < len(self.results):
+                    result = self.results[index]
+                    return (result.url, result.title)
+        return None
 
     @on(DataTable.RowSelected, "#kcs-results-table")
     def on_table_selected(self, event: DataTable.RowSelected) -> None:

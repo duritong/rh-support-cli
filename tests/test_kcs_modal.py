@@ -221,3 +221,21 @@ class KcsModalTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(modal.results, [self.result])
                 modal.dismiss(None)
                 await pilot.pause()
+
+    async def test_duplicate_urls_remain_individually_selectable(self):
+        second = KCSSearchResult("123", "Second title", view_uri=self.result.url)
+        self.app.search_service.search_kcs.return_value = [self.result, second]
+        async with self.app.run_test() as pilot:
+            callback = Mock()
+            modal = KCSSearchModal(self.app.search_service, initial_query="query")
+            self.app.push_screen(modal, callback)
+            await pilot.pause()
+            await self.app.workers.wait_for_complete()
+            await pilot.pause()
+            table = modal.query_one(DataTable)
+            self.assertEqual(table.row_count, 2)
+            table.move_cursor(row=1)
+            table.focus()
+            await pilot.press("enter")
+            await pilot.pause()
+            callback.assert_called_once_with(("open", second.url, second.title))
