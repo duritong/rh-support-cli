@@ -142,7 +142,17 @@ To prevent `MemoryError` exceptions when handling multi-gigabyte files, `FilePar
 * Positive-sized `read(size)` calls are bounded by `block_size` (default 8 MiB), including Requests' normal transport reads. Explicit `read(-1)`/`read()` retains file-like read-all semantics and is not memory-bounded.
 * Implements `__len__` returning the part's exact slice length, enabling `requests.put` to set the HTTP `Content-Length` header automatically.
 * Closes file handles safely via context manager (`__enter__` / `__exit__`).
-* Normal transfer reads are independent of total file size; no measured process-wide peak-memory bound is asserted.
+* `tests/test_memory_bounds.py` measures a real `AttachmentService.upload_attachment`
+  transfer in a fresh sandboxed subprocess: a 96 MiB + 123 byte sparse source,
+  four loopback PUT slices, and a completion HTTP 401/refresh/retry. It checks
+  per-part hashes/lengths, completion ETags, progress, and closed single-slot streams.
+* The measured upload must allocate less than 16 MiB of traced Python heap and,
+  where `resource` is available, increase fresh-process peak RSS by less than
+  48 MiB (Linux KiB and macOS byte units normalized). These bounds detect part/file
+  buffering; they are not a universal RSS ceiling or a multi-terabyte benchmark.
+  The required debug log must contain stream-body omission and retry records,
+  omit credentials, and remain below 128 KiB. A separate 256 MiB bounded-read
+  check limits Python heap to 25 MiB.
 
 ### Part Boundary Sizing
 For a file of size $S$ divided into $N$ parts of chunk size $C$:

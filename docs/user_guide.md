@@ -379,7 +379,7 @@ rh-support-cli attachment -c 12345678 delete -a <ATTACHMENT_UUID> -y
 #### Automated Multipart Uploads (> 5 GB up to 5 TB)
 Files exceeding 5 GB are **automatically transferred via multipart uploads**.
 * **No Manual Splitting**: You do not need to run `split -b`. The CLI automatically splits, streams, and completes the upload on Red Hat's storage backend.
-* **Low-Memory Streaming**: Large files stream in small 8 MB memory blocks, maintaining client RAM usage under 50 MB regardless of file size.
+* **Low-Memory Streaming**: Large files stream through bounded reads (up to 8 MiB per block) rather than buffering the whole attachment. Total process memory depends on the runtime, interface, and enabled features; there is no fixed process-wide RAM ceiling.
 * **Live Progress Bar**: Displays real-time transfer speed (MB/s), remaining time, and upload percentage.
 * **Automatic Abort on Failure**: If an upload is cancelled (`Ctrl+C`) or interrupted, the CLI aborts the session cleanly to release storage resources.
 
