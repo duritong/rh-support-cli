@@ -8,7 +8,11 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import venv
 import zipfile
+from email.parser import Parser
+
+from tests.support.wheel_environment import copy_runtime_dependencies
 
 
 class WheelSmokeTests(unittest.TestCase):
@@ -65,27 +69,61 @@ class WheelSmokeTests(unittest.TestCase):
             raise RuntimeError("No wheel found in build directory.")
         cls.wheel_path = os.path.join(cls.wheel_dir, wheels[0])
 
-        # 2. Extract / install wheel into clean target directory
+        # Install the artifact, not a source/editable distribution, entirely offline.
         with zipfile.ZipFile(cls.wheel_path, "r") as zf:
             cls.wheel_members = zf.namelist()
-            zf.extractall(cls.install_dir)
+            metadata_name = next(
+                n for n in cls.wheel_members if n.endswith("/METADATA")
+            )
+            cls.metadata_text = zf.read(metadata_name).decode("utf-8")
+        venv.EnvBuilder(with_pip=True).create(cls.install_dir)
+        cls.installed_python = os.path.join(cls.install_dir, "bin", "python")
+        cls.console_script = os.path.join(cls.install_dir, "bin", "rh-support-cli")
+        site_packages = os.path.join(
+            cls.install_dir,
+            "lib",
+            f"python{sys.version_info.major}.{sys.version_info.minor}",
+            "site-packages",
+        )
+        requirements = Parser().parsestr(cls.metadata_text).get_all("Requires-Dist", [])
+        copy_runtime_dependencies(requirements, site_packages)
+        result = subprocess.run(
+            [
+                cls.installed_python,
+                "-m",
+                "pip",
+                "install",
+                "--no-index",
+                "--no-deps",
+                cls.wheel_path,
+            ],
+            cwd=cls.temp_dir.name,
+            env=cls._installed_env(),
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode:
+            raise RuntimeError(
+                f"Offline wheel install failed: {result.stdout}\n{result.stderr}"
+            )
+
+    @classmethod
+    def _installed_env(cls):
+        env = os.environ.copy()
+        env["PYTHONPATH"] = cls.guard_dir
+        env["PYTHONNOUSERSITE"] = "1"
+        env["HOME"] = cls.temp_dir.name
+        env["XDG_CONFIG_HOME"] = os.path.join(cls.temp_dir.name, "config")
+        env["XDG_CACHE_HOME"] = os.path.join(cls.temp_dir.name, "cache")
+        env["XDG_STATE_HOME"] = os.path.join(cls.temp_dir.name, "state")
+        return env
 
     def _run_installed_python(self, code: str) -> subprocess.CompletedProcess[str]:
-        """Runs Python snippet with sys.path pointing exclusively to installed wheel and clean environment."""
-        # Isolate sys.path from repo root
-        clean_pythonpath = os.pathsep.join((self.guard_dir, self.install_dir))
-        env = os.environ.copy()
-        env["PYTHONPATH"] = clean_pythonpath
-        # Pass loopback-guarded test environment
-        env["HOME"] = self.temp_dir.name
-        env["XDG_CONFIG_HOME"] = os.path.join(self.temp_dir.name, "config")
-        env["XDG_CACHE_HOME"] = os.path.join(self.temp_dir.name, "cache")
-        env["XDG_STATE_HOME"] = os.path.join(self.temp_dir.name, "state")
-
         return subprocess.run(
-            [sys.executable, "-c", code],
+            [self.installed_python, "-c", code],
             cwd=self.temp_dir.name,
-            env=env,
+            env=self._installed_env(),
             capture_output=True,
             text=True,
             check=False,
@@ -142,10 +180,7 @@ print("GUARDED")
         # Inspect wheel metadata
         metadata_files = [f for f in self.wheel_members if f.endswith("METADATA")]
         self.assertTrue(bool(metadata_files), "Wheel must contain dist-info/METADATA")
-        with open(
-            os.path.join(self.install_dir, metadata_files[0]), "r", encoding="utf-8"
-        ) as f:
-            meta_text = f.read()
+        meta_text = self.metadata_text
         self.assertIn("Requires-Python: >=3.9", meta_text)
         self.assertIn("Requires-Dist: markdown-it-py", meta_text)
 
@@ -155,6 +190,8 @@ print("GUARDED")
 import rh_support_lib
 from rh_support_lib.completers import DEFAULT_FALLBACK_PRODUCTS, product_completer
 import os
+import sys
+from importlib import metadata, resources, util
 
 prods = product_completer("Red")
 assert len(prods) > 0, "Product completer must return products"
@@ -163,6 +200,11 @@ assert any("Enterprise Linux" in p or "Enterprise\\ Linux" in p for p in prods)
 # Ensure it was imported from installed target, not checkout
 installed_file = os.path.abspath(rh_support_lib.__file__)
 assert "installed" in installed_file, f"Imported from unexpected location: {installed_file}"
+assert os.path.commonpath((sys.prefix, installed_file)) == sys.prefix
+assert util.find_spec("tests") is None, "Source tests leaked into installed environment"
+assert not any("rh-support-cli" in p for p in sys.path), sys.path
+assert metadata.version("rh-support-cli") == "0.1.0"
+assert resources.files("rh_support_lib").joinpath("data/products.json").is_file()
 print("OK")
 """
         res = self._run_installed_python(code)
@@ -192,19 +234,15 @@ print("OK")
         self.assertIn("OK", res.stdout)
 
     def test_installed_wheel_console_entry_point(self):
-        """Verify the console script entry point definition executes main cleanly."""
-        code = """
-from rh_support_lib.main import main
-import sys
-
-# Test completion script generation via entry point
-sys.argv = ["rh-support-cli", "completion"]
-try:
-    main()
-except SystemExit as e:
-    assert e.code == 0
-"""
-        res = self._run_installed_python(code)
+        """Execute pip's generated console script, not a direct call to main."""
+        res = subprocess.run(
+            [self.console_script, "completion"],
+            check=False,
+            cwd=self.temp_dir.name,
+            env=self._installed_env(),
+            capture_output=True,
+            text=True,
+        )
         self.assertEqual(
             res.returncode,
             0,

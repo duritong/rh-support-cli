@@ -310,6 +310,12 @@ Wheel smoke children retain the loopback guard using temporary copies of only
 `sitecustomize.py` and `network_guard.py`, not the checkout or its test package.
 Their working directory is outside the checkout. A child regression checks guard
 activation before testing rejected DNS/connect/connect_ex and a permitted local connection.
+The artifact is installed with `pip install --no-index --no-deps` into a new
+virtualenv. Runtime dependency distribution files are copied from the provisioned
+test environment, excluding `.pth` hooks and external scripts; system and user
+site-packages are disabled. Tests execute pip's generated `rh-support-cli` script
+and verify installed metadata, bundled catalog loading, and absence of checkout
+imports. No package index is needed during the suite.
 
 ### Mock Server (`MockRedHatHandler`)
 Starts a local loopback `http.server.HTTPServer` mocking:
