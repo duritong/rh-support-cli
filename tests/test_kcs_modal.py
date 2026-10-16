@@ -8,6 +8,8 @@ from unittest.mock import Mock, patch
 from rich.text import Text
 from textual.widgets import DataTable, Input, TextArea
 
+from rh_support_lib.api import AuthenticationError
+from rh_support_lib.errors import ReadError
 from rh_support_lib.models import KCSSearchResult
 from rh_support_lib.tui.app import KCSSearchModal
 from tests import test_tui_actions as fixtures
@@ -192,3 +194,30 @@ class KcsModalTests(unittest.IsolatedAsyncioTestCase):
                 callback.assert_called_once_with(
                     ("insert", "https://access.redhat.com/solutions/0", "Solution 0")
                 )
+
+    async def test_failed_search_is_distinct_from_empty_and_can_be_retried(self):
+        async with self.app.run_test() as pilot:
+            for error in (
+                ReadError("SECRET"),
+                AuthenticationError("SECRET"),
+                RuntimeError("SECRET"),
+            ):
+                self.app.search_service.search_kcs.side_effect = error
+                modal = KCSSearchModal(self.app.search_service, initial_query="query")
+                self.app.push_screen(modal)
+                await pilot.pause()
+                await self.app.workers.wait_for_complete()
+                await pilot.pause()
+                message = str(modal.query_one(DataTable).get_row_at(0)[1])
+                self.assertIn("failed", message.lower())
+                self.assertNotIn("No KCS solutions", message)
+                self.assertNotIn("SECRET", message)
+                self.assertEqual(modal.results, [])
+                self.app.search_service.search_kcs.side_effect = None
+                modal.query_one(Input).focus()
+                await pilot.press("enter")
+                await self.app.workers.wait_for_complete()
+                await pilot.pause()
+                self.assertEqual(modal.results, [self.result])
+                modal.dismiss(None)
+                await pilot.pause()

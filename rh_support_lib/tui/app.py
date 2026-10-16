@@ -32,6 +32,7 @@ from textual.widgets import (
     TextArea,
 )
 
+from rh_support_lib.api import AuthenticationError
 from rh_support_lib.config import resolve_bookmarks
 from rh_support_lib.constants import (
     API_URL,
@@ -501,15 +502,20 @@ class KCSSearchModal(ModalScreen[Optional[tuple[str, str, str]]]):
         app = self.app
 
         def search():
+            error = None
             try:
                 results = self.search_service.search_kcs(
                     query=query, product=self.default_product, limit=20
                 )
+            except AuthenticationError:
+                results = []
+                error = "Authentication failed. Check credentials and submit the query again."
             except Exception:  # noqa: BLE001
                 results = []
+                error = "KCS search failed. Submit the query again to retry."
             with contextlib.suppress(RuntimeError):
                 app.call_from_thread(
-                    self._apply_kcs_results, generation, query, results
+                    self._apply_kcs_results, generation, query, results, error
                 )
 
         self.run_worker(search, thread=True)
@@ -517,12 +523,15 @@ class KCSSearchModal(ModalScreen[Optional[tuple[str, str, str]]]):
     def on_unmount(self) -> None:
         self._search_generation += 1
 
-    def _apply_kcs_results(self, generation, query, results) -> None:
+    def _apply_kcs_results(self, generation, query, results, error=None) -> None:
         if not self.is_mounted or generation != self._search_generation:
             return
         table = self.query_one("#kcs-results-table", DataTable)
         table.clear()
         self.results = results
+        if error:
+            table.add_row("!", Text(error), "-")
+            return
 
         if not self.results:
             table.add_row("-", Text(f"No KCS solutions found for '{query}'."), "-")

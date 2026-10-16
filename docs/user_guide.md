@@ -580,6 +580,8 @@ Bookmark/template dialogs can open without a preselected option; confirming an e
 
 ---
 
+KCS searches run without blocking the dashboard. Authentication or service failures appear as explicit failures, not as "no solutions found"; submit the query again to retry. A newer query supersedes older results, and closing the dialog discards pending results.
+
 ## 7. Stateful Offline Mock Mode (`--mock` & `mock-portal`)
 
 For demos, offline testing, and development without network access:
