@@ -858,8 +858,6 @@ Authentication:
         parser_systemd,
         parser_install_sys,
         p_sys_install,
-        parser_doctor,
-        p_drafts_list,
     }
     # Child defaults must not overwrite options already parsed by a parent.
     draft_parsers = set(drafts_sub.choices.values())

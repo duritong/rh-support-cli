@@ -2,15 +2,21 @@
 
 from __future__ import annotations
 
-import json
 import os
 import re
 import sys
+from contextlib import redirect_stdout
 from datetime import datetime, timezone
 from typing import Any
 
 from rh_support_lib.config import resolve_drafts_dir
-from rh_support_lib.utils import draft_identity, draft_lock, read_draft, remove_draft
+from rh_support_lib.utils import (
+    draft_identity,
+    draft_lock,
+    format_structured_output,
+    read_draft,
+    remove_draft,
+)
 
 
 def find_drafts(
@@ -82,13 +88,13 @@ def cmd_drafts(args: Any, config: dict | None = None) -> int:
     drafts_dir = resolve_drafts_dir(config)
     subcmd = getattr(args, "draft_action", "list") or "list"
     target_case = getattr(args, "case", None)
-    fmt = getattr(args, "format", "text")
-    is_json = fmt == "json" or getattr(args, "json", False)
+    fmt = "json" if getattr(args, "json", False) else getattr(args, "format", "text")
+    structured = fmt in ("json", "yaml")
 
     if subcmd == "list":
         drafts = find_drafts(case_number=target_case, drafts_dir=drafts_dir)
-        if is_json:
-            print(json.dumps(drafts, indent=2))
+        if structured:
+            print(format_structured_output(drafts, fmt=fmt))
             return 0
 
         if not drafts:
@@ -154,8 +160,8 @@ def cmd_drafts(args: Any, config: dict | None = None) -> int:
             sys.exit(f"Error: No draft matching '{identifier}' found in {drafts_dir}")
         match = matches[0]
 
-        if is_json:
-            print(json.dumps(match, indent=2))
+        if structured:
+            print(format_structured_output(match, fmt=fmt))
             return 0
 
         print(
@@ -168,16 +174,31 @@ def cmd_drafts(args: Any, config: dict | None = None) -> int:
     if subcmd in ("clear", "clean", "rm"):
         drafts = find_drafts(case_number=target_case, drafts_dir=drafts_dir)
         if not drafts:
-            print("No drafts to delete.")
+            if structured:
+                print(
+                    format_structured_output(
+                        {"deleted": 0, "skipped": 0, "cancelled": False}, fmt=fmt
+                    )
+                )
+            else:
+                print("No drafts to delete.")
             return 0
 
         if not getattr(args, "yes", False):
             case_info = f" for Case #{target_case}" if target_case else ""
-            confirm = input(
-                f"Delete {len(drafts)} saved comment draft(s){case_info}? [y/N]: "
-            )
+            with redirect_stdout(sys.stderr if structured else sys.stdout):
+                confirm = input(
+                    f"Delete {len(drafts)} saved comment draft(s){case_info}? [y/N]: "
+                )
             if confirm.lower() not in ("y", "yes"):
-                print("Operation cancelled.")
+                if structured:
+                    print(
+                        format_structured_output(
+                            {"deleted": 0, "skipped": 0, "cancelled": True}, fmt=fmt
+                        )
+                    )
+                else:
+                    print("Operation cancelled.")
                 return 0
 
         deleted = 0
@@ -196,9 +217,17 @@ def cmd_drafts(args: Any, config: dict | None = None) -> int:
             except OSError:
                 skipped += 1
 
-        print(f"✓ Deleted {deleted} saved comment draft(s).")
-        if skipped:
-            print(f"Skipped {skipped} active, changed, or unavailable draft(s).")
+        if structured:
+            print(
+                format_structured_output(
+                    {"deleted": deleted, "skipped": skipped, "cancelled": False},
+                    fmt=fmt,
+                )
+            )
+        else:
+            print(f"✓ Deleted {deleted} saved comment draft(s).")
+            if skipped:
+                print(f"Skipped {skipped} active, changed, or unavailable draft(s).")
         return 0
 
     return 0

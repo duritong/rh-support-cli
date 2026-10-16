@@ -15,6 +15,7 @@ from typing import Any
 from rh_support_lib.config import load_config
 from rh_support_lib.services.cache import CacheService
 from rh_support_lib.services.state import StateService
+from rh_support_lib.utils import format_structured_output
 
 
 def check_auth(token_file: str | None = None) -> dict[str, Any]:
@@ -314,7 +315,7 @@ def cmd_doctor(args: Any, config: dict | None = None) -> int:
     config_file = getattr(args, "config_file", None)
     is_online = getattr(args, "online", False)
     fmt = getattr(args, "format", "text")
-    is_json = fmt == "json" or getattr(args, "json", False)
+    fmt = "json" if getattr(args, "json", False) else fmt
     simple = getattr(args, "simple_output", False)
 
     checks = [
@@ -334,7 +335,7 @@ def cmd_doctor(args: Any, config: dict | None = None) -> int:
     warns = sum(1 for c in checks if c["status"] == "WARN")
     passes = sum(1 for c in checks if c["status"] == "PASS")
 
-    if is_json:
+    if fmt in ("json", "yaml"):
         payload = {
             "summary": {
                 "total": len(checks),
@@ -344,7 +345,7 @@ def cmd_doctor(args: Any, config: dict | None = None) -> int:
             },
             "checks": checks,
         }
-        print(json.dumps(payload, indent=2))
+        print(format_structured_output(payload, fmt=fmt))
         return 1 if fails else 0
 
     if simple:

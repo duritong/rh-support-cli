@@ -572,6 +572,8 @@ rh-support-cli doctor --online
 ```
 
 ### 5.18 Comment Drafts Discovery & Recovery (`drafts`)
+
+`doctor` and all `drafts` actions accept `--json` or `--format json|yaml` at the global or command level. Draft lists serialize as lists, previews as records, and cleanup as a receipt with `deleted`, `skipped`, and `cancelled`. Cleanup confirmation stays on stderr for structured output; JSON/YAML does not bypass confirmation.
 Generated editor boundaries are recognized only inside the leading comment header; marker text within the body remains content.
 Retrying a generated recovery file with `comment --file` removes its editor guidance and previous-comment context. Ordinary input files and raw TUI drafts preserve leading Markdown headings, including during automatic resume.
 `drafts show` prefers an exact filename, then an exact case number (ignoring leading zeroes), then a unique partial filename. Multiple matches fail with an ambiguity error; use the full filename to select one.

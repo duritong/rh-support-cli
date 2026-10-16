@@ -97,6 +97,36 @@ class DoctorCliTests(unittest.TestCase):
         self.assertIn("Red Hat Support CLI — Diagnostic Report", stdout)
         self.assertIn("Summary:", stdout)
 
+    def test_doctor_structured_formats_before_and_after_command(self):
+        import subprocess
+        import sys
+
+        import yaml
+
+        for fmt in ("json", "yaml"):
+            for before in (False, True):
+                with self.subTest(fmt=fmt, before=before):
+                    arguments = (
+                        ["--format", fmt, "doctor"]
+                        if before
+                        else ["doctor", "--format", fmt]
+                    )
+                    result = subprocess.run(
+                        [sys.executable, self.cli_path, *arguments],
+                        env=self.env,
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    report = (
+                        json.loads(result.stdout)
+                        if fmt == "json"
+                        else yaml.safe_load(result.stdout)
+                    )
+                    self.assertIsInstance(report, dict)
+                    self.assertIn("checks", report)
+
     def test_broken_configuration_still_produces_full_json_report(self):
         config = Path(self.temp_home) / "broken.yaml"
         for contents in ("bookmarks: [", "cache: []", "default_bookmark: missing"):

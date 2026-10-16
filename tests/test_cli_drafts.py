@@ -28,12 +28,12 @@ class DraftsCliTests(unittest.TestCase):
             "rh-support-cli.py",
         )
 
-    def _run_cli(self, *args: str) -> tuple[int, str, str]:
+    def _run_cli(self, *args: str, input: str | None = None) -> tuple[int, str, str]:
         import subprocess
 
         cmd = [sys.executable, self.cli_path, *args]
         res = subprocess.run(
-            cmd, env=self.env, capture_output=True, text=True, check=False
+            cmd, env=self.env, capture_output=True, text=True, input=input, check=False
         )
         return res.returncode, res.stdout, res.stderr
 
@@ -42,6 +42,59 @@ class DraftsCliTests(unittest.TestCase):
         rc, stdout, _stderr = self._run_cli("drafts", "list")
         self.assertEqual(rc, 0)
         self.assertIn("No saved comment drafts found", stdout)
+
+    def test_structured_formats_at_root_group_and_action_levels(self):
+        import yaml
+
+        path = os.path.join(self.drafts_dir, "comment_draft_12345_saved.txt")
+        for fmt in ("json", "yaml"):
+            for position in ("root", "group", "action"):
+                for action in ("list", "show", "clear"):
+                    with self.subTest(fmt=fmt, position=position, action=action):
+                        with open(path, "w") as draft:
+                            draft.write("Saved content")
+                        suffix = (
+                            ["12345"]
+                            if action == "show"
+                            else (["--yes"] if action == "clear" else [])
+                        )
+                        arguments = ["drafts", action, *suffix]
+                        index = (
+                            0
+                            if position == "root"
+                            else (1 if position == "group" else len(arguments))
+                        )
+                        arguments[index:index] = ["--format", fmt]
+                        code, output, errors = self._run_cli(*arguments)
+                        self.assertEqual(code, 0, errors)
+                        result = (
+                            json.loads(output)
+                            if fmt == "json"
+                            else yaml.safe_load(output)
+                        )
+                        self.assertIsInstance(
+                            result, list if action == "list" else dict
+                        )
+                        if action == "clear":
+                            self.assertEqual(result["deleted"], 1)
+
+    def test_clear_confirmation_cancel_and_empty_receipts_are_structured(self):
+        path = os.path.join(self.drafts_dir, "comment_draft_12345_saved.txt")
+        with open(path, "w") as draft:
+            draft.write("Saved content")
+        code, output, errors = self._run_cli("drafts", "clear", "--json", input="n\n")
+        self.assertEqual(code, 0, errors)
+        self.assertTrue(json.loads(output)["cancelled"])
+        self.assertIn("Delete 1", errors)
+        self.assertTrue(os.path.exists(path))
+        code, output, errors = self._run_cli("drafts", "clear", "--json", input="y\n")
+        self.assertEqual(code, 0, errors)
+        self.assertEqual(json.loads(output)["deleted"], 1)
+        code, output, errors = self._run_cli("drafts", "clear", "--json", "--yes")
+        self.assertEqual(code, 0, errors)
+        self.assertEqual(
+            json.loads(output), {"deleted": 0, "skipped": 0, "cancelled": False}
+        )
 
     def test_show_precedence_and_ambiguity(self):
         from pathlib import Path
