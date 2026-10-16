@@ -99,6 +99,42 @@ class PollingTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(self.app.query_one(DataTable).row_count, 0)
             self.service.check_case_last_modified.assert_not_called()
 
+    async def test_poll_refreshes_active_search_instead_of_regular_queue(self):
+        async with self.app.run_test():
+            self.app.active_search_query = "kernel"
+            matches = [case("999")]
+            self.service.list_cases.return_value = [case("unrelated")]
+            with patch.object(
+                self.app.search_service, "search_cases", return_value=matches
+            ) as search:
+                await self.start(self.app.fetch_cases)
+                await self.start(self.app.poll_cases_background)
+                self.assertEqual(self.app.cases, matches)
+                self.assertEqual(search.call_count, 2)
+                self.assertEqual(search.call_args.kwargs["query"], "kernel")
+                self.assertIn("Search: 'kernel'", self.app.sub_title)
+                self.service.list_cases.assert_not_called()
+
+    async def test_query_change_discards_old_search_completion_during_poll(self):
+        async with self.app.run_test():
+            self.service.list_cases.return_value = []
+            self.ui_thread = threading.get_ident()
+            blocked, entered, release = self.gate([case("obsolete")])
+            self.app.active_search_query = "old"
+            with patch.object(
+                self.app.search_service, "search_cases", side_effect=blocked
+            ) as search:
+                pending = self.start(self.app.fetch_cases)
+                await self.reached(entered)
+                self.app.active_search_query = "new"
+                search.side_effect = None
+                search.return_value = [case("new-match")]
+                await self.start(self.app.poll_cases_background)
+                release.set()
+                await pending
+                self.assertEqual([c.case_number for c in self.app.cases], ["new-match"])
+                self.assertEqual(search.call_args.kwargs["query"], "new")
+
     async def test_expired_or_disabled_cache_refreshes_display_and_preserves_draft(
         self,
     ):

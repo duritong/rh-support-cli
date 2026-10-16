@@ -239,6 +239,8 @@ KCS result selection stops its table event at the modal. The application's case-
 
 KCS searches run in modal-owned thread workers. Results are dispatched onto the UI thread and accepted only for the mounted modal's current search generation; later queries and modal removal invalidate older completions.
 
+Initial queue loads, explicit refreshes, and background polling share the same case-list reader and captured search query. Polling cannot replace a keyword search with the ordinary queue; query changes invalidate in-flight results through list-request ownership.
+
 The interactive dashboard (`rh_support_lib/tui/app.py`) is implemented using Textual:
 
 * **Dual-Layout Topologies**:

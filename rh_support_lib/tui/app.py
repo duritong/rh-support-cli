@@ -1076,27 +1076,7 @@ class SupportApp(App):
 
             self._safe_call(show_loading)
             try:
-                params = snapshot[1]
-                search_query = snapshot[7] if len(snapshot) > 7 else None
-                if search_query:
-                    cases = self.search_service.search_cases(
-                        query=search_query,
-                        account=params.get("account"),
-                        status=params.get("status"),
-                        severity=params.get("severity"),
-                        owner=params.get("owner"),
-                        product=params.get("product"),
-                        limit=50,
-                    )
-                elif params.get("following"):
-                    cases = self.case_service.list_followed_cases(
-                        **{k: v for k, v in params.items() if k != "following"}
-                    )
-                else:
-                    list_kwargs = {k: v for k, v in params.items() if k != "following"}
-                    if force:
-                        list_kwargs["use_cache"] = False
-                    cases = self.case_service.list_cases(**list_kwargs)
+                cases = self._read_case_list(snapshot, force)
                 self._safe_call(self._apply_case_list, snapshot, cases)
             except Exception as e:  # noqa: BLE001
                 self._safe_call(self._case_list_error, snapshot, f"Network Error: {e}")
@@ -1104,6 +1084,26 @@ class SupportApp(App):
     def _case_list_error(self, snapshot, message):
         if self._list_request_current(snapshot) and self.current_details is snapshot[6]:
             self._call_for_case(snapshot[4], snapshot[5], self._read_warning, message)
+
+    def _read_case_list(self, snapshot, force=False):
+        params = snapshot[1]
+        search_query = snapshot[7]
+        if search_query:
+            return self.search_service.search_cases(
+                query=search_query,
+                account=params.get("account"),
+                status=params.get("status"),
+                severity=params.get("severity"),
+                owner=params.get("owner"),
+                product=params.get("product"),
+                limit=50,
+            )
+        list_kwargs = {k: v for k, v in params.items() if k != "following"}
+        if params.get("following"):
+            return self.case_service.list_followed_cases(**list_kwargs)
+        if force:
+            list_kwargs["use_cache"] = False
+        return self.case_service.list_cases(**list_kwargs)
 
     def _apply_case_list(self, snapshot, cases, poll=False):
         if not self._list_request_current(snapshot):
@@ -1252,15 +1252,7 @@ class SupportApp(App):
     def _read_poll_results(self, snapshot):
         generation = None
         try:
-            params = snapshot[1]
-            if params.get("following"):
-                fresh_cases = self.case_service.list_followed_cases(
-                    **{k: v for k, v in params.items() if k != "following"}
-                )
-            else:
-                list_kwargs = {k: v for k, v in params.items() if k != "following"}
-                list_kwargs["use_cache"] = False
-                fresh_cases = self.case_service.list_cases(**list_kwargs)
+            fresh_cases = self._read_case_list(snapshot, force=True)
 
             changed = self._safe_call(
                 self._apply_case_list, snapshot, fresh_cases, True
