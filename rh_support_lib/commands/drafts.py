@@ -67,13 +67,14 @@ def find_drafts(
                 "case_number": c_num,
                 "size_bytes": stat.st_size,
                 "modified": mtime,
+                "mtime_ns": stat.st_mtime_ns,
                 "snippet": snippet or "(empty draft)",
                 "content": content,
             }
         )
 
     # Sort newest first
-    results.sort(key=lambda x: x["modified"], reverse=True)
+    results.sort(key=lambda x: x["mtime_ns"], reverse=True)
     return results
 
 

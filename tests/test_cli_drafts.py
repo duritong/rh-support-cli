@@ -61,6 +61,18 @@ class DraftsCliTests(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertEqual(json.loads(stdout)["file"], "comment_draft_123_old.txt")
 
+    def test_discovery_sorts_subsecond_mtimes(self):
+        from pathlib import Path
+
+        from rh_support_lib.commands.drafts import find_drafts
+
+        for name, ns in (("a", 1000000001), ("z", 1000000002)):
+            path = Path(self.drafts_dir) / f"comment_draft_123_{name}.txt"
+            path.write_text(name)
+            os.utime(path, ns=(ns, ns))
+        drafts = find_drafts(drafts_dir=self.drafts_dir)
+        self.assertEqual(drafts[0]["content"], "z")
+
     def test_drafts_discovery_filtering_and_show(self):
         """Verify drafts list, filtering by case, and drafts show preview."""
         # Create 2 drafts

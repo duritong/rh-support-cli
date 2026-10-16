@@ -575,6 +575,7 @@ rh-support-cli doctor --online
 Generated editor boundaries are recognized only inside the leading comment header; marker text within the body remains content.
 Retrying a generated recovery file with `comment --file` removes its editor guidance and previous-comment context. Ordinary input files and raw TUI drafts preserve leading Markdown headings, including during automatic resume.
 `drafts show` prefers an exact filename, then an exact case number (ignoring leading zeroes), then a unique partial filename. Multiple matches fail with an ambiguity error; use the full filename to select one.
+Listing and automatic resume order drafts by full filesystem modification precision, not the rounded timestamp displayed in the table. JSON includes `mtime_ns`.
 
 Discovers, previews, and purges preserved comment drafts stored when editing or posting was interrupted:
 
