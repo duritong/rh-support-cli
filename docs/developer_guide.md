@@ -237,6 +237,8 @@ Private lists and case records live under `private/<opaque-context-hash>/{lists,
 
 KCS result selection stops its table event at the modal. The application's case-selection handler is scoped to `#case-table`, so other result tables cannot change the active case or initiate case-detail reads.
 
+KCS searches run in modal-owned thread workers. Results are dispatched onto the UI thread and accepted only for the mounted modal's current search generation; later queries and modal removal invalidate older completions.
+
 The interactive dashboard (`rh_support_lib/tui/app.py`) is implemented using Textual:
 
 * **Dual-Layout Topologies**:

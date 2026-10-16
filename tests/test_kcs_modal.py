@@ -1,11 +1,14 @@
 """Mounted regressions for knowledgebase search and case/draft ownership."""
 
+import asyncio
+import threading
 import unittest
 from unittest.mock import Mock, patch
 
-from textual.widgets import DataTable
+from textual.widgets import DataTable, Input
 
 from rh_support_lib.models import KCSSearchResult
+from rh_support_lib.tui.app import KCSSearchModal
 from tests import test_tui_actions as fixtures
 
 
@@ -35,3 +38,62 @@ class KcsModalTests(unittest.IsolatedAsyncioTestCase):
                 browser.assert_called_once_with(self.result.url)
                 self.assertEqual(self.app.selected_case_id, "1")
                 request.assert_not_called()
+
+    async def test_search_is_responsive_and_ignores_superseded_results(self):
+        entered, release = threading.Event(), threading.Event()
+        threads = []
+
+        def search(query, **kwargs):
+            threads.append(threading.get_ident())
+            if query == "first":
+                entered.set()
+                if not release.wait(5):
+                    raise RuntimeError("Test did not release first search")
+                return [KCSSearchResult("old", "Old")]
+            return [self.result]
+
+        self.app.search_service.search_kcs.side_effect = search
+        try:
+            async with self.app.run_test() as pilot:
+                modal = KCSSearchModal(self.app.search_service, initial_query="first")
+                self.app.push_screen(modal)
+                self.assertTrue(await asyncio.to_thread(entered.wait, 5))
+                self.assertNotEqual(threads[0], threading.get_ident())
+                field = modal.query_one(Input)
+                field.value = "next"
+                await pilot.press("enter")
+                await pilot.pause()
+                self.assertEqual(modal.results, [self.result])
+                release.set()
+                await self.app.workers.wait_for_complete()
+                await pilot.pause()
+                self.assertEqual(modal.results, [self.result])
+        finally:
+            release.set()
+
+    async def test_search_completion_after_close_does_not_touch_case_view(self):
+        entered, release = threading.Event(), threading.Event()
+
+        def search(**kwargs):
+            entered.set()
+            if not release.wait(5):
+                raise RuntimeError("Test did not release search")
+            return [self.result]
+
+        self.app.search_service.search_kcs.side_effect = search
+        try:
+            async with self.app.run_test() as pilot:
+                modal = KCSSearchModal(self.app.search_service, initial_query="first")
+                self.app.push_screen(modal)
+                self.assertTrue(await asyncio.to_thread(entered.wait, 5))
+                with patch.object(modal, "query_one", wraps=modal.query_one) as query:
+                    modal.dismiss(None)
+                    await pilot.pause()
+                    query.reset_mock()
+                    release.set()
+                    await self.app.workers.wait_for_complete()
+                    await pilot.pause()
+                    query.assert_not_called()
+                self.assertNotIsInstance(self.app.screen, KCSSearchModal)
+        finally:
+            release.set()
