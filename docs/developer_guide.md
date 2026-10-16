@@ -366,4 +366,27 @@ After running the script, review and commit the updated data file:
 ```bash
 git add rh_support_lib/data/products.json
 git commit -m "Update Red Hat product catalog"
+
+---
+
+## 11. Dependency Policy and Minimum Supported Versions
+
+`setup.py` declares explicit evidence-based minimum versions (`install_requires`) to protect against contract drift and breaking changes on supported Python versions (>=3.9):
+
+| Dependency | Minimum Floor | Purpose & Evidence |
+| :--- | :--- | :--- |
+| `requests` | `>=2.25.0` | HTTP client with connection pooling, Python 3.9 compatibility, and urllib3 1.26+ support. |
+| `requests-toolbelt` | `>=0.9.1` | Multipart streaming encoder and adapter primitives. |
+| `pyyaml` | `>=5.4.1` | YAML loading with `yaml.safe_load` security mitigations. |
+| `jinja2` | `>=3.0.0` | Jinja2 template engine with Python 3.9 context isolation and typing support. |
+| `dateparser` | `>=1.0.0` | Date and timezone parsing for comment timestamps and checkpoints. |
+| `argcomplete` | `>=1.12.0` | Shell tab-completion supporting `_ARGCOMPLETE_STDOUT_FILENAME` and vertical-tab IPC. |
+| `rich` | `>=12.0.0` | Terminal rendering, `Table.grid`, `Text.rstrip()`, `ROUNDED` box styling, and pagination. |
+| `textual` | `>=0.40.0` | TUI framework supporting `ModalScreen`, event decorators, and DataTable operations. |
+| `markdown-it-py` | `>=2.0.0` | Markdown rendering engine supporting `"gfm-like"` preset with soft breaks. |
+
+### Upgrade & Pinning Policy
+* Library dependencies declare **lower bounds only** (no artificial upper pins) so consumers and package distributors can resolve dependency trees without conflicting constraints.
+* Direct imports in code must always be declared in `install_requires` rather than relied upon as transitive dependencies.
+* Dependency upgrades are validated by running the canonical offline test suite (`python -m tests -q`) across all supported Python runtimes.
 ```
