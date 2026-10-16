@@ -77,6 +77,7 @@ Detailed guides, configuration specifications, and technical design documents ar
 | **[User Guide](docs/user_guide.md)** | Operators & Users | Complete command reference, configuration (`config.yaml`), bookmarks, templates, rich text formatting options, attachment handling, and TUI keyboard shortcuts. |
 | **[Developer Guide](docs/developer_guide.md)** | Developers & Contributors | Codebase file structure, domain decoupling, GraphQL & Hydra API protocols, multipart streaming engine (`FilePartStream`), thread safety, caching, and testing. |
 | **[Vision Guidelines](docs/vision.md)** | Strategic Compass | North Star mission statement, target personas, and the 5 immutable architectural design pillars governing the project. |
+| **[Potential Future Work](docs/future-work.md)** | Contributors & Planners | Outstanding ideas, prerequisites, execution approach, and acceptance criteria; not a release commitment. |
 
 ---
 
