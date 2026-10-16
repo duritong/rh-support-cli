@@ -525,7 +525,7 @@ class KCSSearchModal(ModalScreen[Optional[tuple[str, str, str]]]):
         self.results = results
 
         if not self.results:
-            table.add_row("-", f"No KCS solutions found for '{query}'.", "-")
+            table.add_row("-", Text(f"No KCS solutions found for '{query}'."), "-")
             return
 
         for r in self.results:
@@ -533,7 +533,7 @@ class KCSSearchModal(ModalScreen[Optional[tuple[str, str, str]]]):
                 "Solution" if "/solutions/" in r.url else "Article"
             )
             prod_name = getattr(r, "product", "") or ""
-            table.add_row(kcs_type, r.title, prod_name, key=r.url)
+            table.add_row(Text(kcs_type), Text(r.title), Text(prod_name), key=r.url)
 
     def _selected_kcs_item(self) -> tuple[str, str] | None:
         table = self.query_one("#kcs-results-table", DataTable)

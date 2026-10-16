@@ -5,6 +5,7 @@ import threading
 import unittest
 from unittest.mock import Mock, patch
 
+from rich.text import Text
 from textual.widgets import DataTable, Input, TextArea
 
 from rh_support_lib.models import KCSSearchResult
@@ -133,3 +134,34 @@ class KcsModalTests(unittest.IsolatedAsyncioTestCase):
             self.app.query_one(TextArea).text = "new draft"
             callbacks[0]()
             self.assertEqual(self.app.query_one(TextArea).text, "new draft")
+
+    async def test_kcs_metadata_is_literal_not_rich_markup(self):
+        self.result.title = "Failure [/dev/sda]"
+        self.result.product = "RHEL [bold]literal[/bold]"
+        self.result.document_kind = "[/]"
+        async with self.app.run_test() as pilot:
+            modal = KCSSearchModal(self.app.search_service, initial_query="disk error")
+            self.app.push_screen(modal)
+            await pilot.pause()
+            await self.app.workers.wait_for_complete()
+            await pilot.pause()
+            row = modal.query_one(DataTable).get_row_at(0)
+            self.assertEqual(
+                row,
+                [
+                    Text(self.result.document_kind),
+                    Text(self.result.title),
+                    Text(self.result.product),
+                ],
+            )
+
+    async def test_empty_results_keep_query_brackets_literal(self):
+        self.app.search_service.search_kcs.return_value = []
+        async with self.app.run_test() as pilot:
+            modal = KCSSearchModal(self.app.search_service, initial_query="[/]")
+            self.app.push_screen(modal)
+            await pilot.pause()
+            await self.app.workers.wait_for_complete()
+            await pilot.pause()
+            row = modal.query_one(DataTable).get_row_at(0)
+            self.assertEqual(row[1], Text("No KCS solutions found for '[/]'."))

@@ -245,6 +245,8 @@ Comment composer status choices/defaults use the matching loaded case details, n
 
 Deferred KCS-link insertion requires matching displayed/selected case details and an open composer, and captures the case plus draft generation. Rejected or superseded insertions neither change hidden/new drafts nor announce success.
 
+KCS table metadata and query-bearing messages use literal Rich `Text` rather than markup strings, preserving bracketed diagnostics and preventing externally supplied titles/products from being parsed as terminal markup.
+
 The interactive dashboard (`rh_support_lib/tui/app.py`) is implemented using Textual:
 
 * **Dual-Layout Topologies**:
