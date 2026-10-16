@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -17,6 +18,12 @@ class WheelSmokeTests(unittest.TestCase):
         cls.temp_dir = tempfile.TemporaryDirectory(prefix="rh-wheel-test-")
         cls.wheel_dir = os.path.join(cls.temp_dir.name, "wheels")
         cls.install_dir = os.path.join(cls.temp_dir.name, "installed")
+        cls.guard_dir = os.path.join(cls.temp_dir.name, "guard")
+        os.mkdir(cls.guard_dir)
+        for name in ("sitecustomize.py", "network_guard.py"):
+            shutil.copy2(
+                os.path.join(cls.repo_root, "tests", "support", name), cls.guard_dir
+            )
         os.makedirs(cls.wheel_dir, exist_ok=True)
         res = subprocess.run(
             [
@@ -64,7 +71,7 @@ class WheelSmokeTests(unittest.TestCase):
     def _run_installed_python(self, code: str) -> subprocess.CompletedProcess[str]:
         """Runs Python snippet with sys.path pointing exclusively to installed wheel and clean environment."""
         # Isolate sys.path from repo root
-        clean_pythonpath = self.install_dir
+        clean_pythonpath = os.pathsep.join((self.guard_dir, self.install_dir))
         env = os.environ.copy()
         env["PYTHONPATH"] = clean_pythonpath
         # Pass loopback-guarded test environment
@@ -75,6 +82,7 @@ class WheelSmokeTests(unittest.TestCase):
 
         return subprocess.run(
             [sys.executable, "-c", code],
+            cwd=self.temp_dir.name,
             env=env,
             capture_output=True,
             text=True,
@@ -92,6 +100,34 @@ class WheelSmokeTests(unittest.TestCase):
                 name.endswith("test_rh_support_cli.py"),
                 f"Wheel contains test file: {name}",
             )
+
+    def test_installed_child_retains_loopback_guard(self):
+        code = """
+import socket
+import sitecustomize
+assert hasattr(sitecustomize, "_guard"), "Child lost sandbox network guard"
+for operation in (
+    lambda: socket.getaddrinfo("example.invalid", 443),
+    lambda: socket.socket().connect(("192.0.2.1", 443)),
+    lambda: socket.socket().connect_ex(("192.0.2.1", 443)),
+):
+    try:
+        operation()
+    except RuntimeError as exc:
+        assert "Offline tests blocked" in str(exc)
+    else:
+        raise AssertionError("Non-loopback operation was allowed")
+with socket.socket() as listener:
+    listener.bind(("127.0.0.1", 0))
+    listener.listen(1)
+    with socket.create_connection(listener.getsockname(), timeout=2):
+        connection, _ = listener.accept()
+        connection.close()
+print("GUARDED")
+"""
+        result = self._run_installed_python(code)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("GUARDED", result.stdout)
 
     def test_wheel_contains_bundled_product_catalog_and_metadata(self):
         """Verify the built wheel includes the bundled catalog data file and valid packaging metadata."""

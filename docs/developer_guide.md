@@ -306,6 +306,11 @@ The canonical entry point wraps collected cases in `tests.support.SandboxSuite`.
 
 The test suite runs fully offline without requiring network connectivity or real credentials.
 
+Wheel smoke children retain the loopback guard using temporary copies of only
+`sitecustomize.py` and `network_guard.py`, not the checkout or its test package.
+Their working directory is outside the checkout. A child regression checks guard
+activation before testing rejected DNS/connect/connect_ex and a permitted local connection.
+
 ### Mock Server (`MockRedHatHandler`)
 Starts a local loopback `http.server.HTTPServer` mocking:
 * Red Hat SSO OIDC token exchange (`/auth/token`).
