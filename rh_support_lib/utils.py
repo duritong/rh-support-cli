@@ -259,6 +259,8 @@ def strip_header_comments(lines):
     found_boundary = False
     boundary_idx = -1
     for i, line in enumerate(lines):
+        if not line.lstrip().startswith("#"):
+            break
         if line.strip() == boundary_marker:
             found_boundary = True
             boundary_idx = i

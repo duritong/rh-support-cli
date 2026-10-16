@@ -12,6 +12,15 @@ from rh_support_lib import utils
 
 
 class EditorTests(unittest.TestCase):
+    def test_body_boundary_text_is_not_a_header(self):
+        body = "Body\n# Leading lines starting with '#' will be ignored.\nkeep me\n"
+        self.assertEqual(utils.strip_header_comments(body.splitlines(True)), body)
+        code = "#!/bin/sh\nprintf hello\n# Leading lines starting with '#' will be ignored.\n"
+        self.assertEqual(
+            utils.strip_header_comments(code.splitlines(True)),
+            code[code.index("printf") :],
+        )
+
     def setUp(self):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)

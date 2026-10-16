@@ -572,6 +572,8 @@ rh-support-cli doctor --online
 ```
 
 ### 5.18 Comment Drafts Discovery & Recovery (`drafts`)
+Generated editor boundaries are recognized only inside the leading comment header; marker text within the body remains content.
+
 Discovers, previews, and purges preserved comment drafts stored when editing or posting was interrupted:
 
 ```bash
