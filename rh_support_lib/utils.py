@@ -5,6 +5,7 @@ import json
 import os
 import re
 import shlex
+import stat
 import subprocess
 import tempfile
 from dataclasses import asdict, is_dataclass
@@ -293,6 +294,55 @@ def draft_body(content: str) -> str:
     if lines and lines[0].startswith("# Enter comment for Case "):
         return strip_header_comments(lines)
     return content
+
+
+def draft_identity(info):
+    return (info.st_dev, info.st_ino, info.st_mtime_ns, info.st_size)
+
+
+def read_draft(path):
+    """Read only a stable, same-user regular entry, never a symlink."""
+    directory, name = os.path.split(os.path.abspath(path))
+    dir_fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        before = os.stat(name, dir_fd=dir_fd, follow_symlinks=False)
+        if not stat.S_ISREG(before.st_mode) or before.st_uid != os.getuid():
+            raise OSError("Unsafe draft entry")
+        fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dir_fd)
+        with os.fdopen(fd, encoding="utf-8") as stream:
+            info = os.fstat(stream.fileno())
+            if draft_identity(before) != draft_identity(info):
+                raise OSError("Draft replaced during read")
+            content = stream.read()
+            after = os.stat(name, dir_fd=dir_fd, follow_symlinks=False)
+            if draft_identity(info) != draft_identity(after) or draft_identity(
+                info
+            ) != draft_identity(os.fstat(stream.fileno())):
+                raise OSError("Draft changed during read")
+        return content, info
+    finally:
+        os.close(dir_fd)
+
+
+def remove_draft(path, identity):
+    """Remove only the unchanged regular entry captured by discovery."""
+    directory, name = os.path.split(os.path.abspath(path))
+    try:
+        dir_fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            info = os.stat(name, dir_fd=dir_fd, follow_symlinks=False)
+            if (
+                not stat.S_ISREG(info.st_mode)
+                or info.st_uid != os.getuid()
+                or tuple(identity) != draft_identity(info)
+            ):
+                return False
+            os.unlink(name, dir_fd=dir_fd)
+            return True
+        finally:
+            os.close(dir_fd)
+    except OSError:
+        return False
 
 
 class EditorError(RuntimeError):

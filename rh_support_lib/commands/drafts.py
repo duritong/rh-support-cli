@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import json
 import os
 import re
@@ -11,6 +10,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from rh_support_lib.config import resolve_drafts_dir
+from rh_support_lib.utils import draft_identity, read_draft, remove_draft
 
 
 def find_drafts(
@@ -35,8 +35,6 @@ def find_drafts(
             continue
 
         fpath = os.path.join(target_dir, fname)
-        if not os.path.isfile(fpath):
-            continue
 
         # Extract case number from filename: comment_draft_{case}_{suffix}.txt
         match = re.match(r"^comment_draft_([^_]+)_", fname)
@@ -45,9 +43,10 @@ def find_drafts(
         if case_number and str(case_number).strip() not in (c_num, c_num.lstrip("0")):
             continue
 
-        content = ""
-        with contextlib.suppress(Exception), open(fpath, "r", encoding="utf-8") as f:
-            content = f.read()
+        try:
+            content, stat = read_draft(fpath)
+        except (OSError, UnicodeError):
+            continue
 
         snippet = ""
         for line in content.splitlines():
@@ -56,7 +55,6 @@ def find_drafts(
                 snippet = line_str[:80] + ("..." if len(line_str) > 80 else "")
                 break
 
-        stat = os.stat(fpath)
         mtime = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).strftime(
             "%Y-%m-%d %H:%M:%S"
         )
@@ -68,6 +66,7 @@ def find_drafts(
                 "size_bytes": stat.st_size,
                 "modified": mtime,
                 "mtime_ns": stat.st_mtime_ns,
+                "identity": draft_identity(stat),
                 "snippet": snippet or "(empty draft)",
                 "content": content,
             }
@@ -183,8 +182,7 @@ def cmd_drafts(args: Any, config: dict | None = None) -> int:
 
         deleted = 0
         for d in drafts:
-            with contextlib.suppress(OSError):
-                os.remove(d["path"])
+            if remove_draft(d["path"], d["identity"]):
                 deleted += 1
 
         print(f"✓ Deleted {deleted} saved comment draft(s).")

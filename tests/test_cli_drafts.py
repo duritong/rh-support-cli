@@ -106,6 +106,71 @@ class DraftsCliTests(unittest.TestCase):
         with self.assertRaises(ConfigError):
             _validate_config({"drafts_dir": ["bad"]})
 
+    def test_discovery_rejects_symlinks_and_survives_disappearance(self):
+        from pathlib import Path
+
+        from rh_support_lib.commands.drafts import find_drafts
+
+        outside = Path(self.temp_home) / "secret.txt"
+        outside.write_text("private outside content")
+        link = Path(self.drafts_dir) / "comment_draft_123_link.txt"
+        link.symlink_to(outside)
+        self.assertEqual(find_drafts(drafts_dir=self.drafts_dir), [])
+        link.unlink()
+        path = Path(self.drafts_dir) / "comment_draft_123_gone.txt"
+        path.write_text("gone")
+        real_listdir = os.listdir
+
+        def disappear(directory):
+            names = real_listdir(directory)
+            path.unlink()
+            return names
+
+        with patch("rh_support_lib.commands.drafts.os.listdir", side_effect=disappear):
+            self.assertEqual(find_drafts(drafts_dir=self.drafts_dir), [])
+
+    def test_clear_does_not_remove_replacement_after_confirmation(self):
+        from pathlib import Path
+        from types import SimpleNamespace
+
+        from rh_support_lib.commands.drafts import cmd_drafts
+
+        path = Path(self.drafts_dir) / "comment_draft_123_old.txt"
+        path.write_text("old")
+
+        def confirm(_):
+            replacement = path.with_suffix(".new")
+            replacement.write_text("new recovery copy")
+            replacement.replace(path)
+            return "yes"
+
+        with patch("builtins.input", side_effect=confirm):
+            cmd_drafts(
+                SimpleNamespace(draft_action="clear"), {"drafts_dir": self.drafts_dir}
+            )
+        self.assertEqual(path.read_text(), "new recovery copy")
+
+    def test_discovery_rechecks_inode_at_open_and_owner(self):
+        from pathlib import Path
+
+        from rh_support_lib.commands.drafts import find_drafts
+
+        path = Path(self.drafts_dir) / "comment_draft_123_race.txt"
+        path.write_text("original")
+        with patch("rh_support_lib.utils.os.getuid", return_value=os.getuid() + 1):
+            self.assertEqual(find_drafts(drafts_dir=self.drafts_dir), [])
+        real_open = os.open
+
+        def replace_before_open(name, flags, *args, **kwargs):
+            if name == path.name:
+                replacement = path.with_suffix(".new")
+                replacement.write_text("replacement must not be read")
+                replacement.replace(path)
+            return real_open(name, flags, *args, **kwargs)
+
+        with patch("rh_support_lib.utils.os.open", side_effect=replace_before_open):
+            self.assertEqual(find_drafts(drafts_dir=self.drafts_dir), [])
+
     def test_drafts_discovery_filtering_and_show(self):
         """Verify drafts list, filtering by case, and drafts show preview."""
         # Create 2 drafts
