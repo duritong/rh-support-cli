@@ -393,3 +393,37 @@ class TuiActionTests(unittest.IsolatedAsyncioTestCase):
                 self.app.current_details = current
                 callback()
             self.service.state_service.mark_case_read.assert_not_called()
+
+    async def test_jump_to_case_modal_navigation(self):
+        from rh_support_lib.tui.app import CaseJumpModal
+
+        async with self.app.run_test() as pilot:
+            self.app.action_jump_to_case()
+            await pilot.pause()
+            self.assertIsInstance(self.app.screen, CaseJumpModal)
+
+            with patch.object(self.app, "_request_case_details") as mock_req:
+                self.app.screen.dismiss("04526149")
+                await pilot.pause()
+                self.assertEqual(self.app.selected_case_id, "04526149")
+                mock_req.assert_called_once_with("04526149")
+
+    async def test_jump_to_case_preserves_dirty_comment_draft(self):
+        from rh_support_lib.tui.app import UnsavedChangesModal
+
+        async with self.app.run_test() as pilot:
+            current = details()
+            self.app.selected_case_id = "1"
+            self.app.render_case_details(current, [])
+            await pilot.pause()
+            self.app.action_add_comment()
+            await pilot.pause()
+            text_area = self.app.query_one(TextArea)
+            text_area.text = "Unsaved draft comment"
+            await pilot.pause()
+
+            # Attempt jumping to case 2 while draft is dirty
+            self.app.select_case_by_id("2")
+            await pilot.pause()
+            self.assertIsInstance(self.app.screen, UnsavedChangesModal)
+            self.assertEqual(self.app.selected_case_id, "1")

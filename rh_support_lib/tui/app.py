@@ -363,6 +363,39 @@ class DownloadModal(ModalScreen[Optional[tuple[str, str]]]):
         self.dismiss(None)
 
 
+class CaseJumpModal(ModalScreen[str]):
+    """Modal screen for directly jumping to a support case by number."""
+
+    def compose(self) -> ComposeResult:
+        yield Grid(
+            Label("Jump to Support Case", id="modal-title"),
+            Label("Enter Case Number:"),
+            Input(placeholder="e.g. 12345678", id="case-jump-input"),
+            Horizontal(
+                Button("Jump", variant="success", id="jump-btn"),
+                Button("Cancel", variant="error", id="cancel-btn"),
+                id="modal-buttons",
+            ),
+            id="template-modal-grid",
+        )
+
+    def on_mount(self) -> None:
+        self.query_one("#case-jump-input", Input).focus()
+
+    @on(Button.Pressed, "#jump-btn")
+    def do_jump(self) -> None:
+        inp = self.query_one("#case-jump-input", Input)
+        self.dismiss(inp.value.strip())
+
+    @on(Input.Submitted, "#case-jump-input")
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        self.dismiss(event.value.strip())
+
+    @on(Button.Pressed, "#cancel-btn")
+    def cancel_jump(self) -> None:
+        self.dismiss("")
+
+
 class FocusableContainer(VerticalScroll):
     """A scrollable container that can receive keyboard focus and handles keyboard scrolling."""
 
@@ -411,9 +444,10 @@ class SupportApp(App):
         ("w", "toggle_follow", "Follow"),
         ("m", "mark_read", "Mark Read"),
         ("o", "toggle_comment_order", "Order (New/Old)"),
+        ("g", "jump_to_case", "Jump to Case"),
+        Binding(":", "jump_to_case", "Jump to Case", show=False),
         ("v", "toggle_layout", "Split (H/V)"),
         Binding("l", "toggle_layout", "Toggle Layout", show=False),
-        Binding("ctrl+up", "focus_top", "Focus Top", priority=True),
         Binding("ctrl+down", "focus_bottom", "Focus Bottom", priority=True),
         Binding("ctrl+left", "focus_left", "Focus Left", priority=True),
         Binding("ctrl+right", "focus_right", "Focus Right", priority=True),
@@ -1179,10 +1213,10 @@ class SupportApp(App):
         )
         return False
 
-    @on(DataTable.RowSelected)
-    def on_row_selected(self, event: DataTable.RowSelected) -> None:
-        next_case_id = str(event.row_key.value)
-        if self.selected_case_id == next_case_id:
+    def select_case_by_id(self, next_case_id: str) -> None:
+        """Selects and loads a support case by number, checking for unsaved changes."""
+        clean_id = str(next_case_id).strip()
+        if not clean_id or self.selected_case_id == clean_id:
             return
 
         # Check if commenting is open and holds dirty text
@@ -1190,23 +1224,43 @@ class SupportApp(App):
             text_area = self.query_one("#tui-comment-textarea", TextArea)
             comment_text = text_area.text
             if comment_text.strip():
-                self.prompt_unsaved_changes_on_navigation(comment_text, next_case_id)
+                self.prompt_unsaved_changes_on_navigation(comment_text, clean_id)
                 return
-            else:
-                self.screen.remove_class("commenting")
-                text_area.text = ""
+            self.screen.remove_class("commenting")
+            text_area.text = ""
 
-        # SWR: If details exist in local disk cache, render immediately without waiting
-        self.selected_case_id = next_case_id
+        # Move table cursor if case exists in current table
+        with contextlib.suppress(Exception):
+            table = self.query_one("#case-table", DataTable)
+            for row_idx, r_key in enumerate(table.rows):
+                val = str(r_key.value)
+                if val == clean_id or val.lstrip("0") == clean_id.lstrip("0"):
+                    table.move_cursor(row=row_idx)
+                    break
+
+        self.selected_case_id = clean_id
         cached_rec = self.case_service.cache_service.get_case_details(
-            next_case_id, ttl=0, require_complete=True
+            clean_id, ttl=0, require_complete=True
         )
         if cached_rec:
             cached_details, cached_atts, _ = cached_rec
             self.render_case_details(cached_details, cached_atts)
 
-        # Proceed to validate/fetch fresh case details in background
-        self._request_case_details(next_case_id)
+        self._request_case_details(clean_id)
+
+    @on(DataTable.RowSelected)
+    def on_row_selected(self, event: DataTable.RowSelected) -> None:
+        next_case_id = str(event.row_key.value)
+        self.select_case_by_id(next_case_id)
+
+    def action_jump_to_case(self) -> None:
+        """Opens modal to jump directly to a case number."""
+
+        def handle_jump(case_num: str) -> None:
+            if case_num:
+                self.select_case_by_id(case_num)
+
+        self.push_screen(CaseJumpModal(), handle_jump)
 
     @on(Button.Pressed, ".tui-comment-btn, #tui-comment-btn")
     def on_comment_click(self) -> None:

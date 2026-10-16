@@ -565,9 +565,9 @@ Automatic refresh continues when caching is disabled or cached details expire. E
 | **`PageUp` / `PageDown`** | Scroll screen-by-screen |
 | **`c`** | Open inline Comment drafting pane |
 | **`o`** | Toggle comment ordering (newest first vs oldest first) |
+| **`g`** / **`:`** | Jump directly to case by number (Jump Modal) |
 | **`a`** | Upload file attachment (Attach Modal) |
 | **`t`** | Select and apply template (Template Modal) |
-| **`b`** | Switch active filter bookmark (Bookmark Modal) |
 | **`v` / `l`** | Toggle layout (horizontal mailbox vs vertical side-by-side) |
 | **`w`** | Toggle follow/unfollow for active case |
 | **`m`** | Mark active case as read |
