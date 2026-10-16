@@ -283,9 +283,21 @@ The interactive dashboard (`rh_support_lib/tui/app.py`) is implemented using Tex
 
 ## 9. Test Suite & Mock Architecture
 
-All tests live in the `tests/` package: focused regressions use `tests/test_*.py`, and the main end-to-end module is `tests/test_rh_support_cli.py`. The package's `tests/__init__.py` exposes a `load_tests` hook that discovers all tests with the repository as the top-level directory. There is no explicit focused-module list in the main test module to maintain.
+All tests live in the `tests/` package. The test suite is organized into focused modular suites inheriting from `MockServerTestCase` (`tests/support/mock_server.py`):
+* `tests/test_cli_cases.py`: Case listing, show, incident export, and pagination.
+* `tests/test_cli_auth.py`: Authentication, token priority, offline tokens, and token cache identity.
+* `tests/test_cli_comments.py`: Comment posting, status updates, editor stripping, context, and markdown preservation.
+* `tests/test_cli_attachments.py`: Attachment list, upload, multipart streaming, download safety, and deletion.
+* `tests/test_cli_tracking.py`: Case tracking, following, sync, unread checkpoints, and state persistence.
+* `tests/test_cli_systemd.py`: Systemd service and timer unit generation and management.
+* `tests/test_cli_doctor.py`: Local health, credentials, permissions, and background sync diagnostics.
+* `tests/test_cli_drafts.py`: Preserved comment drafts discovery, preview, and cleanup.
+* `tests/test_tui_actions.py`: Interactive TUI keyboard bindings, dwell navigation, and header status chips.
+* `tests/test_rh_support_cli.py`: Core integration tests for templates, creation, search, mock portal, and TUI.
 
-The canonical entry point wraps collected cases in `tests.support.SandboxSuite`. It uses a temporary working directory as well as a temporary HOME/XDG/TMP tree, clears credential/path/proxy/session overrides, and blocks non-loopback DNS and socket connections. Relative-path fixtures are created in the temporary working directory, not the repository root. Python CLI subprocesses inherit the network guard through a test-only `sitecustomize` path; normal application imports do not activate it. Real Requests serialization with a mocked transport remains testable. Spawn/forkserver children must finish before cleanup. This is serial process-global test isolation, not an OS sandbox for native/non-Python networking. Standard package discovery with `python -m unittest discover -b` also activates the sandbox through the package hook. For focused modules or classes, use the canonical runner rather than unguarded focused unittest invocations that bypass that hook. The entire `tests` package, including `tests/support/`, is excluded from installed packages.
+The package's `tests/__init__.py` exposes a `load_tests` hook that discovers all tests with the repository as the top-level directory.
+
+The canonical entry point wraps collected cases in `tests.support.SandboxSuite`. It uses a temporary working directory as well as a temporary HOME/XDG/TMP tree, clears credential/path/proxy/session overrides, and blocks non-loopback DNS and socket connections. Relative-path fixtures are created in the temporary working directory, not the repository root. Python CLI subprocesses inherit the network guard through a test-only `sitecustomize` path; normal application imports do not activate it. Real Requests serialization with a mocked transport remains testable. Spawn/forkserver children must finish before cleanup. This is serial process-global test isolation, not an OS sandbox for native/non-Python networking.
 
 The test suite runs fully offline without requiring network connectivity or real credentials.
 
