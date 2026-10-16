@@ -2042,18 +2042,7 @@ class SupportApp(App):
             )
             return
 
-        case = (
-            next(
-                (
-                    c
-                    for c in self.cases
-                    if str(c.case_number or c.id) == self.selected_case_id
-                ),
-                None,
-            )
-            if self.selected_case_id
-            else None
-        )
+        case = self.current_details.case if self._displayed_case_selected() else None
         current_status = case.status if case else None
         status_choices = get_status_choices_for_case(current_status)
         target_status = determine_reply_status(current_status)
@@ -2083,18 +2072,7 @@ class SupportApp(App):
         )
 
     def update_comment_status_dropdown(self) -> None:
-        case = (
-            next(
-                (
-                    c
-                    for c in self.cases
-                    if (c.case_number or c.id) == self.selected_case_id
-                ),
-                None,
-            )
-            if self.selected_case_id
-            else None
-        )
+        case = self.current_details.case if self._displayed_case_selected() else None
         current_status = case.status if case else None
         target_status = determine_reply_status(current_status)
 

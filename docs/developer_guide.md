@@ -241,6 +241,8 @@ KCS searches run in modal-owned thread workers. Results are dispatched onto the 
 
 Initial queue loads, explicit refreshes, and background polling share the same case-list reader and captured search query. Polling cannot replace a keyword search with the ordinary queue; query changes invalidate in-flight results through list-request ownership.
 
+Comment composer status choices/defaults use the matching loaded case details, not queue membership. Directly jumped cases outside the active filters therefore retain the same reply-status policy, including keeping closed cases closed.
+
 The interactive dashboard (`rh_support_lib/tui/app.py`) is implemented using Textual:
 
 * **Dual-Layout Topologies**:

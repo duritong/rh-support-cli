@@ -428,6 +428,30 @@ class TuiActionTests(unittest.IsolatedAsyncioTestCase):
             self.assertIsInstance(self.app.screen, UnsavedChangesModal)
             self.assertEqual(self.app.selected_case_id, "1")
 
+    async def test_jumped_case_composer_uses_loaded_status_outside_queue(self):
+        from textual.widgets import Input
+
+        async with self.app.run_test() as pilot:
+            self.app.cases = [details("1").case]
+            with patch.object(self.app, "_request_case_details"):
+                self.app.action_jump_to_case()
+                await pilot.pause()
+                self.app.screen.query_one(Input).value = "99"
+                await pilot.press("enter")
+                await pilot.pause()
+            for status, expected in (
+                ("Closed", "Closed"),
+                ("Waiting on Red Hat", "Waiting on Customer Action Required"),
+                ("Waiting on Customer Action Required", "In Progress"),
+            ):
+                with self.subTest(status=status):
+                    self.app.render_case_details(details("99", status=status), [])
+                    await pilot.pause()
+                    self.app.action_add_comment()
+                    await pilot.pause()
+                    self.assertEqual(self.app.query_one(Select).value, expected)
+                    self.app.action_exit_commenting()
+
     async def test_case_search_modal_filters_table_and_escape_clears(self):
         from rh_support_lib.tui.app import CaseSearchModal
 
