@@ -5,7 +5,7 @@ import threading
 import unittest
 from unittest.mock import Mock, patch
 
-from textual.widgets import DataTable, Input
+from textual.widgets import DataTable, Input, TextArea
 
 from rh_support_lib.models import KCSSearchResult
 from rh_support_lib.tui.app import KCSSearchModal
@@ -97,3 +97,39 @@ class KcsModalTests(unittest.IsolatedAsyncioTestCase):
                 self.assertNotIsInstance(self.app.screen, KCSSearchModal)
         finally:
             release.set()
+
+    async def test_rejected_insertion_does_not_leak_into_a_later_case_draft(self):
+        async with self.app.run_test() as pilot:
+            self.app.selected_case_id = "1"
+            self.app.render_case_details(fixtures.details(), [])
+            await pilot.pause()
+            self.app.action_add_comment()
+            await pilot.pause()
+            self.app.action_exit_commenting()
+            self.app.selected_case_id = "2"
+            self.app.append_to_comment_draft("case 2 solution")
+            await pilot.pause()
+            self.assertEqual(self.app.query_one(TextArea).text, "")
+            self.app.selected_case_id = "3"
+            self.app.render_case_details(fixtures.details("3"), [])
+            await pilot.pause()
+            self.app.action_add_comment()
+            await pilot.pause()
+            self.assertEqual(self.app.query_one(TextArea).text, "")
+
+    async def test_deferred_insertion_cannot_modify_a_replaced_draft(self):
+        async with self.app.run_test() as pilot:
+            self.app.selected_case_id = "1"
+            self.app.render_case_details(fixtures.details(), [])
+            await pilot.pause()
+            self.app.action_add_comment()
+            await pilot.pause()
+            callbacks = []
+            with patch.object(
+                self.app, "call_after_refresh", side_effect=callbacks.append
+            ):
+                self.app.append_to_comment_draft("old solution")
+            self.app._comment_generation += 1
+            self.app.query_one(TextArea).text = "new draft"
+            callbacks[0]()
+            self.assertEqual(self.app.query_one(TextArea).text, "new draft")

@@ -2016,10 +2016,23 @@ class SupportApp(App):
 
     def append_to_comment_draft(self, text_to_append: str) -> None:
         """Appends text to the active comment draft, opening the composer if needed."""
+        if not self._guard_detail_action():
+            return
         if not self.screen.has_class("commenting"):
             self.action_add_comment()
+        if not self.screen.has_class("commenting"):
+            return
+        case_id = self.selected_case_id
+        generation = self._comment_generation
 
         def do_append() -> None:
+            if (
+                self.selected_case_id != case_id
+                or self._comment_generation != generation
+                or not self.screen.has_class("commenting")
+                or not self._displayed_case_selected()
+            ):
+                return
             with contextlib.suppress(Exception):
                 text_area = self.query_one("#tui-comment-textarea", TextArea)
                 current = text_area.text
@@ -2030,6 +2043,7 @@ class SupportApp(App):
                     current += "\n"
                 text_area.text = current
                 text_area.focus()
+                self.notify("Inserted KCS link into comment draft.")
 
         self.call_after_refresh(do_append)
 
@@ -2628,7 +2642,6 @@ class SupportApp(App):
             elif action_type == "insert":
                 link_md = f"[{title}]({url})"
                 self.append_to_comment_draft(link_md)
-                self.notify("Inserted KCS link into comment draft.")
 
         self.push_screen(
             KCSSearchModal(

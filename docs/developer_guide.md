@@ -243,6 +243,8 @@ Initial queue loads, explicit refreshes, and background polling share the same c
 
 Comment composer status choices/defaults use the matching loaded case details, not queue membership. Directly jumped cases outside the active filters therefore retain the same reply-status policy, including keeping closed cases closed.
 
+Deferred KCS-link insertion requires matching displayed/selected case details and an open composer, and captures the case plus draft generation. Rejected or superseded insertions neither change hidden/new drafts nor announce success.
+
 The interactive dashboard (`rh_support_lib/tui/app.py`) is implemented using Textual:
 
 * **Dual-Layout Topologies**:
