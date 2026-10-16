@@ -2972,7 +2972,13 @@ class TestTuiDraftSafety(unittest.TestCase):
         self.home = tempfile.TemporaryDirectory()
         self.addCleanup(self.home.cleanup)
         for patcher in (
-            mock.patch.dict(os.environ, {"HOME": self.home.name}),
+            mock.patch.dict(
+                os.environ,
+                {
+                    "HOME": self.home.name,
+                    "XDG_CONFIG_HOME": os.path.join(self.home.name, ".config"),
+                },
+            ),
             mock.patch("rh_support_lib.tui.app.CaseService"),
             mock.patch("rh_support_lib.tui.app.AttachmentService"),
         ):
