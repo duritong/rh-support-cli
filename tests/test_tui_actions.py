@@ -534,3 +534,41 @@ class TuiActionTests(unittest.IsolatedAsyncioTestCase):
                 "[Test Solution](https://access.redhat.com/solutions/12345)",
                 editor.text,
             )
+
+    async def test_tui_header_status_chips_update_on_scope_and_freshness(self):
+        """Test visible identity, scope, and freshness chips in the TUI header."""
+        from textual.widgets import Label
+
+        async with self.app.run_test() as pilot:
+            # 1. Inspect initial chip presence
+            ident_chip = self.app.query_one("#chip-identity", Label)
+            scope_chip = self.app.query_one("#chip-scope", Label)
+            fresh_chip = self.app.query_one("#chip-freshness", Label)
+
+            self.assertIn("User:", str(ident_chip.render()))
+            self.assertEqual(str(scope_chip.render()), "Bookmark: None")
+            self.assertIn("Refreshed:", str(fresh_chip.render()))
+
+            # 2. Scope chip updates immediately when search query changes
+            self.app.active_search_query = "kernel panic"
+            self.app._sync_header_status()
+            await pilot.pause()
+            self.assertEqual(str(scope_chip.render()), 'Search: "kernel panic"')
+
+            # 3. Scope chip restores when search is cleared
+            self.app.active_search_query = None
+            self.app._sync_header_status()
+            await pilot.pause()
+            self.assertEqual(str(scope_chip.render()), "Bookmark: None")
+
+            # 4. Scope chip updates when bookmark changes
+            self.app.active_bookmark = "team"
+            self.app._sync_header_status()
+            await pilot.pause()
+            self.assertEqual(str(scope_chip.render()), "Bookmark: team")
+
+            # 5. Freshness chip updates when case list is applied
+            self.app._apply_case_list(self.app._begin_case_list(), [details().case])
+            await pilot.pause()
+            self.assertIn("Refreshed:", str(fresh_chip.render()))
+            self.assertNotEqual(str(fresh_chip.render()), "Refreshed: Never")

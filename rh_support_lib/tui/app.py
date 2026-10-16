@@ -7,6 +7,7 @@ import pathlib
 import re
 import tempfile
 import threading
+from datetime import datetime, timezone
 from typing import Any, ClassVar, Optional
 
 from rich.box import ROUNDED
@@ -713,6 +714,26 @@ class SupportApp(App):
         color: $text;
         dock: top;
     }
+    #tui-header-chips {
+        height: 1;
+        dock: top;
+        background: $surface;
+        color: $text;
+        padding: 0 1;
+    }
+    .header-chip {
+        margin-right: 2;
+        text-style: bold;
+    }
+    #chip-identity {
+        color: $accent;
+    }
+    #chip-scope {
+        color: $primary;
+    }
+    #chip-freshness {
+        color: $text-muted;
+    }
     Footer {
         dock: bottom;
     }
@@ -922,6 +943,11 @@ class SupportApp(App):
         user = ""
         with contextlib.suppress(Exception):
             user = self.case_service.get_current_user()
+        if not user:
+            with contextlib.suppress(Exception):
+                user = os.environ.get("USER") or ""
+        self.user_identity = user
+        self.last_refreshed_at: str | None = None
         saved_layout = "vertical"
         with contextlib.suppress(Exception):
             saved_layout = self.case_service.state_service.get_tui_layout(user)
@@ -991,6 +1017,26 @@ class SupportApp(App):
             self.active_jobs.remove(description)
         self._sync_header_status()
 
+    def _sync_header_chips(self) -> None:
+        """Updates visible identity, scope, and freshness chips from local state."""
+        with contextlib.suppress(Exception):
+            ident_label = self.query_one("#chip-identity", Label)
+            scope_label = self.query_one("#chip-scope", Label)
+            fresh_label = self.query_one("#chip-freshness", Label)
+
+            user_str = self.user_identity or "Local"
+            ident_label.update(f"User: {user_str}")
+
+            if self.active_search_query:
+                scope_label.update(f'Search: "{self.active_search_query}"')
+            elif self.active_bookmark:
+                scope_label.update(f"Bookmark: {self.active_bookmark}")
+            else:
+                scope_label.update("Bookmark: None")
+
+            fresh_str = self.last_refreshed_at or "Never"
+            fresh_label.update(f"Refreshed: {fresh_str}")
+
     def _sync_header_status(self) -> None:
         if self.active_jobs:
             jobs_str = " | ".join(self.active_jobs)
@@ -999,6 +1045,7 @@ class SupportApp(App):
             self.sub_title = f"Search: '{self.active_search_query}' (Esc to clear)"
         else:
             self.sub_title = ""
+        self._sync_header_chips()
 
     def format_title(self, title: str, sub_title: str) -> Content:
         title_content = Content(title)
@@ -1012,6 +1059,29 @@ class SupportApp(App):
 
     def compose(self) -> ComposeResult:
         yield Header()
+        scope_init = (
+            f'Search: "{self.active_search_query}"'
+            if self.active_search_query
+            else (
+                f"Bookmark: {self.active_bookmark}"
+                if self.active_bookmark
+                else "Bookmark: None"
+            )
+        )
+        yield Horizontal(
+            Label(
+                f"User: {self.user_identity or 'Local'}",
+                id="chip-identity",
+                classes="header-chip",
+            ),
+            Label(scope_init, id="chip-scope", classes="header-chip"),
+            Label(
+                f"Refreshed: {self.last_refreshed_at or 'Never'}",
+                id="chip-freshness",
+                classes="header-chip",
+            ),
+            id="tui-header-chips",
+        )
         yield Container(
             DataTable(id="case-table"),
             id="case-list-container",
@@ -1132,6 +1202,10 @@ class SupportApp(App):
         if not self._list_request_current(snapshot):
             return None
         self.cases = cases
+        self.last_refreshed_at = (
+            datetime.now(timezone.utc).astimezone().strftime("%H:%M:%S")
+        )
+        self._sync_header_chips()
         if not poll:
             self.populate_cases_table()
             return None

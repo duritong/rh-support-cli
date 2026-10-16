@@ -593,6 +593,11 @@ rh-support-cli tui
 
 Automatic refresh continues when caching is disabled or cached details expire. Empty queues clear the old rows, and obsolete refreshes cannot replace the current filter or selection. An open draft is preserved while case details refresh.
 
+### Status Bar & Header Chips:
+The top status bar provides real-time, non-blocking operational context:
+* **Identity Chip (`User: <name>`)**: Shows the authenticated SSO username or local user.
+* **Scope Chip (`Bookmark: <name>` or `Search: "<query>"`)**: Displays the currently active filter bookmark or search query. Updates immediately upon bookmark selection (`b`) or case search (`/`), restoring to `Bookmark: None` when search is cleared (`Esc`).
+* **Freshness Chip (`Refreshed: <time>`)**: Displays the local timestamp of the last successful case list synchronization (via manual refresh or background polling).
 ### Options:
 * `-l <layout>` / `--layout <layout>`: Split layout (`horizontal` / `mailbox` default or `vertical` side-by-side).
 * `-b <name>` / `--bookmark <name>`: Launch with a specific bookmark filter.
