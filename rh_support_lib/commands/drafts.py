@@ -24,7 +24,9 @@ def find_drafts(
     drafts_dir: str | None = None,
 ) -> list[dict[str, Any]]:
     """Scans drafts directory and returns metadata for saved drafts."""
-    target_dir = drafts_dir or resolve_drafts_dir()
+    target_dir = os.path.realpath(
+        os.path.expanduser(drafts_dir or resolve_drafts_dir())
+    )
     if not os.path.isdir(target_dir):
         return []
 

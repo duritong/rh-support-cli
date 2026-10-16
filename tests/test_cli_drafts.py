@@ -159,6 +159,47 @@ class DraftsCliTests(unittest.TestCase):
         with self.assertRaises(ConfigError):
             _validate_config({"drafts_dir": ["bad"]})
 
+    def test_symlinked_storage_directory_is_consistent_across_draft_lifecycle(self):
+        from pathlib import Path
+        from types import SimpleNamespace
+
+        from rh_support_lib import utils
+        from rh_support_lib.commands.actions import cmd_comment
+        from rh_support_lib.commands.drafts import find_drafts
+        from rh_support_lib.tui.app import SupportApp
+
+        target = Path(self.temp_home) / "physical"
+        target.mkdir()
+        alias = Path(self.temp_home) / "linked"
+        alias.symlink_to(target, target_is_directory=True)
+        config = {"drafts_dir": str(alias)}
+        with (
+            patch.dict(os.environ, self.env, clear=True),
+            patch("rh_support_lib.utils.subprocess.call", return_value=0),
+        ):
+            _, path = utils.open_editor(
+                "123", None, initial_body="Saved body", config=config
+            )
+            self.assertEqual(len(find_drafts("123", str(alias))), 1)
+            self.assertEqual(Path(path).parent, target)
+            app = Mock(config=config, selected_case_id="456", _comment_generation=0)
+            app.run_worker.side_effect = lambda fn, **kwargs: fn()
+            SupportApp.save_comment_to_file(app, "TUI body")
+            self.assertEqual(find_drafts("456", str(alias))[0]["content"], "TUI body")
+            args = SimpleNamespace(
+                case="123",
+                file=None,
+                edit=False,
+                status=None,
+                template=None,
+                format="markdown",
+                include_previous_comments=0,
+            )
+            with patch("rh_support_lib.commands.actions.CaseService") as service:
+                service.return_value.add_comment.return_value = Mock(id="posted")
+                cmd_comment(args, Mock(), config)
+            self.assertEqual(find_drafts("123", str(alias)), [])
+
     def test_discovery_rejects_symlinks_and_survives_disappearance(self):
         from pathlib import Path
 

@@ -299,6 +299,8 @@ The interactive dashboard (`rh_support_lib/tui/app.py`) is implemented using Tex
 
 Comment cleanup uses a caller-owned `approval_info` snapshot captured by `open_editor` together with the approved body in one stable, no-follow read. The public `(body, path)` return remains unchanged. Atomic replacements or new edits after approval are preserved after posting rather than retired as submitted content.
 
+Draft-directory selection canonicalizes the chosen directory before writing, locking, discovery, and cleanup. Symlinked storage directories therefore share one consistent lifecycle, while symlink draft entries are still rejected by no-follow reads and identity checks.
+
 All tests live in the `tests/` package. The test suite is organized into focused modular suites inheriting from `MockServerTestCase` (`tests/support/mock_server.py`):
 * `tests/test_cli_cases.py`: Case listing, show, incident export, and pagination.
 * `tests/test_cli_auth.py`: Authentication, token priority, offline tokens, and token cache identity.

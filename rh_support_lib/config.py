@@ -24,20 +24,22 @@ def _names(value, field):
 def resolve_drafts_dir(config: dict | None = None) -> str:
     """Resolves the directory used to preserve comment drafts."""
     if config and config.get("drafts_dir"):
-        return os.path.expanduser(config["drafts_dir"])
-    if os.environ.get("RH_SUPPORT_DRAFTS"):
-        return os.path.expanduser(os.environ["RH_SUPPORT_DRAFTS"])
-    if os.environ.get("RH_SUPPORT_CONFIG"):
-        return os.path.join(
+        directory = config["drafts_dir"]
+    elif os.environ.get("RH_SUPPORT_DRAFTS"):
+        directory = os.environ["RH_SUPPORT_DRAFTS"]
+    elif os.environ.get("RH_SUPPORT_CONFIG"):
+        directory = os.path.join(
             os.path.dirname(
                 os.path.abspath(os.path.expanduser(os.environ["RH_SUPPORT_CONFIG"]))
             ),
             "drafts",
         )
-    xdg_config = os.environ.get("XDG_CONFIG_HOME")
-    if xdg_config:
-        return os.path.join(os.path.expanduser(xdg_config), "rh-support-cli", "drafts")
-    return os.path.expanduser("~/.config/rh-support-cli/drafts")
+    else:
+        xdg_config = os.environ.get("XDG_CONFIG_HOME") or "~/.config"
+        directory = os.path.join(
+            os.path.expanduser(xdg_config), "rh-support-cli", "drafts"
+        )
+    return os.path.realpath(os.path.expanduser(directory))
 
 
 def _validate_filters(filters, field):

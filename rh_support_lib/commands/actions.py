@@ -116,7 +116,7 @@ def _cmd_comment(args, api_client, config, output, draft_stack):
             from rh_support_lib.config import resolve_drafts_dir
 
             if (
-                os.path.dirname(os.path.abspath(args.file))
+                os.path.realpath(os.path.dirname(os.path.abspath(args.file)))
                 == os.path.abspath(resolve_drafts_dir(config))
                 and os.path.basename(args.file).startswith("comment_draft_")
                 and not draft_stack.enter_context(draft_lock(args.file))
