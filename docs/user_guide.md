@@ -253,6 +253,8 @@ rh-support-cli show -c 12345678 --export slack
 rh-support-cli show -c 12345678 --export json
 ```
 
+Handoff exports distinguish closed cases from pending work. Unrecognized or missing statuses report an unknown next action rather than assuming an active Red Hat investigation. Suggested ownership for recognized waiting states is not a substitute for reading the latest case request.
+
 ### 5.3 Case Browser Link (`link`)
 Generates the browser URL for a support case (bypasses authentication):
 ```bash

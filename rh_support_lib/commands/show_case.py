@@ -39,12 +39,22 @@ def format_incident_export(
         latest_rh_text = snippet[:200] + ("..." if len(snippet) > 200 else "")
 
     # Pending action
-    is_cust_action = "customer" in status.lower()
-    next_step = (
-        "Customer action required (check latest Red Hat request)."
-        if is_cust_action
-        else "Waiting on Red Hat support / engineering investigation."
-    )
+    workflow_status = str(status).strip().casefold()
+    if workflow_status == "closed":
+        next_step = "Case is closed; review the resolution before reopening."
+    elif workflow_status in (
+        "waiting on customer",
+        "waiting on customer action required",
+    ):
+        next_step = "Customer action required (check latest Red Hat request)."
+    elif workflow_status in (
+        "waiting on red hat",
+        "waiting on engineering",
+        "in progress",
+    ):
+        next_step = "Waiting on Red Hat support / engineering investigation."
+    else:
+        next_step = "Next action is unknown; review the case history."
 
     # Attachments summary
     att_summary = f"{len(attachments)} file(s)"
