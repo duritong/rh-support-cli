@@ -606,6 +606,7 @@ class SupportApp(App):
         Binding("?", "search_kcs", "KCS Search", show=False),
         ("v", "toggle_layout", "Split (H/V)"),
         Binding("l", "toggle_layout", "Toggle Layout", show=False),
+        Binding("ctrl+up", "focus_top", "Focus Top", priority=True),
         Binding("ctrl+down", "focus_bottom", "Focus Bottom", priority=True),
         Binding("ctrl+left", "focus_left", "Focus Left", priority=True),
         Binding("ctrl+right", "focus_right", "Focus Right", priority=True),
