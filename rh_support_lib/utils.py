@@ -287,6 +287,14 @@ def strip_header_comments(lines):
     return "".join(lines[first_content_idx:])
 
 
+def draft_body(content: str) -> str:
+    """Decode generated recovery files without stripping verbatim Markdown."""
+    lines = content.splitlines(keepends=True)
+    if lines and lines[0].startswith("# Enter comment for Case "):
+        return strip_header_comments(lines)
+    return content
+
+
 class EditorError(RuntimeError):
     """Editor failure with a safe reason and the path to the recoverable draft."""
 

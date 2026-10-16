@@ -114,7 +114,7 @@ class DraftsCliTests(unittest.TestCase):
         d = os.path.join(self.drafts_dir, "comment_draft_12345_prev.txt")
         with open(d, "w") as f:
             f.write(
-                "# Header\n# Leading lines starting with '#' will be ignored.\n\nResumed text from previous draft\n"
+                "# Enter comment for Case 12345.\n# Leading lines starting with '#' will be ignored.\n\nResumed text from previous draft\n"
             )
 
         with (

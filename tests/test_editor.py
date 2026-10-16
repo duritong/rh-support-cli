@@ -291,6 +291,35 @@ class EditorCommandTests(unittest.TestCase):
             ]
             self.assertTrue(desc.startswith("# Incident Root Cause"))
 
+    def test_generated_recovery_file_strips_context_but_raw_resume_keeps_heading(self):
+        from rh_support_lib.commands.actions import cmd_comment
+
+        source = self.root / "recovery.txt"
+        source.write_text(
+            "# Enter comment for Case 123.\n# private context\n"
+            "# Leading lines starting with '#' will be ignored.\n\n# Real heading\nBody"
+        )
+        with patch("rh_support_lib.commands.actions.CaseService") as service:
+            cmd_comment(self.args(file=str(source)), Mock())
+            self.assertEqual(
+                service.return_value.add_comment.call_args.args[1],
+                "# Real heading\nBody",
+            )
+        drafts = self.root / "drafts"
+        drafts.mkdir()
+        (drafts / "comment_draft_123_raw.txt").write_text("# Real heading\nBody")
+        with (
+            patch("rh_support_lib.commands.actions.CaseService"),
+            patch(
+                "rh_support_lib.commands.actions.open_editor",
+                return_value=("Body", None),
+            ) as editor,
+        ):
+            cmd_comment(self.args(), Mock(), {"drafts_dir": str(drafts)})
+            self.assertEqual(
+                editor.call_args.kwargs["initial_body"], "# Real heading\nBody"
+            )
+
     def test_empty_description_file_never_launches_editor_or_creates_case(self):
         from rh_support_lib.commands.create_case import cmd_create
 

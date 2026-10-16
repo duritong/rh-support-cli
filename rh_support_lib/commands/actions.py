@@ -8,6 +8,7 @@ from rh_support_lib.errors import CommentOutcomeUnknownError, PartialCommentErro
 from rh_support_lib.services.cases import CaseService
 from rh_support_lib.utils import (
     EditorError,
+    draft_body,
     format_structured_output,
     open_editor,
 )
@@ -107,7 +108,7 @@ def _cmd_comment(args, api_client, config, output):
             sys.exit(f"Error: File '{args.file}' does not exist.")
         try:
             with open(args.file, "r") as f:
-                file_content = f.read().strip()
+                file_content = draft_body(f.read()).strip()
         except (OSError, UnicodeError):
             sys.exit("Error: Unable to read comment file. No changes submitted.")
         if not file_content:
@@ -153,7 +154,6 @@ def _cmd_comment(args, api_client, config, output):
         if not file_content:
             from rh_support_lib.commands.drafts import find_drafts
             from rh_support_lib.config import resolve_drafts_dir
-            from rh_support_lib.utils import strip_header_comments
 
             existing_drafts = find_drafts(
                 case_number=args.case, drafts_dir=resolve_drafts_dir(config)
@@ -162,9 +162,7 @@ def _cmd_comment(args, api_client, config, output):
                 latest_draft = existing_drafts[0]
                 draft_content = latest_draft.get("content", "").strip()
                 if draft_content:
-                    extracted = strip_header_comments(
-                        draft_content.splitlines(keepends=True)
-                    ).strip()
+                    extracted = draft_body(draft_content).strip()
                     if extracted:
                         print(
                             f"Resuming saved draft for Case #{args.case} ({latest_draft['modified']})..."
