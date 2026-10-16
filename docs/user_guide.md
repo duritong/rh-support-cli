@@ -564,12 +564,15 @@ Automatic refresh continues when caching is disabled or cached details expire. E
 | **`j` / `k` / `Up/Down`** | Navigate row-by-row / scroll lines |
 | **`PageUp` / `PageDown`** | Scroll screen-by-screen |
 | **`c`** | Open inline Comment drafting pane |
+| **`Ctrl+X`** | Close the composer, checking Save/Discard/Cancel for a nonempty draft |
 | **`o`** | Toggle comment ordering (newest first vs oldest first) |
 | **`g`** / **`:`** | Jump directly to case by number (Jump Modal) |
 | **`/`** / **`s`** | Search support cases by keywords / filter queue (Search Modal) |
 | **`K`** / **`?`** | Search Red Hat Knowledgebase / KCS solutions (KCS Modal) |
 | **`a`** | Upload file attachment (Attach Modal) |
 | **`t`** | Select and apply template (Template Modal) |
+| **`b`** | Switch active filter bookmark (Bookmark Modal) |
+| **`v` / `l`** | Toggle horizontal/vertical layout |
 | **`w`** | Toggle follow/unfollow for active case |
 | **`m`** | Mark active case as read |
 | **`f`** | Zoom / Fullscreen toggle for active pane |

@@ -630,6 +630,7 @@ class SupportApp(App):
         ("t", "apply_template", "Apply Template"),
         Binding("b", "select_bookmark", "Bookmark", priority=False),
         Binding("f", "focus_pane", "Focus Pane", priority=False),
+        ("w", "toggle_follow", "Follow"),
         ("m", "mark_read", "Mark Read"),
         ("o", "toggle_comment_order", "Order (New/Old)"),
         ("g", "jump_to_case", "Jump to Case"),
@@ -645,7 +646,9 @@ class SupportApp(App):
         Binding("ctrl+left", "focus_left", "Focus Left", priority=True),
         Binding("ctrl+right", "focus_right", "Focus Right", priority=True),
         Binding("escape", "escape_action", "Cancel/Unfocus", show=False),
-        Binding("ctrl+x", "exit_commenting", "Cancel Commenting", show=False),
+        Binding(
+            "ctrl+x", "exit_commenting", "Cancel Commenting", show=False, priority=True
+        ),
     ]
 
     CSS = """

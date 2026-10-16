@@ -251,6 +251,8 @@ KCS table metadata and query-bearing messages use literal Rich `Text` rather tha
 
 The KCS modal overrides the workspace screen grid with a centered vertical layout. Its bounded container and flexible result-table height keep results and action buttons visible at standard 80x24 and 120x40 terminal sizes; mounted tests resize the terminal and click the visible controls.
 
+`tests/test_tui_bindings.py` maintains an explicit key/action contract independent of `BINDINGS`, presses every application key/alias and scroll binding in mounted apps, verifies real follow persistence/badges and pane/layout effects, and types printable shortcuts into editor/modal inputs without invoking actions. New or removed bindings require a deliberate coverage update. `Ctrl+X` has priority so the focused editor cannot consume the composer-cancel shortcut; dirty drafts still use Save/Discard/Cancel.
+
 The interactive dashboard (`rh_support_lib/tui/app.py`) is implemented using Textual:
 
 * **Dual-Layout Topologies**:
