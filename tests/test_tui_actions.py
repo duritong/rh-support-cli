@@ -463,3 +463,50 @@ class TuiActionTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIsNone(self.app.active_search_query)
                 self.assertEqual(self.app.sub_title, "")
                 mock_req.assert_called_once_with(force=True)
+
+    async def test_kcs_search_modal_open_and_insert_link(self):
+        from rh_support_lib.tui.app import KCSSearchModal
+
+        async with self.app.run_test() as pilot:
+            current = details()
+            self.app.selected_case_id = "1"
+            self.app.render_case_details(current, [])
+            await pilot.pause()
+
+            # 1. Action opens KCSSearchModal with case summary pre-filled
+            self.app.action_search_kcs()
+            await pilot.pause()
+            self.assertIsInstance(self.app.screen, KCSSearchModal)
+            self.assertEqual(self.app.screen.initial_query, "Case 1")
+
+            # 2. Test dismiss with ("open", url, title)
+            with patch("webbrowser.open") as mock_open:
+                self.app.screen.dismiss(
+                    (
+                        "open",
+                        "https://access.redhat.com/solutions/12345",
+                        "Test Solution",
+                    )
+                )
+                await pilot.pause()
+                mock_open.assert_called_once_with(
+                    "https://access.redhat.com/solutions/12345"
+                )
+
+            # 3. Test dismiss with ("insert", url, title)
+            self.app.action_search_kcs()
+            await pilot.pause()
+            self.app.screen.dismiss(
+                (
+                    "insert",
+                    "https://access.redhat.com/solutions/12345",
+                    "Test Solution",
+                )
+            )
+            await pilot.pause()
+            self.assertTrue(self.app.screen.has_class("commenting"))
+            editor = self.app.query_one(TextArea)
+            self.assertIn(
+                "[Test Solution](https://access.redhat.com/solutions/12345)",
+                editor.text,
+            )

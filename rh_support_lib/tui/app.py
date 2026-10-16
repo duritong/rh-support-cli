@@ -38,7 +38,7 @@ from rh_support_lib.constants import (
     SEVERITY_MAP,
     STATUS_FILTER_MAP,
 )
-from rh_support_lib.models import Attachment, Case, CaseDetails
+from rh_support_lib.models import Attachment, Case, CaseDetails, KCSSearchResult
 from rh_support_lib.services.attachments import AttachmentService
 from rh_support_lib.services.cases import CaseService
 from rh_support_lib.services.search import SearchService
@@ -443,6 +443,114 @@ class CaseSearchModal(ModalScreen[str]):
         self.dismiss("")
 
 
+class KCSSearchModal(ModalScreen[Optional[tuple[str, str, str]]]):
+    """Modal screen for searching Red Hat Knowledgebase (KCS) solutions."""
+
+    def __init__(
+        self,
+        search_service: Any,
+        initial_query: str = "",
+        default_product: str | None = None,
+    ):
+        super().__init__()
+        self.search_service = search_service
+        self.initial_query = initial_query
+        self.default_product = default_product
+        self.results: list[KCSSearchResult] = []
+
+    def compose(self) -> ComposeResult:
+        yield Grid(
+            Label("Search Red Hat Knowledgebase (KCS)", id="modal-title"),
+            Input(
+                value=self.initial_query,
+                placeholder="Search solutions, articles, error messages...",
+                id="kcs-search-input",
+            ),
+            DataTable(id="kcs-results-table"),
+            Horizontal(
+                Button("Open in Browser", variant="success", id="open-btn"),
+                Button("Insert Link", variant="primary", id="insert-btn"),
+                Button("Close", variant="error", id="cancel-btn"),
+                id="modal-buttons",
+            ),
+            id="kcs-modal-grid",
+        )
+
+    def on_mount(self) -> None:
+        table = self.query_one("#kcs-results-table", DataTable)
+        table.add_columns("TYPE", "TITLE", "PRODUCT")
+        table.cursor_type = "row"
+        self.query_one("#kcs-search-input", Input).focus()
+        if self.initial_query.strip():
+            self.execute_kcs_search(self.initial_query.strip())
+
+    @on(Input.Submitted, "#kcs-search-input")
+    def on_search_submitted(self, event: Input.Submitted) -> None:
+        query = event.value.strip()
+        if query:
+            self.execute_kcs_search(query)
+
+    def execute_kcs_search(self, query: str) -> None:
+        table = self.query_one("#kcs-results-table", DataTable)
+        table.clear()
+        try:
+            self.results = self.search_service.search_kcs(
+                query=query, product=self.default_product, limit=20
+            )
+        except Exception:  # noqa: BLE001
+            self.results = []
+
+        if not self.results:
+            table.add_row("-", f"No KCS solutions found for '{query}'.", "-")
+            return
+
+        for r in self.results:
+            kcs_type = getattr(r, "document_kind", "") or (
+                "Solution" if "/solutions/" in r.url else "Article"
+            )
+            prod_name = getattr(r, "product", "") or ""
+            table.add_row(kcs_type, r.title, prod_name, key=r.url)
+
+    def _selected_kcs_item(self) -> tuple[str, str] | None:
+        table = self.query_one("#kcs-results-table", DataTable)
+        if not self.results:
+            return None
+        with contextlib.suppress(Exception):
+            cell_key = table.coordinate_to_cell_key(table.cursor_coordinate)
+            if cell_key:
+                selected_url = str(cell_key.row_key.value)
+                for r in self.results:
+                    if r.url == selected_url:
+                        return (r.url, r.title)
+        return (self.results[0].url, self.results[0].title) if self.results else None
+
+    @on(DataTable.RowSelected, "#kcs-results-table")
+    def on_table_selected(self) -> None:
+        item = self._selected_kcs_item()
+        if item:
+            self.dismiss(("open", item[0], item[1]))
+
+    @on(Button.Pressed, "#open-btn")
+    def do_open(self) -> None:
+        item = self._selected_kcs_item()
+        if item:
+            self.dismiss(("open", item[0], item[1]))
+        else:
+            self.dismiss(None)
+
+    @on(Button.Pressed, "#insert-btn")
+    def do_insert(self) -> None:
+        item = self._selected_kcs_item()
+        if item:
+            self.dismiss(("insert", item[0], item[1]))
+        else:
+            self.dismiss(None)
+
+    @on(Button.Pressed, "#cancel-btn")
+    def do_cancel(self) -> None:
+        self.dismiss(None)
+
+
 class FocusableContainer(VerticalScroll):
     """A scrollable container that can receive keyboard focus and handles keyboard scrolling."""
 
@@ -494,6 +602,8 @@ class SupportApp(App):
         Binding(":", "jump_to_case", "Jump to Case", show=False),
         ("/", "search_cases", "Search Cases"),
         Binding("s", "search_cases", "Search Cases", show=False),
+        ("K", "search_kcs", "KCS Search"),
+        Binding("?", "search_kcs", "KCS Search", show=False),
         ("v", "toggle_layout", "Split (H/V)"),
         Binding("l", "toggle_layout", "Toggle Layout", show=False),
         Binding("ctrl+down", "focus_bottom", "Focus Bottom", priority=True),
@@ -657,9 +767,19 @@ class SupportApp(App):
     #template-modal-grid {
         padding: 1 2;
         width: 65;
-        height: 18;
         border: thick $primary 80%;
         background: $surface;
+    }
+    #kcs-modal-grid {
+        padding: 1 2;
+        width: 85;
+        height: 24;
+        border: thick $primary 80%;
+        background: $surface;
+    }
+    #kcs-results-table {
+        height: 12;
+        margin: 1 0;
     }
     #unsaved-label {
         text-align: center;
@@ -1876,6 +1996,25 @@ class SupportApp(App):
 
         self.call_after_refresh(focus_textarea)
 
+    def append_to_comment_draft(self, text_to_append: str) -> None:
+        """Appends text to the active comment draft, opening the composer if needed."""
+        if not self.screen.has_class("commenting"):
+            self.action_add_comment()
+
+        def do_append() -> None:
+            with contextlib.suppress(Exception):
+                text_area = self.query_one("#tui-comment-textarea", TextArea)
+                current = text_area.text
+                if current and not current.endswith("\n"):
+                    current += "\n"
+                current += text_to_append
+                if not current.endswith("\n"):
+                    current += "\n"
+                text_area.text = current
+                text_area.focus()
+
+        self.call_after_refresh(do_append)
+
     def compose_comment_pane(self) -> None:
         container = self.query_one("#comment-pane-container")
         if len(container.children) > 0:
@@ -2471,6 +2610,38 @@ class SupportApp(App):
             self._sync_header_status()
             self.notify("Search cleared.")
             self._request_cases(force=True)
+
+    def action_search_kcs(self) -> None:
+        """Opens modal to search Red Hat Knowledgebase (KCS) solutions."""
+        initial_query = ""
+        default_product = None
+        if self.current_details and self.current_details.case:
+            c = self.current_details.case
+            initial_query = c.summary or ""
+            default_product = c.product or None
+
+        def handle_kcs_result(result: tuple[str, str, str] | None) -> None:
+            if not result:
+                return
+            action_type, url, title = result
+            if action_type == "open":
+                import webbrowser
+
+                webbrowser.open(url)
+                self.notify(f"Opened in browser: {url}")
+            elif action_type == "insert":
+                link_md = f"[{title}]({url})"
+                self.append_to_comment_draft(link_md)
+                self.notify("Inserted KCS link into comment draft.")
+
+        self.push_screen(
+            KCSSearchModal(
+                self.search_service,
+                initial_query=initial_query,
+                default_product=default_product,
+            ),
+            handle_kcs_result,
+        )
 
     def action_toggle_comment_order(self) -> None:
         """Toggles comment display order between oldest first and newest first."""

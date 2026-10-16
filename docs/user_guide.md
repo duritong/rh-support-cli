@@ -567,18 +567,16 @@ Automatic refresh continues when caching is disabled or cached details expire. E
 | **`o`** | Toggle comment ordering (newest first vs oldest first) |
 | **`g`** / **`:`** | Jump directly to case by number (Jump Modal) |
 | **`/`** / **`s`** | Search support cases by keywords / filter queue (Search Modal) |
+| **`K`** / **`?`** | Search Red Hat Knowledgebase / KCS solutions (KCS Modal) |
 | **`a`** | Upload file attachment (Attach Modal) |
 | **`t`** | Select and apply template (Template Modal) |
-| **`v` / `l`** | Toggle layout (horizontal mailbox vs vertical side-by-side) |
 | **`w`** | Toggle follow/unfollow for active case |
 | **`m`** | Mark active case as read |
 | **`f`** | Zoom / Fullscreen toggle for active pane |
 | **`r`** | Contextual refresh |
 | **`q`** | Quit TUI |
 
-Bookmark/template dialogs can open without a preselected option; confirming an empty selection makes no change. Pressing `/` or `s` opens the case search dialog to filter the displayed table by query keywords, summary, or case number; pressing `Escape` clears an active search and restores the regular case queue. The documented `b`, `f`, `o`, `g`, and `s` keys operate outside text entry, while typing those letters in the comment editor remains ordinary input. Order changes use the loaded thread without another request. Automatic read marking applies only after the current displayed version's dwell period; navigation or a new detail version supersedes older timers.
-
-*For internal TUI architecture, Textual view-swapping, and threading details, see the [Developer Guide](developer_guide.md).*
+Bookmark/template dialogs can open without a preselected option; confirming an empty selection makes no change. Pressing `/` or `s` opens the case search dialog to filter the displayed table by query keywords, summary, or case number; pressing `Escape` clears an active search and restores the regular case queue. Pressing `K` or `?` opens the Red Hat Knowledgebase (KCS) search dialog pre-filled with the active case summary, allowing you to open solutions in your browser or insert solution links directly into your comment draft. The documented `b`, `f`, `o`, `g`, `s`, and `K` keys operate outside text entry, while typing those letters in the comment editor remains ordinary input. Order changes use the loaded thread without another request. Automatic read marking applies only after the current displayed version's dwell period; navigation or a new detail version supersedes older timers.
 
 ---
 
