@@ -549,6 +549,7 @@ Pressing `<TAB>` automatically suggests context-relevant values:
 Runs automated local diagnostic health checks inspecting credentials, configuration, directory permissions, and background sync timers:
 
 Cache write checks use a temporary file and leave existing cache files and symlinks untouched.
+Authentication checks use the same source precedence as normal commands: `--token-file`, the `REDHAT_SUPPORT_OFFLINE_TOKEN` environment variable, then `~/.config/rh-support-cli/token`. An empty or unreadable selected source fails without falling back to another identity or prompting. Token values are fully masked; file permissions broader than `0600` produce a warning.
 
 ```bash
 # Run local diagnostic health checks:

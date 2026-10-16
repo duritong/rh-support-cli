@@ -17,48 +17,40 @@ from rh_support_lib.config import load_config
 
 def check_auth(token_file: str | None = None) -> dict[str, Any]:
     """Inspects offline token configuration without revealing secrets."""
-    token = None
-    source = None
+    from rh_support_lib.api import _get_offline_token
 
-    if token_file and os.path.isfile(token_file):
+    token_path = None
+    if token_file is not None:
+        token_path = token_file
         source = f"CLI argument (--token-file {token_file})"
-        with contextlib.suppress(Exception), open(token_file, "r") as f:
-            token = f.read().strip()
-    elif os.environ.get("REDHAT_SUPPORT_OFFLINE_TOKEN"):
+    elif "REDHAT_SUPPORT_OFFLINE_TOKEN" in os.environ:
         source = "Environment variable (REDHAT_SUPPORT_OFFLINE_TOKEN)"
-        token = os.environ["REDHAT_SUPPORT_OFFLINE_TOKEN"].strip()
     else:
-        cfg_token = os.path.expanduser("~/.config/rh-support-cli/token")
-        if os.path.isfile(cfg_token):
-            source = f"Config file ({cfg_token})"
-            with contextlib.suppress(Exception), open(cfg_token, "r") as f:
-                token = f.read().strip()
+        token_path = os.path.expanduser("~/.config/rh-support-cli/token")
+        source = f"Config file ({token_path})"
 
+    token = _get_offline_token(token_file, interactive=False)
     if not token:
         return {
             "category": "Authentication",
             "name": "Offline API Token",
             "status": "FAIL",
-            "message": "No offline token found (set REDHAT_SUPPORT_OFFLINE_TOKEN or ~/.config/rh-support-cli/token).",
+            "message": "No offline token found or selected source is empty/unreadable (set --token-file, REDHAT_SUPPORT_OFFLINE_TOKEN or ~/.config/rh-support-cli/token).",
         }
 
-    # Mask token
-    masked = token[:4] + "..." + token[-4:] if len(token) > 8 else "***"
-    details = f"Configured via {source} [{masked}]"
+    details = f"Configured via {source} [***]"
 
     # Check file permissions if loaded from file
-    if source and "(" in source:
-        fpath = source.split("(")[1].split(")")[0]
-        if os.path.isfile(fpath):
-            with contextlib.suppress(Exception):
-                mode = os.stat(fpath).st_mode & 0o777
-                if mode & 0o077:
-                    return {
-                        "category": "Authentication",
-                        "name": "Offline API Token",
-                        "status": "WARN",
-                        "message": f"{details} — Warning: permissions {oct(mode)} are too open (recommended: 0600).",
-                    }
+    if token_path is not None and os.path.isfile(token_path):
+        with contextlib.suppress(OSError):
+            mode = os.stat(token_path).st_mode & 0o777
+            if mode & 0o077:
+                return {
+                    "category": "Authentication",
+                    "name": "Offline API Token",
+                    "status": "WARN",
+                    "message": f"{details} — Warning: permissions {oct(mode)} are too open (recommended: 0600).",
+                }
 
     return {
         "category": "Authentication",
