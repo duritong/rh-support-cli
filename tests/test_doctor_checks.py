@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -83,3 +84,42 @@ class DoctorCheckTests(unittest.TestCase):
             result = doctor.check_auth("selected-token")
         self.assertEqual(result["status"], "FAIL")
         self.assertNotIn("sensitive-error", result["message"])
+
+    def test_main_dispatches_doctor_before_config_or_api_with_flags_and_mock(self):
+        from rh_support_lib.main import _main
+
+        with (
+            patch.object(
+                sys,
+                "argv",
+                [
+                    "rh-support-cli",
+                    "--mock",
+                    "--json",
+                    "--token-file",
+                    "selected",
+                    "doctor",
+                    "--online",
+                    "--simple-output",
+                ],
+            ),
+            patch(
+                "rh_support_lib.main.load_config",
+                side_effect=AssertionError("config prerequisite"),
+            ),
+            patch("rh_support_lib.main._start_mock") as mock_server,
+            patch(
+                "rh_support_lib.api.RedHatAPIClient",
+                side_effect=AssertionError("API client"),
+            ),
+            patch.object(doctor, "cmd_doctor", return_value=1) as command,
+            self.assertRaises(SystemExit) as exit_result,
+        ):
+            _main()
+        self.assertEqual(exit_result.exception.code, 1)
+        mock_server.assert_called_once_with(None)
+        args = command.call_args.args[0]
+        self.assertEqual(args.token_file, "selected")
+        self.assertEqual(args.format, "json")
+        self.assertTrue(args.online)
+        self.assertTrue(args.simple_output)

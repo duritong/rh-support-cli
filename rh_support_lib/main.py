@@ -911,6 +911,13 @@ Authentication:
         args.format = "json" if args.json else args.output_format or "text"
         args.json = args.format == "json"
 
+    if args.command == "doctor":
+        from rh_support_lib.commands.doctor import cmd_doctor
+
+        if args.mock:
+            _start_mock(args.mock_corpus)
+        sys.exit(cmd_doctor(args))
+
     config = load_config(args.config_file)
     if args.command in ("list", "following", "search", "tui"):
         selected = getattr(args, "bookmark", None)
@@ -944,11 +951,6 @@ Authentication:
     elif args.command in ["list-templates", "list-template"]:
         cmd_list_templates(args, config)
         sys.exit(0)
-    elif args.command == "doctor":
-        from rh_support_lib.commands.doctor import cmd_doctor
-
-        rc = cmd_doctor(args, config=config)
-        sys.exit(rc)
     elif args.command == "drafts":
         from rh_support_lib.commands.drafts import cmd_drafts
 

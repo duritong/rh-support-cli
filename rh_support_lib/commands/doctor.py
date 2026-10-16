@@ -62,27 +62,28 @@ def check_auth(token_file: str | None = None) -> dict[str, Any]:
 
 def check_configuration(config_file: str | None = None) -> dict[str, Any]:
     """Inspects YAML configuration file health."""
-    cfg_path = (
+    cfg_path = os.path.expanduser(
         config_file
-        or os.environ.get("RH_SUPPORT_CONFIG")
-        or os.path.expanduser("~/.config/rh-support-cli/config.yaml")
+        if config_file is not None
+        else os.environ.get("RH_SUPPORT_CONFIG")
+        or "~/.config/rh-support-cli/config.yaml"
     )
-    if not os.path.isfile(cfg_path):
-        return {
-            "category": "Configuration",
-            "name": "Configuration File",
-            "status": "INFO",
-            "message": f"No custom config file found at {cfg_path} (using defaults).",
-        }
-
     try:
-        cfg = load_config(cfg_path)
+        cfg = load_config(config_file)
     except Exception as e:  # noqa: BLE001
         return {
             "category": "Configuration",
             "name": "Configuration File",
             "status": "FAIL",
             "message": f"Failed to parse {cfg_path}: {e}",
+        }
+
+    if not os.path.isfile(cfg_path):
+        return {
+            "category": "Configuration",
+            "name": "Configuration File",
+            "status": "INFO",
+            "message": f"No custom config file found at {cfg_path} (using defaults).",
         }
 
     bms = len(cfg.get("bookmarks") or {})

@@ -293,6 +293,7 @@ All tests live in the `tests/` package. The test suite is organized into focused
 * `tests/test_cli_doctor.py` and `tests/test_doctor_checks.py`: Sandboxed local health, credentials, permissions, and background sync diagnostics. CLI subprocesses use `sys.executable` and a sandboxed inactive `systemctl`, with isolated HOME/XDG paths and no inherited Red Hat configuration. Cache probes use exclusively created temporary files with automatic cleanup, never a predictable writable filename.
 * `tests/test_cli_drafts.py`: Preserved comment drafts discovery, preview, and cleanup.
 * Doctor authentication uses the API's noninteractive `_get_offline_token` resolver without an access-token exchange. Permission checks retain the selected path separately from display text, and diagnostics never include credential fragments or token-read exception contents.
+* Doctor dispatch precedes the main configuration prerequisite and API-client construction. Its configuration check calls `load_config` with the original selection, preserving optional-default semantics and schema validation. Output flags are normalized before dispatch, and `--mock` endpoint setup still occurs before any optional probe.
 * `tests/test_tui_actions.py`: Interactive TUI keyboard bindings, dwell navigation, and header status chips.
 * `tests/test_rh_support_cli.py`: Core integration tests for templates, creation, search, mock portal, and TUI.
 

@@ -38,12 +38,13 @@ class DoctorCliTests(unittest.TestCase):
             "rh-support-cli.py",
         )
 
-    def _run_doctor(self, *extra_args: str) -> tuple[int, str, str]:
+    def _run_doctor(self, *extra_args: str, global_args=()) -> tuple[int, str, str]:
         import subprocess
 
         cmd = [
             sys.executable,
             self.cli_path,
+            *global_args,
             "doctor",
             *extra_args,
         ]
@@ -95,3 +96,50 @@ class DoctorCliTests(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertIn("Red Hat Support CLI — Diagnostic Report", stdout)
         self.assertIn("Summary:", stdout)
+
+    def test_broken_configuration_still_produces_full_json_report(self):
+        config = Path(self.temp_home) / "broken.yaml"
+        for contents in ("bookmarks: [", "cache: []", "default_bookmark: missing"):
+            config.write_text(contents)
+            for source in ("cli", "environment", "default"):
+                with self.subTest(contents=contents, source=source):
+                    self.env.pop("RH_SUPPORT_CONFIG", None)
+                    global_args = ()
+                    default = (
+                        Path(self.temp_home) / ".config/rh-support-cli/config.yaml"
+                    )
+                    if default.exists():
+                        default.unlink()
+                    if source == "cli":
+                        global_args = ("--config-file", str(config))
+                    elif source == "environment":
+                        self.env["RH_SUPPORT_CONFIG"] = str(config)
+                    else:
+                        default.parent.mkdir(parents=True, exist_ok=True)
+                        default.write_text(contents)
+                    rc, stdout, stderr = self._run_doctor(
+                        "--json", global_args=global_args
+                    )
+                    self.assertEqual(rc, 1)
+                    data = json.loads(stdout)
+                    self.assertEqual(len(data["checks"]), 7)
+                    configuration = next(
+                        c for c in data["checks"] if c["category"] == "Configuration"
+                    )
+                    self.assertEqual(configuration["status"], "FAIL")
+                    self.assertNotIn("Authenticating", stdout + stderr)
+
+    def test_selected_missing_config_fails_but_absent_default_is_optional(self):
+        for global_args, env_path in (
+            (("--config-file", str(Path(self.temp_home) / "missing")), None),
+            ((), str(Path(self.temp_home) / "missing")),
+            ((), None),
+        ):
+            with self.subTest(global_args=global_args, env_path=env_path):
+                self.env.pop("RH_SUPPORT_CONFIG", None)
+                if env_path:
+                    self.env["RH_SUPPORT_CONFIG"] = env_path
+                rc, stdout, _ = self._run_doctor("--json", global_args=global_args)
+                data = json.loads(stdout)
+                self.assertEqual(rc, 1 if global_args or env_path else 0)
+                self.assertEqual(len(data["checks"]), 7)
