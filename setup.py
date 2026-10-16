@@ -14,7 +14,7 @@ setup(
         "pyyaml>=5.4.1",
         "jinja2>=3.0.0",
         "dateparser>=1.0.0",
-        "argcomplete>=1.12.0",
+        "argcomplete>=3.7.0",
         "rich>=13.3.3",
         "textual>=6.0.0",
         "markdown-it-py>=2.2.0",

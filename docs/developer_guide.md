@@ -399,15 +399,20 @@ These are tested compatible versions, not a claim about the earliest historical
 versions with each API. Textual 0.40.0 fails the installed CLI import because it
 has no `textual.content.Content`. Requests-toolbelt 0.9.1 fails to import with
 urllib3 2.x (`contrib.appengine` was removed); its tested floor is 1.0.0.
+Argcomplete 1.12.0 produces empty Bash choice completions on Python 3.14;
+the supported, tested cross-version floor is 3.7.0.
 
 Clean Python 3.9.25 validation used the exact direct floors: Requests 2.25.0,
 requests-toolbelt 1.0.0, PyYAML 5.4.1, Jinja2 3.0.0, dateparser 1.0.0,
-argcomplete 1.12.0, Rich 13.3.3, Textual 6.0.0, and markdown-it-py 2.2.0
-(resolved urllib3 1.26.20). The full run reached 473 tests; four existing doctor
-HTTPError-close subcases failed under Python 3.9, independently of dependencies.
+argcomplete 3.7.0, Rich 13.3.3, Textual 6.0.0, and markdown-it-py 2.2.0
+(resolved urllib3 1.26.20). An initial full run with argcomplete 1.12.0 reached
+473 tests; four existing doctor HTTPError-close subcases failed under Python 3.9,
+independently of dependencies.
 Installed-wheel tests passed. Python 3.14.7 wheel validation also exercises the UI
 and toolbelt floors with modern Requests/PyYAML/urllib3; those newer binary/runtime
-dependencies are not an exact-all-minima claim for Python 3.14.
+dependencies are not an exact-all-minima claim for Python 3.14. The final
+argcomplete 3.7.0 combination is checked with the real Bash-completion regression
+and wheel/memory tests on Python 3.9, plus the full suite on Python 3.14.
 
 To repeat the floor setup, provision a separate environment with `pip setuptools
 wheel` and pin every direct version listed above, then run `python -B -m tests -q`.
