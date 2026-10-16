@@ -617,7 +617,7 @@ Automatic refresh continues when caching is disabled or cached details expire. E
 The top status bar provides real-time, non-blocking operational context:
 * **Identity Chip (`User: <name>`)**: Shows the authenticated SSO username or local user.
 * **Scope Chip (`Bookmark: <name>` or `Search: "<query>"`)**: Displays the currently active filter bookmark or search query. Updates immediately upon bookmark selection (`b`) or case search (`/`), restoring to `Bookmark: None` when search is cleared (`Esc`).
-* **Freshness Chip (`Refreshed: <time>`)**: Displays the local timestamp of the last successful case list synchronization (via manual refresh or background polling).
+* **Freshness Chip**: `Refreshed: <time>` indicates a remotely validated list. Cache hits show `Cached; Last live: <time>` and do not advance the last live timestamp. Search results with additional cached matches show `Mixed live/cached`; their last live time covers only the remote portion. Empty followed lists are local, not evidence of API health. Manual forced refresh and background polling validate remotely; failures and obsolete completions retain the last good list and freshness state.
 ### Options:
 * `-l <layout>` / `--layout <layout>`: Split layout (`horizontal` / `mailbox` default or `vertical` side-by-side).
 * `-b <name>` / `--bookmark <name>`: Launch with a specific bookmark filter.

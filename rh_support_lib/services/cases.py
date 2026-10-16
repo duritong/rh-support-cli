@@ -689,7 +689,11 @@ class CaseService:
         all_pages: bool = False,
         limit: int | None = None,
         use_cache: bool = True,
+        provenance: dict | None = None,
     ) -> list[Case]:
+        """Return cases, optionally recording this request's source in a caller-owned dict."""
+        if provenance is not None:
+            provenance.update(source="local")
         if first <= 0 or (limit is not None and limit < 0):
             raise ValueError("Case page size must be positive and limit nonnegative.")
         if limit == 0:
@@ -707,6 +711,8 @@ class CaseService:
         if use_cache and not after and not query and self.cache_service.enabled:
             cached_list = self.cache_service.get_case_list(cache_key)
             if cached_list is not None:
+                if provenance is not None:
+                    provenance.update(source="cache")
                 return (
                     cached_list[:limit]
                     if limit is not None
@@ -733,6 +739,8 @@ class CaseService:
             and cases
         ):
             self.cache_service.set_case_list(cache_key, cases)
+        if provenance is not None:
+            provenance.update(source="live")
         return cases
 
     def _list_cases_graphql(
@@ -983,8 +991,11 @@ class CaseService:
         product: str | None = None,
         limit: int = 20,
         local_only: bool = False,
+        provenance: dict | None = None,
     ) -> list[Case]:
         """Searches support cases via GraphQL API and local cache."""
+        if provenance is not None:
+            provenance.update(source="local")
         if limit <= 0:
             return []
         if local_only:
@@ -1006,6 +1017,7 @@ class CaseService:
             query=query,
             limit=limit,
             use_cache=False,
+            provenance=provenance,
         )
 
         # Also search local cache (which matches full description and comment bodies) and merge
@@ -1025,9 +1037,13 @@ class CaseService:
         seen = {c.case_number for c in remote_cases}
         merged = list(remote_cases)
         for lc in local_cases:
+            if len(merged) >= limit:
+                break
             if lc.case_number not in seen:
                 seen.add(lc.case_number)
                 merged.append(lc)
+                if provenance is not None:
+                    provenance.update(source="mixed")
             if len(merged) >= limit:
                 break
 
@@ -1904,8 +1920,11 @@ class CaseService:
         severity: list[str] | str | None = None,
         owner: str | None = None,
         product: str | None = None,
+        provenance: dict | None = None,
     ) -> list[Case]:
         """Returns the list of followed cases for the user. If sync is True, updates checkpoints first."""
+        if provenance is not None:
+            provenance.update(source="local")
         user = username or self.get_current_user()
         if sync:
             self.sync_tracked_cases(username=user, account=account)
@@ -1973,6 +1992,8 @@ class CaseService:
         with ThreadPoolExecutor(max_workers=min(10, len(case_numbers))) as executor:
             cases = list(executor.map(fetch_one, case_numbers))
 
+        if provenance is not None:
+            provenance.update(source="live")
         return [
             c
             for c in cases

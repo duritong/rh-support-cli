@@ -32,8 +32,11 @@ class SearchService:
         limit: int = 20,
         local_only: bool = False,
         following: bool = False,
+        provenance: dict | None = None,
     ) -> list[Case]:
         """Searches support cases via GraphQL API and local cache."""
+        if provenance is not None:
+            provenance.update(source="local")
         if following:
             if limit <= 0:
                 return []
@@ -47,6 +50,7 @@ class SearchService:
                 severity=severity,
                 owner=owner,
                 product=product,
+                provenance=provenance,
             )
             term = str(query).strip().casefold()
             return [
@@ -64,6 +68,7 @@ class SearchService:
             product=product,
             limit=limit,
             local_only=local_only,
+            provenance=provenance,
         )
 
     def search_kcs(

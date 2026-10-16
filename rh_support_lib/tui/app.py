@@ -948,6 +948,7 @@ class SupportApp(App):
                 user = os.environ.get("USER") or ""
         self.user_identity = user
         self.last_refreshed_at: str | None = None
+        self.list_source = "local"
         saved_layout = "vertical"
         with contextlib.suppress(Exception):
             saved_layout = self.case_service.state_service.get_tui_layout(user)
@@ -1034,8 +1035,16 @@ class SupportApp(App):
             else:
                 scope_label.update("Bookmark: None")
 
-            fresh_str = self.last_refreshed_at or "Never"
-            fresh_label.update(f"Refreshed: {fresh_str}")
+            fresh_label.update(self._freshness_label())
+
+    def _freshness_label(self) -> str:
+        timestamp = self.last_refreshed_at or "Never"
+        if self.list_source == "live":
+            return f"Refreshed: {timestamp}"
+        source = {"cache": "Cached", "mixed": "Mixed live/cached"}.get(
+            self.list_source, "Local (not remotely validated)"
+        )
+        return f"{source}; Last live: {timestamp}"
 
     def _sync_header_status(self) -> None:
         if self.active_jobs:
@@ -1073,10 +1082,11 @@ class SupportApp(App):
                 f"User: {self.user_identity or 'Local'}",
                 id="chip-identity",
                 classes="header-chip",
+                markup=False,
             ),
-            Label(scope_init, id="chip-scope", classes="header-chip"),
+            Label(scope_init, id="chip-scope", classes="header-chip", markup=False),
             Label(
-                f"Refreshed: {self.last_refreshed_at or 'Never'}",
+                self._freshness_label(),
                 id="chip-freshness",
                 classes="header-chip",
             ),
@@ -1125,6 +1135,7 @@ class SupportApp(App):
             self._detail_generation,
             self.current_details,
             self.active_search_query,
+            {},  # Caller-owned provenance travels with this request, never on the service.
         )
 
     def _list_request_current(self, snapshot):
@@ -1190,8 +1201,10 @@ class SupportApp(App):
                 product=params.get("product"),
                 limit=50,
                 following=bool(params.get("following")),
+                provenance=snapshot[8],
             )
         list_kwargs = {k: v for k, v in params.items() if k != "following"}
+        list_kwargs["provenance"] = snapshot[8]
         if params.get("following"):
             return self.case_service.list_followed_cases(**list_kwargs)
         if force:
@@ -1202,9 +1215,11 @@ class SupportApp(App):
         if not self._list_request_current(snapshot):
             return None
         self.cases = cases
-        self.last_refreshed_at = (
-            datetime.now(timezone.utc).astimezone().strftime("%H:%M:%S")
-        )
+        self.list_source = snapshot[8].get("source", "local")
+        if self.list_source in ("live", "mixed"):
+            self.last_refreshed_at = (
+                datetime.now(timezone.utc).astimezone().strftime("%H:%M:%S")
+            )
         self._sync_header_chips()
         if not poll:
             self.populate_cases_table()

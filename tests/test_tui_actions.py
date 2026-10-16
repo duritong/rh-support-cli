@@ -18,6 +18,9 @@ from rh_support_lib.models import (
     CaseDetails,
     TrackedCase,
 )
+from rh_support_lib.services.cache import CacheService
+from rh_support_lib.services.cases import CaseService
+from rh_support_lib.services.search import SearchService
 from rh_support_lib.tui.app import BookmarkModal, SupportApp, TemplateModal
 
 
@@ -535,6 +538,108 @@ class TuiActionTests(unittest.IsolatedAsyncioTestCase):
                 editor.text,
             )
 
+    async def test_real_list_cache_does_not_claim_remote_freshness(self):
+        client = Mock(spec=RedHatAPIClient)
+        client.get_cache_scope.return_value = "test-scope"
+        client.get_token.return_value = "offline-token"
+        cache = CacheService(cache_dir=self.temp, scope="test-scope")
+        service = CaseService(client, cache_service=cache)
+        self.app.case_service = service
+        with patch.object(
+            service, "_list_cases_graphql", return_value=[details().case]
+        ) as remote:
+            service.list_cases(
+                **{
+                    k: v
+                    for k, v in self.app._begin_case_list()[1].items()
+                    if k != "following"
+                }
+            )
+            remote.reset_mock()
+            async with self.app.run_test() as pilot:
+                self.app.fetch_cases()
+                await pilot.pause()
+                remote.assert_not_called()
+                chip = self.app.query_one("#chip-freshness")
+                self.assertIn("Cached", str(chip.render()))
+                self.assertIsNone(self.app.last_refreshed_at)
+                self.app.fetch_cases(force=True)
+                await pilot.pause()
+                remote.assert_called_once()
+                self.assertIsNotNone(self.app.last_refreshed_at)
+                self.assertIn("Refreshed:", str(chip.render()))
+                last_good = self.app.last_refreshed_at
+                self.app.fetch_cases()
+                self.assertIn("Cached", str(chip.render()))
+                self.assertEqual(self.app.last_refreshed_at, last_good)
+                old = self.app._begin_case_list()
+                old_cases = self.app._read_case_list(old, force=True)
+                current = self.app._begin_case_list()
+                self.app._read_case_list(current)
+                self.assertIsNot(old[8], current[8])
+                self.assertEqual(old[8], {"source": "live"})
+                self.assertEqual(current[8], {"source": "cache"})
+                self.app._apply_case_list(old, old_cases)
+                self.assertIn("Cached", str(chip.render()))
+                remote.side_effect = RuntimeError("offline")
+                self.app.fetch_cases(force=True)
+                self.assertEqual(self.app.last_refreshed_at, last_good)
+                self.assertIn("Cached", str(chip.render()))
+                self.assertEqual(self.app.cases[0].case_number, "1")
+                remote.side_effect = None
+                remote.reset_mock()
+                self.app.poll_cases_background()
+                remote.assert_called_once()
+                self.assertIn("Refreshed:", str(chip.render()))
+                self.assertFalse(self.app._poll_in_flight)
+
+    async def test_search_mixed_and_followed_local_provenance(self):
+        client = Mock(spec=RedHatAPIClient)
+        client.get_cache_scope.return_value = "test-scope"
+        client.get_token.return_value = "offline-token"
+        service = CaseService(client)
+        self.app.case_service = service
+        self.app.search_service = SearchService(client, case_service=service)
+        service.cache_service._set_case_details("2", details("2"))
+        with patch.object(
+            service, "_list_cases_graphql", return_value=[details().case]
+        ):
+            async with self.app.run_test():
+                self.app.active_search_query = "Case"
+                self.app.fetch_cases()
+                self.assertEqual(len(self.app.cases), 2)
+                self.assertIn(
+                    "Mixed", str(self.app.query_one("#chip-freshness").render())
+                )
+                self.app.active_search_query = None
+                self.app.config["bookmarks"]["followed"] = {"following": True}
+                self.app.active_bookmark = "followed"
+                last_good = self.app.last_refreshed_at
+                with patch.object(
+                    service.state_service, "get_followed_cases", return_value={}
+                ):
+                    self.app.fetch_cases(force=True)
+                self.assertEqual(self.app.last_refreshed_at, last_good)
+                self.assertIn(
+                    "Local", str(self.app.query_one("#chip-freshness").render())
+                )
+                followed = TrackedCase(case_number="1", relationship="followed")
+                with (
+                    patch.object(
+                        service.state_service,
+                        "get_followed_cases",
+                        return_value={"1": followed},
+                    ),
+                    patch.object(
+                        service, "_get_case_details_graphql", return_value=details()
+                    ) as remote,
+                ):
+                    self.app.fetch_cases(force=True)
+                    remote.assert_called_once()
+                self.assertIn(
+                    "Refreshed:", str(self.app.query_one("#chip-freshness").render())
+                )
+
     async def test_tui_header_status_chips_update_on_scope_and_freshness(self):
         """Test visible identity, scope, and freshness chips in the TUI header."""
         from textual.widgets import Label
@@ -547,7 +652,7 @@ class TuiActionTests(unittest.IsolatedAsyncioTestCase):
 
             self.assertIn("User:", str(ident_chip.render()))
             self.assertEqual(str(scope_chip.render()), "Bookmark: None")
-            self.assertIn("Refreshed:", str(fresh_chip.render()))
+            self.assertIn("Last live: Never", str(fresh_chip.render()))
 
             # 2. Scope chip updates immediately when search query changes
             self.app.active_search_query = "kernel panic"
@@ -568,7 +673,9 @@ class TuiActionTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(str(scope_chip.render()), "Bookmark: team")
 
             # 5. Freshness chip updates when case list is applied
-            self.app._apply_case_list(self.app._begin_case_list(), [details().case])
+            snapshot = self.app._begin_case_list()
+            snapshot[8].update(source="live")
+            self.app._apply_case_list(snapshot, [details().case])
             await pilot.pause()
             self.assertIn("Refreshed:", str(fresh_chip.render()))
             self.assertNotEqual(str(fresh_chip.render()), "Refreshed: Never")
