@@ -330,7 +330,9 @@ def edit_file(path: str) -> None:
         )
 
 
-def open_editor(case_number, status_label, header_content=None, initial_body=None):
+def open_editor(
+    case_number, status_label, header_content=None, initial_body=None, *, config=None
+):
     """
     Opens the system default editor for interactive comment entry.
     Returns the content (possibly empty) and the path to the temporary file.
@@ -338,7 +340,7 @@ def open_editor(case_number, status_label, header_content=None, initial_body=Non
     """
     from rh_support_lib.config import resolve_drafts_dir
 
-    drafts_dir = resolve_drafts_dir()
+    drafts_dir = resolve_drafts_dir(config)
     os.makedirs(drafts_dir, exist_ok=True)
     with tempfile.NamedTemporaryFile(
         mode="w+",

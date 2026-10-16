@@ -99,6 +99,7 @@ def _validate_config(config):
             raise ConfigError(f"{section}: expected a mapping")
     for key in (
         "templates_dir",
+        "drafts_dir",
         "debug_file",
         "default_create_template",
         "default_kcs_language",
@@ -110,7 +111,7 @@ def _validate_config(config):
         if key in config:
             if not isinstance(config[key], str):
                 raise ConfigError(f"{key}: expected a string")
-            if key in ("templates_dir", "debug_file"):
+            if key in ("templates_dir", "drafts_dir", "debug_file"):
                 config[key] = os.path.expanduser(config[key])
     if "language" in config.get("kcs", {}) and not isinstance(
         config["kcs"]["language"], str

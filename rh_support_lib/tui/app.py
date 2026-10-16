@@ -2310,7 +2310,9 @@ class SupportApp(App):
     def save_comment_to_file(
         self, comment_text: str, next_case_id: str | None = None, on_saved=None
     ) -> None:
-        drafts_dir = os.path.expanduser("~/.config/rh-support-cli/drafts")
+        from rh_support_lib.config import resolve_drafts_dir
+
+        drafts_dir = resolve_drafts_dir(self.config)
         case_id = self.selected_case_id
         generation = self._comment_generation
 

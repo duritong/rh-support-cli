@@ -576,6 +576,7 @@ Generated editor boundaries are recognized only inside the leading comment heade
 Retrying a generated recovery file with `comment --file` removes its editor guidance and previous-comment context. Ordinary input files and raw TUI drafts preserve leading Markdown headings, including during automatic resume.
 `drafts show` prefers an exact filename, then an exact case number (ignoring leading zeroes), then a unique partial filename. Multiple matches fail with an ambiguity error; use the full filename to select one.
 Listing and automatic resume order drafts by full filesystem modification precision, not the rounded timestamp displayed in the table. JSON includes `mtime_ns`.
+CLI editing, TUI saving, and draft discovery use the same directory: the string setting `drafts_dir`, then `RH_SUPPORT_DRAFTS`, then `drafts` beside `RH_SUPPORT_CONFIG`, then `$XDG_CONFIG_HOME/rh-support-cli/drafts`, falling back to `~/.config/rh-support-cli/drafts`.
 
 Discovers, previews, and purges preserved comment drafts stored when editing or posting was interrupted:
 

@@ -176,6 +176,7 @@ def _cmd_comment(args, api_client, config, output):
                 final_status,
                 header_content=header_content,
                 initial_body=file_content,
+                config=config,
             )
         except EditorError as error:
             sys.exit(f"Editor Error: {error}")

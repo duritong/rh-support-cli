@@ -73,6 +73,39 @@ class DraftsCliTests(unittest.TestCase):
         drafts = find_drafts(drafts_dir=self.drafts_dir)
         self.assertEqual(drafts[0]["content"], "z")
 
+    def test_configured_directory_used_by_real_cli_editor_and_tui_save(self):
+        from rh_support_lib import utils
+        from rh_support_lib.commands.drafts import find_drafts
+        from rh_support_lib.config import (
+            ConfigError,
+            _validate_config,
+            resolve_drafts_dir,
+        )
+        from rh_support_lib.tui.app import SupportApp
+
+        config = {"drafts_dir": self.drafts_dir}
+        with (
+            patch.dict(os.environ, self.env, clear=True),
+            patch("rh_support_lib.utils.subprocess.call", return_value=0),
+        ):
+            _, path = utils.open_editor("123", None, initial_body="CLI", config=config)
+            self.assertEqual(os.path.dirname(path), self.drafts_dir)
+            app = Mock(config=config, selected_case_id="456", _comment_generation=0)
+            app.run_worker.side_effect = lambda fn, **kw: fn()
+            SupportApp.save_comment_to_file(app, "# TUI body")
+            self.assertEqual(
+                find_drafts("456", self.drafts_dir)[0]["content"], "# TUI body"
+            )
+            for env, expected in (
+                ({"RH_SUPPORT_DRAFTS": "/drafts"}, "/drafts"),
+                ({"RH_SUPPORT_CONFIG": "/config/custom.yaml"}, "/config/drafts"),
+                ({"XDG_CONFIG_HOME": "/xdg"}, "/xdg/rh-support-cli/drafts"),
+            ):
+                with patch.dict(os.environ, env, clear=True):
+                    self.assertEqual(resolve_drafts_dir(), expected)
+        with self.assertRaises(ConfigError):
+            _validate_config({"drafts_dir": ["bad"]})
+
     def test_drafts_discovery_filtering_and_show(self):
         """Verify drafts list, filtering by case, and drafts show preview."""
         # Create 2 drafts
