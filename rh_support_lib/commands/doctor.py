@@ -266,24 +266,23 @@ def check_runtime_environment() -> dict[str, Any]:
 
 
 def check_online_connectivity(timeout: float = 3.0) -> dict[str, Any]:
-    """Performs bounded online check to Red Hat SSO and GraphQL endpoints."""
+    """Checks HTTP reachability of GraphQL, without authenticating or querying it."""
     import time
+    import urllib.error
     import urllib.request
 
     from rh_support_lib.constants import GRAPHQL_URL
 
     endpoint = GRAPHQL_URL
-    start = time.time()
+    start = time.monotonic()
     try:
         req = urllib.request.Request(endpoint, method="HEAD")
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            elapsed = (time.time() - start) * 1000
-            return {
-                "category": "Connectivity",
-                "name": "Red Hat API Endpoint",
-                "status": "PASS",
-                "message": f"Reachable in {elapsed:.1f}ms (HTTP {resp.status})",
-            }
+            status = resp.status
+    except urllib.error.HTTPError as e:
+        # An HTTP rejection still proves the endpoint answered the probe.
+        status = e.code
+        e.close()
     except Exception as e:  # noqa: BLE001
         return {
             "category": "Connectivity",
@@ -291,6 +290,14 @@ def check_online_connectivity(timeout: float = 3.0) -> dict[str, Any]:
             "status": "FAIL",
             "message": f"Cannot reach {endpoint} within {timeout}s: {e}",
         }
+
+    elapsed = (time.monotonic() - start) * 1000
+    return {
+        "category": "Connectivity",
+        "name": "Red Hat API Endpoint",
+        "status": "PASS",
+        "message": f"{endpoint} reachable in {elapsed:.1f}ms (HTTP {status}; reachability only, not authentication or API health).",
+    }
 
 
 def cmd_doctor(args: Any, config: dict | None = None) -> int:

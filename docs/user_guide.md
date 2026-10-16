@@ -553,6 +553,8 @@ Authentication checks use the same source precedence as normal commands: `--toke
 Doctor produces the full report even when configuration is invalid. A missing optional default config uses defaults (`INFO`); a missing file selected by `--config-file` or `RH_SUPPORT_CONFIG`, invalid YAML, or invalid settings reports `FAIL`. Any failed check makes doctor exit with status 1; warnings alone do not.
 Storage diagnostics follow the same paths as normal commands, including `RH_SUPPORT_STATE`, state beside an explicitly selected config, and XDG defaults. Tilde and relative paths are supported. Cache and product-catalog checks use the application's cache location, including when `XDG_CACHE_HOME` already ends in `rh-support-cli`.
 
+Doctor is offline by default. `--online` sends one unauthenticated `HEAD` probe to the configured GraphQL endpoint with a 3-second request timeout. Any HTTP response, including `401`, `403`, `405`, or a server error, proves HTTP reachability and reports `PASS` with the response code. DNS, TLS, connection, and timeout errors report `FAIL`. This does not check SSO, validate credentials, query cases, or establish API service health.
+
 ```bash
 # Run local diagnostic health checks:
 rh-support-cli doctor

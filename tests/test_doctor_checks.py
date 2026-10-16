@@ -7,8 +7,11 @@ import os
 import sys
 import tempfile
 import unittest
+from argparse import Namespace
+from io import StringIO
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
+from urllib.error import HTTPError, URLError
 
 from rh_support_lib.commands import doctor
 
@@ -172,3 +175,54 @@ class DoctorCheckTests(unittest.TestCase):
                 result = doctor.check_product_catalog()
                 self.assertIn("1000 products", result["message"])
                 self.assertIn("local cache", result["message"])
+
+    def test_online_http_responses_prove_reachability_without_credentials(self):
+        endpoint = "https://diagnostic.invalid/graphql"
+        for status in (200, 401, 403, 405, 503):
+            response = MagicMock()
+            response.__enter__.return_value.status = status
+            error = (
+                HTTPError(endpoint, status, "HTTP response", {}, None)
+                if status != 200
+                else None
+            )
+            with (
+                self.subTest(status=status),
+                patch("rh_support_lib.constants.GRAPHQL_URL", endpoint),
+                patch(
+                    "urllib.request.urlopen", return_value=response, side_effect=error
+                ) as probe,
+            ):
+                result = doctor.check_online_connectivity(timeout=0.25)
+                self.assertEqual(result["status"], "PASS")
+                self.assertIn(f"HTTP {status}", result["message"])
+                self.assertIn(endpoint, result["message"])
+                request = probe.call_args.args[0]
+                self.assertEqual(request.full_url, endpoint)
+                self.assertEqual(request.get_method(), "HEAD")
+                self.assertEqual(request.headers, {})
+                probe.assert_called_once_with(request, timeout=0.25)
+
+    def test_online_transport_errors_fail(self):
+        for error in (URLError("DNS unavailable"), TimeoutError("timed out")):
+            with (
+                self.subTest(error=error),
+                patch("urllib.request.urlopen", side_effect=error),
+            ):
+                result = doctor.check_online_connectivity(timeout=0.25)
+                self.assertEqual(result["status"], "FAIL")
+                self.assertIn("0.25s", result["message"])
+
+    def test_default_doctor_never_probes_online(self):
+        os.environ["REDHAT_SUPPORT_OFFLINE_TOKEN"] = "test-token"
+        with (
+            patch(
+                "urllib.request.urlopen", side_effect=AssertionError("network")
+            ) as probe,
+            patch.object(
+                doctor, "check_systemd_timer", return_value={"status": "INFO"}
+            ),
+            patch("sys.stdout", new_callable=StringIO),
+        ):
+            self.assertEqual(doctor.cmd_doctor(Namespace(json=True)), 0)
+        probe.assert_not_called()
