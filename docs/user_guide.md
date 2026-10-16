@@ -551,6 +551,7 @@ Runs automated local diagnostic health checks inspecting credentials, configurat
 Cache write checks use a temporary file and leave existing cache files and symlinks untouched.
 Authentication checks use the same source precedence as normal commands: `--token-file`, the `REDHAT_SUPPORT_OFFLINE_TOKEN` environment variable, then `~/.config/rh-support-cli/token`. An empty or unreadable selected source fails without falling back to another identity or prompting. Token values are fully masked; file permissions broader than `0600` produce a warning.
 Doctor produces the full report even when configuration is invalid. A missing optional default config uses defaults (`INFO`); a missing file selected by `--config-file` or `RH_SUPPORT_CONFIG`, invalid YAML, or invalid settings reports `FAIL`. Any failed check makes doctor exit with status 1; warnings alone do not.
+Storage diagnostics follow the same paths as normal commands, including `RH_SUPPORT_STATE`, state beside an explicitly selected config, and XDG defaults. Tilde and relative paths are supported. Cache and product-catalog checks use the application's cache location, including when `XDG_CACHE_HOME` already ends in `rh-support-cli`.
 
 ```bash
 # Run local diagnostic health checks:

@@ -13,6 +13,8 @@ import tempfile
 from typing import Any
 
 from rh_support_lib.config import load_config
+from rh_support_lib.services.cache import CacheService
+from rh_support_lib.services.state import StateService
 
 
 def check_auth(token_file: str | None = None) -> dict[str, Any]:
@@ -101,16 +103,11 @@ def check_configuration(config_file: str | None = None) -> dict[str, Any]:
     }
 
 
-def check_state_storage() -> dict[str, Any]:
+def check_state_storage(config_file: str | None = None) -> dict[str, Any]:
     """Inspects state.yaml write permissions and locking."""
-    state_path = os.environ.get("RH_SUPPORT_STATE")
-    if not state_path:
-        xdg_state = os.environ.get("XDG_STATE_HOME") or os.path.expanduser(
-            "~/.local/state"
-        )
-        state_path = os.path.join(xdg_state, "rh-support-cli", "state.yaml")
+    state_path = StateService._resolve_state_path(config_file=config_file)
 
-    state_dir = os.path.dirname(state_path)
+    state_dir = os.path.dirname(os.path.abspath(state_path))
     try:
         os.makedirs(state_dir, exist_ok=True)
         # Test file lockability
@@ -146,8 +143,7 @@ def check_state_storage() -> dict[str, Any]:
 
 def check_disk_cache() -> dict[str, Any]:
     """Inspects local XDG disk cache directory."""
-    cache_base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
-    cache_dir = os.path.join(cache_base, "rh-support-cli")
+    cache_dir = CacheService._resolve_cache_dir()
     try:
         os.makedirs(cache_dir, exist_ok=True)
         with tempfile.NamedTemporaryFile(
@@ -177,9 +173,8 @@ def check_product_catalog() -> dict[str, Any]:
     count = len(DEFAULT_FALLBACK_PRODUCTS)
     source = "bundled fallbacks"
 
-    cache_base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
     cached_catalog = os.path.join(
-        cache_base, "rh-support-cli", "catalog", "products.json"
+        CacheService._resolve_cache_dir(), "catalog", "products.json"
     )
     repo_catalog = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -311,7 +306,7 @@ def cmd_doctor(args: Any, config: dict | None = None) -> int:
         check_runtime_environment(),
         check_auth(token_file=token_file),
         check_configuration(config_file=config_file),
-        check_state_storage(),
+        check_state_storage(config_file=config_file),
         check_disk_cache(),
         check_product_catalog(),
         check_systemd_timer(),

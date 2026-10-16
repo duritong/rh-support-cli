@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 import tempfile
@@ -29,6 +30,9 @@ class DoctorCheckTests(unittest.TestCase):
         )
         environment.start()
         self.addCleanup(environment.stop)
+        previous_directory = os.getcwd()
+        os.chdir(self.home)
+        self.addCleanup(os.chdir, previous_directory)
 
     def test_cache_probe_preserves_existing_file_and_symlink_target(self):
         cache = self.home / "cache" / "rh-support-cli"
@@ -123,3 +127,48 @@ class DoctorCheckTests(unittest.TestCase):
         self.assertEqual(args.format, "json")
         self.assertTrue(args.online)
         self.assertTrue(args.simple_output)
+
+    def test_state_probe_uses_core_path_selection(self):
+        from rh_support_lib.services.state import StateService
+
+        for environment, config in (
+            ({"RH_SUPPORT_STATE": "~/custom/state.yaml"}, None),
+            ({"RH_SUPPORT_STATE": "relative-state.yaml"}, None),
+            ({"RH_SUPPORT_CONFIG": "~/custom/config.yaml"}, None),
+            ({}, "relative/config.yaml"),
+            ({"XDG_STATE_HOME": "~/state-home"}, None),
+        ):
+            with (
+                self.subTest(environment=environment, config=config),
+                patch.dict(os.environ, environment),
+            ):
+                expected = Path(StateService._resolve_state_path(config_file=config))
+                expected.parent.mkdir(parents=True, exist_ok=True)
+                expected.write_text(
+                    "users:\n  test:\n    tracked_cases:\n      '123': {}\n"
+                )
+                result = doctor.check_state_storage(config_file=config)
+                self.assertEqual(result["status"], "PASS")
+                self.assertIn(str(expected), result["message"])
+                self.assertIn("1 tracked case(s)", result["message"])
+                self.assertTrue(Path(str(expected) + ".lock").is_file())
+
+    def test_cache_and_catalog_use_core_expansion_and_app_directory(self):
+        from rh_support_lib.services.cache import CacheService
+
+        for base in ("~/cache-tilde", "relative-cache", "~/cache-app/rh-support-cli"):
+            with (
+                self.subTest(base=base),
+                patch.dict(os.environ, {"XDG_CACHE_HOME": base}),
+            ):
+                expected = Path(CacheService._resolve_cache_dir())
+                result = doctor.check_disk_cache()
+                self.assertEqual(result["status"], "PASS")
+                self.assertIn(str(expected), result["message"])
+                self.assertTrue(expected.is_dir())
+                catalog = expected / "catalog" / "products.json"
+                catalog.parent.mkdir()
+                catalog.write_text(json.dumps({"products": ["product"] * 1000}))
+                result = doctor.check_product_catalog()
+                self.assertIn("1000 products", result["message"])
+                self.assertIn("local cache", result["message"])

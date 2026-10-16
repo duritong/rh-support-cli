@@ -294,6 +294,7 @@ All tests live in the `tests/` package. The test suite is organized into focused
 * `tests/test_cli_drafts.py`: Preserved comment drafts discovery, preview, and cleanup.
 * Doctor authentication uses the API's noninteractive `_get_offline_token` resolver without an access-token exchange. Permission checks retain the selected path separately from display text, and diagnostics never include credential fragments or token-read exception contents.
 * Doctor dispatch precedes the main configuration prerequisite and API-client construction. Its configuration check calls `load_config` with the original selection, preserving optional-default semantics and schema validation. Output flags are normalized before dispatch, and `--mock` endpoint setup still occurs before any optional probe.
+* Doctor storage checks share `StateService._resolve_state_path` (including its legacy-state migration behavior) and `CacheService._resolve_cache_dir`. Forward the CLI config path to the state resolver; do not duplicate XDG path logic. Tests isolate the working directory as well as HOME/XDG paths so relative-path probes cannot touch personal or repository state.
 * `tests/test_tui_actions.py`: Interactive TUI keyboard bindings, dwell navigation, and header status chips.
 * `tests/test_rh_support_cli.py`: Core integration tests for templates, creation, search, mock portal, and TUI.
 

@@ -143,3 +143,16 @@ class DoctorCliTests(unittest.TestCase):
                 data = json.loads(stdout)
                 self.assertEqual(rc, 1 if global_args or env_path else 0)
                 self.assertEqual(len(data["checks"]), 7)
+
+    def test_state_probe_follows_cli_config_directory(self):
+        config = Path(self.temp_home) / "custom" / "config.yaml"
+        config.parent.mkdir()
+        config.write_text("{}")
+        rc, stdout, _ = self._run_doctor(
+            "--json", global_args=("--config-file", str(config))
+        )
+        self.assertEqual(rc, 0)
+        state = next(
+            c for c in json.loads(stdout)["checks"] if c["category"] == "State Storage"
+        )
+        self.assertIn(str(config.parent / "state.yaml"), state["message"])
