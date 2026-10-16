@@ -171,6 +171,32 @@ class DraftsCliTests(unittest.TestCase):
         with patch("rh_support_lib.utils.os.open", side_effect=replace_before_open):
             self.assertEqual(find_drafts(drafts_dir=self.drafts_dir), [])
 
+    def test_clear_rechecks_ownership_acquired_while_confirmation_is_open(self):
+        from contextlib import ExitStack
+        from pathlib import Path
+        from types import SimpleNamespace
+
+        from rh_support_lib.commands.drafts import cmd_drafts
+        from rh_support_lib.utils import draft_lock
+
+        path = Path(self.drafts_dir) / "comment_draft_123_confirm.txt"
+        path.write_text("sole recovery copy")
+        with ExitStack() as owner:
+
+            def confirm(_):
+                self.assertTrue(owner.enter_context(draft_lock(path)))
+                return "yes"
+
+            with patch("builtins.input", side_effect=confirm):
+                cmd_drafts(
+                    SimpleNamespace(draft_action="clear"),
+                    {"drafts_dir": self.drafts_dir},
+                )
+            self.assertTrue(path.exists())
+        rc, _, stderr = self._run_cli("drafts", "clear", "-y")
+        self.assertEqual(rc, 0, stderr)
+        self.assertFalse(path.exists(), "Unlocked sidecar must not count as active")
+
     def test_drafts_discovery_filtering_and_show(self):
         """Verify drafts list, filtering by case, and drafts show preview."""
         # Create 2 drafts

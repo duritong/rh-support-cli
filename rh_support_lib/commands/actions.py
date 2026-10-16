@@ -1,6 +1,6 @@
 import os
 import sys
-from contextlib import redirect_stdout
+from contextlib import ExitStack, redirect_stdout
 
 from rh_support_lib.api import AuthenticationError
 from rh_support_lib.constants import STATUS_MAP
@@ -10,6 +10,7 @@ from rh_support_lib.utils import (
     EditorError,
     draft_body,
     draft_identity,
+    draft_lock,
     format_structured_output,
     open_editor,
     read_draft,
@@ -31,11 +32,11 @@ def cmd_download(args, api_client):
 
 def cmd_comment(args, api_client, config=None):
     output = sys.stdout
-    with redirect_stdout(sys.stderr):
-        return _cmd_comment(args, api_client, config, output)
+    with redirect_stdout(sys.stderr), ExitStack() as draft_stack:
+        return _cmd_comment(args, api_client, config, output, draft_stack)
 
 
-def _cmd_comment(args, api_client, config, output):
+def _cmd_comment(args, api_client, config, output, draft_stack):
 
     # 1. Process templates if specified
     template_content = ""
@@ -111,6 +112,15 @@ def _cmd_comment(args, api_client, config, output):
         if not os.path.isfile(args.file):
             sys.exit(f"Error: File '{args.file}' does not exist.")
         try:
+            from rh_support_lib.config import resolve_drafts_dir
+
+            if (
+                os.path.dirname(os.path.abspath(args.file))
+                == os.path.abspath(resolve_drafts_dir(config))
+                and os.path.basename(args.file).startswith("comment_draft_")
+                and not draft_stack.enter_context(draft_lock(args.file))
+            ):
+                sys.exit("Error: Comment file is active in another process.")
             with open(args.file, "r") as f:
                 file_content = draft_body(f.read()).strip()
         except (OSError, UnicodeError):
@@ -164,6 +174,16 @@ def _cmd_comment(args, api_client, config, output):
             )
             if existing_drafts:
                 latest_draft = existing_drafts[0]
+                try:
+                    if not draft_stack.enter_context(draft_lock(latest_draft["path"])):
+                        sys.exit("Error: Saved draft is active in another process.")
+                    _, info = read_draft(latest_draft["path"])
+                    if draft_identity(info) != tuple(latest_draft["identity"]):
+                        sys.exit(
+                            "Error: Saved draft changed; retry to resume it safely."
+                        )
+                except (OSError, UnicodeError):
+                    sys.exit("Error: Saved draft is unavailable; no changes submitted.")
                 draft_content = latest_draft.get("content", "").strip()
                 if draft_content:
                     extracted = draft_body(draft_content).strip()
@@ -182,6 +202,7 @@ def _cmd_comment(args, api_client, config, output):
                 header_content=header_content,
                 initial_body=file_content,
                 config=config,
+                draft_stack=draft_stack,
             )
         except EditorError as error:
             sys.exit(f"Editor Error: {error}")

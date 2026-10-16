@@ -12,6 +12,39 @@ from rh_support_lib import utils
 
 
 class EditorTests(unittest.TestCase):
+    def test_direct_open_editor_protects_atomic_saves_and_releases_on_failure(self):
+        from rh_support_lib.commands.drafts import cmd_drafts
+
+        directory = self.root / "direct"
+        directory.mkdir()
+        paths = []
+
+        def edit(argv):
+            path = Path(argv[-1])
+            paths.append(path)
+            replacement = path.with_suffix(".new")
+            replacement.write_text(path.read_text())
+            replacement.replace(path)
+            cmd_drafts(
+                SimpleNamespace(draft_action="clear", yes=True),
+                {"drafts_dir": str(directory)},
+            )
+            self.assertTrue(path.exists())
+            return 7
+
+        self.editor.side_effect = edit
+        with self.assertRaises(utils.EditorError):
+            utils.open_editor(
+                "123", None, initial_body="keep", config={"drafts_dir": str(directory)}
+            )
+        with utils.draft_lock(paths[-1]) as acquired:
+            self.assertTrue(acquired, "Failure leaked active ownership")
+        cmd_drafts(
+            SimpleNamespace(draft_action="clear", yes=True),
+            {"drafts_dir": str(directory)},
+        )
+        self.assertFalse(paths[-1].exists())
+
     def test_body_boundary_text_is_not_a_header(self):
         body = "Body\n# Leading lines starting with '#' will be ignored.\nkeep me\n"
         self.assertEqual(utils.strip_header_comments(body.splitlines(True)), body)
@@ -163,6 +196,63 @@ class EditorTests(unittest.TestCase):
 
 
 class EditorCommandTests(unittest.TestCase):
+    def test_cleanup_cannot_delete_source_or_atomically_replaced_editor_during_post(
+        self,
+    ):
+        import subprocess
+        import sys
+
+        from rh_support_lib.commands.actions import cmd_comment
+
+        drafts = self.root / "active"
+        drafts.mkdir()
+        source = drafts / "comment_draft_123_source.txt"
+        source.write_text("saved body")
+        paths = []
+
+        def clear():
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-B",
+                    str(Path(__file__).resolve().parents[1] / "rh-support-cli.py"),
+                    "drafts",
+                    "clear",
+                    "-y",
+                ],
+                env={**os.environ, "RH_SUPPORT_DRAFTS": str(drafts)},
+                capture_output=True,
+                text=True,
+                timeout=15,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("active", result.stdout)
+            self.assertTrue(source.exists())
+            self.assertTrue(paths[-1].exists())
+
+        def edit(argv):
+            path = Path(argv[-1])
+            paths.append(path)
+            replacement = path.with_suffix(".new")
+            replacement.write_text(path.read_text())
+            replacement.replace(path)
+            clear()
+            return 0
+
+        def post(*args, **kwargs):
+            clear()
+            return Mock(id="c1")
+
+        with (
+            patch("rh_support_lib.utils.subprocess.call", side_effect=edit),
+            patch("rh_support_lib.commands.actions.CaseService") as service,
+        ):
+            service.return_value.add_comment.side_effect = post
+            cmd_comment(self.args(), Mock(), {"drafts_dir": str(drafts)})
+        self.assertFalse(source.exists())
+        self.assertFalse(paths[-1].exists())
+
     def test_resume_retires_distinct_source_only_after_confirmed_post(self):
         from rh_support_lib.commands.actions import cmd_comment
         from rh_support_lib.errors import (

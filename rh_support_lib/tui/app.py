@@ -2311,6 +2311,7 @@ class SupportApp(App):
         self, comment_text: str, next_case_id: str | None = None, on_saved=None
     ) -> None:
         from rh_support_lib.config import resolve_drafts_dir
+        from rh_support_lib.utils import draft_lock
 
         drafts_dir = resolve_drafts_dir(self.config)
         case_id = self.selected_case_id
@@ -2346,16 +2347,19 @@ class SupportApp(App):
             path = None
             try:
                 pathlib.Path(drafts_dir).mkdir(parents=True, exist_ok=True)
-                with tempfile.NamedTemporaryFile(
-                    mode="w",
-                    encoding="utf-8",
-                    dir=drafts_dir,
-                    prefix=f"comment_draft_{case_id}_",
-                    suffix=".txt",
-                    delete=False,
-                ) as draft:
-                    path = draft.name
-                    draft.write(comment_text)
+                with draft_lock(os.path.join(drafts_dir, ".creation")) as acquired:
+                    if not acquired:
+                        raise OSError("Draft storage is busy; retry shortly.")
+                    with tempfile.NamedTemporaryFile(
+                        mode="w",
+                        encoding="utf-8",
+                        dir=drafts_dir,
+                        prefix=f"comment_draft_{case_id}_",
+                        suffix=".txt",
+                        delete=False,
+                    ) as draft:
+                        path = draft.name
+                        draft.write(comment_text)
             except OSError as e:
                 if path:
                     with contextlib.suppress(OSError):

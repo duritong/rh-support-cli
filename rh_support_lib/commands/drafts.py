@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from rh_support_lib.config import resolve_drafts_dir
-from rh_support_lib.utils import draft_identity, read_draft, remove_draft
+from rh_support_lib.utils import draft_identity, draft_lock, read_draft, remove_draft
 
 
 def find_drafts(
@@ -181,11 +181,24 @@ def cmd_drafts(args: Any, config: dict | None = None) -> int:
                 return 0
 
         deleted = 0
+        skipped = 0
         for d in drafts:
-            if remove_draft(d["path"], d["identity"]):
-                deleted += 1
+            try:
+                with draft_lock(os.path.join(drafts_dir, ".creation")) as gate:
+                    if not gate:
+                        skipped += 1
+                        continue
+                    with draft_lock(d["path"]) as acquired:
+                        if acquired and remove_draft(d["path"], d["identity"]):
+                            deleted += 1
+                        else:
+                            skipped += 1
+            except OSError:
+                skipped += 1
 
         print(f"✓ Deleted {deleted} saved comment draft(s).")
+        if skipped:
+            print(f"Skipped {skipped} active, changed, or unavailable draft(s).")
         return 0
 
     return 0

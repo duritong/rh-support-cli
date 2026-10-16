@@ -2,6 +2,8 @@
 
 This guide details the codebase architecture, design decisions, API protocols, and internal subsystems for developers and contributors maintaining the CLI and library components.
 
+Draft ownership uses nonblocking `flock` on stable same-user regular sidecars, never PID markers or locks on editor-replaced inodes. `open_editor` retains its tuple-return API and owns the path during editing; the CLI supplies an `ExitStack` to extend ownership through confirmed-post cleanup, and locks resumed sources before rereading their identity. A short directory creation gate coordinates publication with cleanup (including TUI saves). Cleanup acquires the gate and path lock after confirmation, then rechecks the discovery identity. Sidecars are never unlinked, so waiters cannot acquire different lock inodes. Callers outside the CLI can supply `draft_stack` for the same extended lifetime.
+
 ---
 
 ## 1. Project Architecture & File Tree

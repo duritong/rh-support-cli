@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import fcntl
 import html
 import json
 import os
@@ -8,6 +9,7 @@ import shlex
 import stat
 import subprocess
 import tempfile
+from contextlib import ExitStack, contextmanager
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timezone
 from html.parser import HTMLParser
@@ -300,6 +302,32 @@ def draft_identity(info):
     return (info.st_dev, info.st_ino, info.st_mtime_ns, info.st_size)
 
 
+@contextmanager
+def draft_lock(path):
+    """Stable sidecar ownership; never unlink locks or wait on another process."""
+    fd = os.open(
+        os.fspath(path) + ".lock",
+        os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW | os.O_CLOEXEC,
+        0o600,
+    )
+    try:
+        info = os.fstat(fd)
+        if (
+            not stat.S_ISREG(info.st_mode)
+            or info.st_uid != os.getuid()
+            or info.st_nlink != 1
+        ):
+            raise OSError("Unsafe draft lock")
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            yield False
+        else:
+            yield True
+    finally:
+        os.close(fd)
+
+
 def read_draft(path):
     """Read only a stable, same-user regular entry, never a symlink."""
     directory, name = os.path.split(os.path.abspath(path))
@@ -380,14 +408,10 @@ def edit_file(path: str) -> None:
         )
 
 
-def open_editor(
+def _prepare_editor_file(
     case_number, status_label, header_content=None, initial_body=None, *, config=None
 ):
-    """
-    Opens the system default editor for interactive comment entry.
-    Returns the content (possibly empty) and the path to the temporary file.
-    Raises EditorError on editing or reading failure, preserving the draft.
-    """
+    """Create generated recovery content while the creation gate is held."""
     from rh_support_lib.config import resolve_drafts_dir
 
     drafts_dir = resolve_drafts_dir(config)
@@ -419,17 +443,46 @@ def open_editor(
 
         tf_path = tf.name
 
-    edit_file(tf_path)
-    try:
-        with open(tf_path, "r") as f:
-            lines = f.readlines()
-    except (OSError, UnicodeError):
-        raise EditorError(
-            tf_path, "Could not read edited draft; check file permissions and encoding."
-        ) from None
+    return tf_path
 
-    content = strip_header_comments(lines)
-    return content.strip(), tf_path
+
+def open_editor(
+    case_number,
+    status_label,
+    header_content=None,
+    initial_body=None,
+    *,
+    config=None,
+    draft_stack=None,
+):
+    """Return (approved body, recovery path), holding ownership while editing.
+
+    A caller may supply an ExitStack to retain ownership through submission.
+    """
+    from rh_support_lib.config import resolve_drafts_dir
+
+    directory = resolve_drafts_dir(config)
+    os.makedirs(directory, exist_ok=True)
+    with ExitStack() as local_stack:
+        owner = draft_stack if draft_stack is not None else local_stack
+        with draft_lock(os.path.join(directory, ".creation")) as acquired:
+            if not acquired:
+                raise EditorError(directory, "Draft storage is busy; retry shortly.")
+            path = _prepare_editor_file(
+                case_number, status_label, header_content, initial_body, config=config
+            )
+            if not owner.enter_context(draft_lock(path)):
+                raise EditorError(path, "Draft is active in another process.")
+        edit_file(path)
+        try:
+            with open(path, "r") as stream:
+                lines = stream.readlines()
+        except (OSError, UnicodeError):
+            raise EditorError(
+                path,
+                "Could not read edited draft; check file permissions and encoding.",
+            ) from None
+        return strip_header_comments(lines).strip(), path
 
 
 def format_structured_output(data: Any, fmt: str = "json") -> str:
