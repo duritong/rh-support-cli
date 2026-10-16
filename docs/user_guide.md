@@ -548,6 +548,8 @@ Pressing `<TAB>` automatically suggests context-relevant values:
 ### 5.17 Environment & Health Diagnostics (`doctor`)
 Runs automated local diagnostic health checks inspecting credentials, configuration, directory permissions, and background sync timers:
 
+Cache write checks use a temporary file and leave existing cache files and symlinks untouched.
+
 ```bash
 # Run local diagnostic health checks:
 rh-support-cli doctor

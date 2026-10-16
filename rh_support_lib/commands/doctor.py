@@ -9,6 +9,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from typing import Any
 
 from rh_support_lib.config import load_config
@@ -156,10 +157,10 @@ def check_disk_cache() -> dict[str, Any]:
     cache_dir = os.path.join(cache_base, "rh-support-cli")
     try:
         os.makedirs(cache_dir, exist_ok=True)
-        test_file = os.path.join(cache_dir, ".perm_test")
-        with open(test_file, "w") as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", dir=cache_dir, prefix=".doctor-"
+        ) as f:
             f.write("ok")
-        os.remove(test_file)
     except Exception as e:  # noqa: BLE001
         return {
             "category": "Disk Cache",

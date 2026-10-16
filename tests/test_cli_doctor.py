@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 
 class DoctorCliTests(unittest.TestCase):
@@ -14,12 +16,23 @@ class DoctorCliTests(unittest.TestCase):
         super().setUp()
         self.temp_home = tempfile.mkdtemp(prefix="rh-doctor-test-")
         self.addCleanup(lambda: shutil.rmtree(self.temp_home, ignore_errors=True))
-        self.env = os.environ.copy()
+        self.env = {
+            key: value
+            for key, value in os.environ.items()
+            if not key.startswith(("RH_", "REDHAT_", "XDG_"))
+        }
         self.env["HOME"] = self.temp_home
         self.env["XDG_CONFIG_HOME"] = os.path.join(self.temp_home, ".config")
         self.env["XDG_CACHE_HOME"] = os.path.join(self.temp_home, ".cache")
         self.env["XDG_STATE_HOME"] = os.path.join(self.temp_home, ".local", "state")
         self.env["REDHAT_SUPPORT_OFFLINE_TOKEN"] = "mock_offline_token_value_12345"
+        bin_dir = Path(self.temp_home) / "bin"
+        bin_dir.mkdir()
+        systemctl = bin_dir / "systemctl"
+        systemctl.write_text("#!/bin/sh\nprintf 'inactive\\n'\nexit 3\n")
+        systemctl.chmod(0o700)
+        self.env["PATH"] = str(bin_dir)
+        self.env["PYTHONDONTWRITEBYTECODE"] = "1"
         self.cli_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
             "rh-support-cli.py",
@@ -29,7 +42,7 @@ class DoctorCliTests(unittest.TestCase):
         import subprocess
 
         cmd = [
-            os.environ.get("PYTHONEXECUTABLE") or "python3",
+            sys.executable,
             self.cli_path,
             "doctor",
             *extra_args,

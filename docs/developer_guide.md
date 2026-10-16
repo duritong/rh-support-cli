@@ -290,7 +290,7 @@ All tests live in the `tests/` package. The test suite is organized into focused
 * `tests/test_cli_attachments.py`: Attachment list, upload, multipart streaming, download safety, and deletion.
 * `tests/test_cli_tracking.py`: Case tracking, following, sync, unread checkpoints, and state persistence.
 * `tests/test_cli_systemd.py`: Systemd service and timer unit generation and management.
-* `tests/test_cli_doctor.py`: Local health, credentials, permissions, and background sync diagnostics.
+* `tests/test_cli_doctor.py` and `tests/test_doctor_checks.py`: Sandboxed local health, credentials, permissions, and background sync diagnostics. CLI subprocesses use `sys.executable` and a sandboxed inactive `systemctl`, with isolated HOME/XDG paths and no inherited Red Hat configuration. Cache probes use exclusively created temporary files with automatic cleanup, never a predictable writable filename.
 * `tests/test_cli_drafts.py`: Preserved comment drafts discovery, preview, and cleanup.
 * `tests/test_tui_actions.py`: Interactive TUI keyboard bindings, dwell navigation, and header status chips.
 * `tests/test_rh_support_cli.py`: Core integration tests for templates, creation, search, mock portal, and TUI.
