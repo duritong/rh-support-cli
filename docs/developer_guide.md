@@ -241,6 +241,8 @@ KCS searches run in modal-owned thread workers. Results are dispatched onto the 
 
 Initial queue loads, explicit refreshes, and background polling share the same case-list reader and captured search query. Polling cannot replace a keyword search with the ordinary queue; query changes invalidate in-flight results through list-request ownership.
 
+`SearchService.search_cases(following=True)` searches the filtered followed-case set by number/summary before applying the result limit, rather than filtering a truncated general search. Local-only calls use tracked metadata and local identity without live case reads. TUI search loads and polls both forward this membership constraint.
+
 Comment composer status choices/defaults use the matching loaded case details, not queue membership. Directly jumped cases outside the active filters therefore retain the same reply-status policy, including keeping closed cases closed.
 
 Deferred KCS-link insertion requires matching displayed/selected case details and an open composer, and captures the case plus draft generation. Rejected or superseded insertions neither change hidden/new drafts nor announce success.

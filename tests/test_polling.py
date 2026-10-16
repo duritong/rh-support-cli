@@ -115,6 +115,23 @@ class PollingTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIn("Search: 'kernel'", self.app.sub_title)
                 self.service.list_cases.assert_not_called()
 
+    async def test_search_load_and_poll_preserve_following_bookmark(self):
+        async with self.app.run_test():
+            self.app.config["bookmarks"] = {
+                "followed": {"following": True, "owner": "team"}
+            }
+            self.app.active_bookmark = "followed"
+            self.app.active_search_query = "kernel"
+            with patch.object(
+                self.app.search_service, "search_cases", return_value=[]
+            ) as search:
+                await self.start(self.app.fetch_cases)
+                await self.start(self.app.poll_cases_background)
+                self.assertEqual(search.call_count, 2)
+                for call in search.call_args_list:
+                    self.assertTrue(call.kwargs["following"])
+                    self.assertEqual(call.kwargs["owner"], "team")
+
     async def test_query_change_discards_old_search_completion_during_poll(self):
         async with self.app.run_test():
             self.service.list_cases.return_value = []

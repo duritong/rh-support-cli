@@ -31,8 +31,30 @@ class SearchService:
         product: str | None = None,
         limit: int = 20,
         local_only: bool = False,
+        following: bool = False,
     ) -> list[Case]:
         """Searches support cases via GraphQL API and local cache."""
+        if following:
+            if limit <= 0:
+                return []
+            cases = self.case_service.list_followed_cases(
+                username=self.case_service.get_current_user(local_only=True)
+                if local_only
+                else None,
+                fetch_live=not local_only,
+                account=account,
+                status=status,
+                severity=severity,
+                owner=owner,
+                product=product,
+            )
+            term = str(query).strip().casefold()
+            return [
+                case
+                for case in cases
+                if term in str(case.case_number or case.id).casefold()
+                or term in str(case.summary or "").casefold()
+            ][:limit]
         return self.case_service.search_cases(
             query=query,
             account=account,

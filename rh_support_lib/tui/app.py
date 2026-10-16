@@ -1114,6 +1114,7 @@ class SupportApp(App):
                 owner=params.get("owner"),
                 product=params.get("product"),
                 limit=50,
+                following=bool(params.get("following")),
             )
         list_kwargs = {k: v for k, v in params.items() if k != "following"}
         if params.get("following"):

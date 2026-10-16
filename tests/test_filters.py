@@ -94,6 +94,61 @@ class FilterContractTests(unittest.TestCase):
         )
         self.assertEqual([case.case_number for case in result], ["1"])
 
+    def test_followed_search_applies_query_and_filters_before_limit(self):
+        from rh_support_lib.services.search import SearchService
+
+        unrelated = [
+            Case(
+                str(100 + index),
+                "Unrelated",
+                "In Progress",
+                "2 (High)",
+                product="OCP",
+                owner="team-a",
+                account_number="7",
+            )
+            for index in range(60)
+        ]
+        cases = {case.case_number: case for case in unrelated + [self.b, self.a]}
+        self.service.state_service.get_followed_cases.return_value = {
+            number: TrackedCase(number) for number in cases
+        }
+        self.service.get_case_details = mock.Mock(
+            side_effect=lambda number, **kwargs: CaseDetails(cases[number], "")
+        )
+        self.service.list_cases = mock.Mock(
+            side_effect=AssertionError("Must not search general queue")
+        )
+        search = SearchService(mock.Mock(), case_service=self.service)
+        result = search.search_cases(
+            "diagnostic",
+            following=True,
+            limit=1,
+            account="7",
+            status=["In Progress"],
+            severity=["2"],
+            product="OCP",
+            owner="team-a",
+        )
+        self.assertEqual([case.case_number for case in result], ["1"])
+        self.service.list_cases.assert_not_called()
+
+    def test_local_followed_search_uses_only_local_identity_and_tracking(self):
+        from rh_support_lib.services.search import SearchService
+
+        self.service.get_current_user = mock.Mock(return_value="offline")
+        self.service.state_service.get_followed_cases.return_value = {
+            "1": TrackedCase("1")
+        }
+        self.service.get_case_details = mock.Mock(
+            side_effect=AssertionError("Live read")
+        )
+        search = SearchService(mock.Mock(), case_service=self.service)
+        result = search.search_cases("1", following=True, local_only=True)
+        self.assertEqual([case.case_number for case in result], ["1"])
+        self.service.get_current_user.assert_called_once_with(local_only=True)
+        self.service.get_case_details.assert_not_called()
+
     def test_cli_list_forwards_bookmark_product_and_following_filters(self):
         from rh_support_lib.commands.list_cases import cmd_list
 
