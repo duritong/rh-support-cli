@@ -300,6 +300,7 @@ rh-support-cli create --no-default-template
 Posts a comment to an existing case and conditionally transitions its status:
 
 * **Default Transition Behavior**: A comment only switches the case status if the case is currently in a waiting-on-customer state (`Waiting on Customer` or `Waiting on Customer Action Required`), transitioning it to `Waiting on Red Hat` (`In Progress`). If the case is already `Waiting on Red Hat`, `In Progress`, `Waiting on Engineering`, `Closed`, or another state, adding a comment leaves the case status unchanged without submitting an unneeded status mutation.
+  For editor-based CLI comments, this default is checked again after editing, immediately before submission. A status change made by someone else while you edit therefore takes precedence over the initial default shown in the editor.
 * **Explicit Status**: You can explicitly transition status by providing `-s <status>` / `--status <status>` (e.g. `-s closed`, `-s customer`, `-s redhat`) or via a template's `status:` directive.
 * **Preserve Status**: Pass `--no-status-change`, `--keep-status`, or `-s none`/`-s keep` to guarantee no status change occurs even when the case is waiting on customer action.
 * **Consistent TUI Experience**: The interactive TUI comment composer follows the exact same rule: it defaults the status dropdown to `In Progress` only if the case is currently waiting on customer; otherwise it defaults to retaining the current case status and avoids submitting an unnecessary status mutation unless you actively select a different status.

@@ -84,6 +84,11 @@ def _cmd_comment(args, api_client, config, output, draft_stack):
     no_status_change = getattr(args, "no_status_change", False) or getattr(
         args, "keep_status", False
     )
+    implicit_status = (
+        not no_status_change
+        and not getattr(args, "status", None)
+        and not template_status
+    )
     if no_status_change:
         final_status = None
     elif getattr(args, "status", None):
@@ -146,7 +151,8 @@ def _cmd_comment(args, api_client, config, output, draft_stack):
         if not file_content:
             sys.exit("Error: Empty comment file. No changes submitted.")
 
-    if args.edit or (not args.file and not getattr(args, "template", None)):
+    uses_editor = args.edit or (not args.file and not getattr(args, "template", None))
+    if uses_editor:
         # Prepare context if needed
         header_content = None
         if args.include_previous_comments and args.include_previous_comments > 0:
@@ -234,6 +240,11 @@ def _cmd_comment(args, api_client, config, output, draft_stack):
         sys.exit("Error: Empty comment. No comment or status change submitted.")
 
     # 1. Post Comment and update status via CaseService
+    if implicit_status and uses_editor:
+        current_status = case_service.get_case_status(args.case)
+        final_status = (
+            STATUS_IN_PROGRESS if is_waiting_on_customer(current_status) else None
+        )
     submitted_identity = approval_info.get("identity")
     print(f"Posting comment to Case #{args.case}...")
     partial_error = None
