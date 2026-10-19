@@ -259,6 +259,8 @@ Initial queue loads, explicit refreshes, and background polling share the same c
 
 Comment composer status choices/defaults use the matching loaded case details, not queue membership. Directly jumped cases outside the active filters therefore retain the same reply-status policy: switching to `In Progress` only if the case is currently waiting on customer action, and retaining the current status otherwise without submitting redundant status mutations.
 
+CLI default comment transitions resolve status through `CaseService.get_case_status()`, using a live lightweight probe followed by uncached case details if the probe has no status. Raw cached statuses must never authorize an implicit status mutation.
+
 Deferred KCS-link insertion requires matching displayed/selected case details and an open composer, and captures the case plus draft generation. Rejected or superseded insertions neither change hidden/new drafts nor announce success.
 
 KCS table metadata and query-bearing messages use literal Rich `Text` rather than markup strings, preserving bracketed diagnostics and preventing externally supplied titles/products from being parsed as terminal markup.

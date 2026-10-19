@@ -49,6 +49,37 @@ class ReadFailureTests(unittest.TestCase):
         )
         self.assertIsNone(self.service.get_case_details("123"))
 
+    def test_status_lookup_does_not_use_stale_cache_after_failed_probe(self):
+        self.cache.get_case_record.return_value = {
+            "cached_at": 0,
+            "case": {"status": "Waiting on Customer"},
+        }
+        for status in ("Closed", "Waiting on Engineering"):
+            with (
+                self.subTest(status=status),
+                mock.patch.object(
+                    self.service, "check_case_last_modified", return_value=None
+                ),
+                mock.patch.object(
+                    self.service,
+                    "get_case_details",
+                    return_value=CaseDetails(
+                        case=Case(
+                            case_number="123",
+                            summary="Case",
+                            status=status,
+                            severity="Normal",
+                        ),
+                        description="",
+                    ),
+                ) as details,
+            ):
+                self.assertEqual(self.service.get_case_status("123"), status)
+                details.assert_called_once_with(
+                    "123", first_comments=1, all_comments=False, use_cache=False
+                )
+        self.cache.get_case_record.assert_not_called()
+
     def test_reregistering_new_metadata_does_not_acknowledge_unseen_updates(self):
         import os
         import tempfile
