@@ -191,6 +191,7 @@ print("GUARDED")
         """Verify installed wheel can import rh_support_lib and read bundled catalog without git repo."""
         code = """
 import rh_support_lib
+import argcomplete.scripts.activate_global_python_argcomplete
 import requests_toolbelt
 from rh_support_lib.completers import DEFAULT_FALLBACK_PRODUCTS, product_completer
 import os

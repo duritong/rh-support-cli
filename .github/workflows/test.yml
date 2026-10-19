@@ -49,6 +49,14 @@ jobs:
       run: |
         python -m pip install --upgrade pip setuptools wheel
         pip install -e .
+
+    - name: Smoke-test installed shell completion
+      shell: bash
+      run: |
+        activate-global-python-argcomplete --help
+        completion="$(rh-support-cli completion)"
+        test -n "$completion"
+        bash -n <<< "$completion"
         
     - name: Run tests
       run: |

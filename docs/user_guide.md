@@ -531,6 +531,12 @@ rh-support-cli --simple-output show -c 12345678
 ```
 
 ### 5.16 Shell Auto-Completion (`completion`)
+Python 3.9 installations use argcomplete 3.7.0. Release 3.7.1 has a Python 3.9
+import bug in its global activation script and is excluded by this project's
+dependencies. To repair an existing affected environment, run
+`python -m pip install "argcomplete==3.7.0"` using the same Python environment as
+`rh-support-cli`.
+
 Generates shell auto-completion for commands, options, and dynamic values:
 ```bash
 # Print bash completion script:

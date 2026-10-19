@@ -418,6 +418,16 @@ urllib3 2.x (`contrib.appengine` was removed); its tested floor is 1.0.0.
 Argcomplete 1.12.0 produces empty Bash choice completions on Python 3.14;
 the supported, tested cross-version floor is 3.7.0.
 
+Argcomplete 3.7.1 is explicitly excluded: its global activation module evaluates
+PEP 604 union annotations on import and fails on Python 3.9. Since 3.7.2 requires
+Python >=3.10, Python 3.9 resolves to 3.7.0; newer interpreters can use newer
+releases. After dependency installation, every CI Python version runs
+`activate-global-python-argcomplete --help` to exercise the installed activation
+command without modifying shell configuration. The same CI step runs the freshly
+installed `rh-support-cli completion` entry point, requires nonempty output, and
+checks the generated script with `bash -n`. Wheel tests also import the activation
+module in the installed environment.
+
 Clean Python 3.9.25 validation used the exact direct floors: Requests 2.25.0,
 requests-toolbelt 1.0.0, PyYAML 5.4.1, Jinja2 3.0.0, dateparser 1.0.0,
 argcomplete 3.7.0, Rich 13.3.3, Textual 6.0.0, and markdown-it-py 2.2.0
@@ -471,7 +481,7 @@ git commit -m "Update Red Hat product catalog"
 | `pyyaml` | `>=5.4.1` | YAML loading with `yaml.safe_load` security mitigations. |
 | `jinja2` | `>=3.0.0` | Jinja2 template engine with Python 3.9 context isolation and typing support. |
 | `dateparser` | `>=1.0.0` | Date and timezone parsing for comment timestamps and checkpoints. |
-| `argcomplete` | `>=1.12.0` | Shell tab-completion supporting `_ARGCOMPLETE_STDOUT_FILENAME` and vertical-tab IPC. |
+| `argcomplete` | `>=3.7.0,!=3.7.1` | Shell tab-completion supporting `_ARGCOMPLETE_STDOUT_FILENAME` and vertical-tab IPC; excludes the activation-module import failure on Python 3.9. |
 | `rich` | `>=12.0.0` | Terminal rendering, `Table.grid`, `Text.rstrip()`, `ROUNDED` box styling, and pagination. |
 | `textual` | `>=0.40.0` | TUI framework supporting `ModalScreen`, event decorators, and DataTable operations. |
 | `markdown-it-py` | `>=2.0.0` | Markdown rendering engine supporting `"gfm-like"` preset with soft breaks. |
