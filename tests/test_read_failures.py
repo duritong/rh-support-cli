@@ -80,6 +80,43 @@ class ReadFailureTests(unittest.TestCase):
                 )
         self.cache.get_case_record.assert_not_called()
 
+    def test_status_lookup_requires_a_resolved_remote_status(self):
+        for result in (None, mock.Mock(case=mock.Mock(status=None))):
+            with (
+                self.subTest(result=result),
+                mock.patch.object(
+                    self.service, "check_case_last_modified", return_value=None
+                ),
+                mock.patch.object(
+                    self.service, "get_case_details", return_value=result
+                ),
+                self.assertRaises(ReadError),
+            ):
+                self.service.get_case_status("123")
+
+    def test_status_lookup_propagates_read_and_authentication_failures(self):
+        for stage, error in (
+            ("probe", AuthenticationError("Authentication required.")),
+            ("details", AuthenticationError("Authentication required.")),
+            ("details", ReadError("Remote case data is unavailable.")),
+        ):
+            with (
+                self.subTest(stage=stage, error=type(error).__name__),
+                mock.patch.object(
+                    self.service,
+                    "check_case_last_modified",
+                    side_effect=error if stage == "probe" else None,
+                    return_value=None,
+                ),
+                mock.patch.object(
+                    self.service,
+                    "get_case_details",
+                    side_effect=error if stage == "details" else None,
+                ),
+                self.assertRaises(type(error)),
+            ):
+                self.service.get_case_status("123")
+
     def test_reregistering_new_metadata_does_not_acknowledge_unseen_updates(self):
         import os
         import tempfile

@@ -156,7 +156,12 @@ class ConfigurationTests(unittest.IsolatedAsyncioTestCase):
                     status=None,
                     format="plain",
                 )
-                with patch.object(CaseService, "add_comment") as post:
+                with (
+                    patch.object(CaseService, "add_comment") as post,
+                    patch.object(
+                        CaseService, "get_case_status", return_value="In Progress"
+                    ),
+                ):
                     command(args, self.client, self.config)
                 post.assert_called_once_with(
                     "123",
@@ -226,6 +231,7 @@ class ConfigurationTests(unittest.IsolatedAsyncioTestCase):
         Path(args.file).write_text("Existing body", encoding="utf-8")
         with (
             patch.object(CaseService, "add_comment") as post,
+            patch.object(CaseService, "get_case_status", return_value="In Progress"),
             patch.object(CaseService, "follow_case") as follow,
             patch.object(CaseService, "unfollow_case") as unfollow,
         ):

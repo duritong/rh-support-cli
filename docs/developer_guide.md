@@ -261,6 +261,8 @@ Comment composer status choices/defaults use the matching loaded case details, n
 
 CLI default comment transitions resolve status through `CaseService.get_case_status()`, using a live lightweight probe followed by uncached case details if the probe has no status. Raw cached statuses must never authorize an implicit status mutation.
 
+`get_case_status()` returns a resolved status or raises `ReadError`; missing cases/statuses are not treated as keep-status decisions. Authentication failures propagate unchanged, without falling back. The CLI aborts before posting on failed implicit-status reads and reports the preserved draft path if the post-editor check fails.
+
 Editor-based CLI comments re-resolve implicit status after content approval and before posting, rather than treating the editor's initial default as a user-requested transition. Explicit CLI/template status choices and keep-status overrides bypass this lookup.
 
 Deferred KCS-link insertion requires matching displayed/selected case details and an open composer, and captures the case plus draft generation. Rejected or superseded insertions neither change hidden/new drafts nor announce success.

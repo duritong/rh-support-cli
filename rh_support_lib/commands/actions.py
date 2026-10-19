@@ -4,7 +4,11 @@ from contextlib import ExitStack, redirect_stdout
 
 from rh_support_lib.api import AuthenticationError
 from rh_support_lib.constants import STATUS_MAP
-from rh_support_lib.errors import CommentOutcomeUnknownError, PartialCommentError
+from rh_support_lib.errors import (
+    CommentOutcomeUnknownError,
+    PartialCommentError,
+    ReadError,
+)
 from rh_support_lib.services.cases import CaseService
 from rh_support_lib.statuses import STATUS_IN_PROGRESS, is_waiting_on_customer
 from rh_support_lib.utils import (
@@ -34,7 +38,14 @@ def cmd_download(args, api_client):
 def cmd_comment(args, api_client, config=None):
     output = sys.stdout
     with redirect_stdout(sys.stderr), ExitStack() as draft_stack:
-        return _cmd_comment(args, api_client, config, output, draft_stack)
+        try:
+            return _cmd_comment(args, api_client, config, output, draft_stack)
+        except ReadError:
+            sys.exit(
+                "Error: Current case status is unavailable. "
+                "No comment or status change submitted. Retry when reads are available, "
+                "or explicitly choose --status or --no-status-change."
+            )
 
 
 def _cmd_comment(args, api_client, config, output, draft_stack):
@@ -241,7 +252,12 @@ def _cmd_comment(args, api_client, config, output, draft_stack):
 
     # 1. Post Comment and update status via CaseService
     if implicit_status and uses_editor:
-        current_status = case_service.get_case_status(args.case)
+        try:
+            current_status = case_service.get_case_status(args.case)
+        except (ReadError, AuthenticationError):
+            if temp_file_path:
+                print(f"Draft comment preserved at: {temp_file_path}", file=sys.stderr)
+            raise
         final_status = (
             STATUS_IN_PROGRESS if is_waiting_on_customer(current_status) else None
         )

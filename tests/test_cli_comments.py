@@ -326,7 +326,14 @@ class TestCliComments(MockServerTestCase):
 
         try:
             # 3. Run comment command on a failing case ID
-            cmd = [sys.executable, self.cli_path, "comment", "-c", "FAIL_COMMENT"]
+            cmd = [
+                sys.executable,
+                self.cli_path,
+                "comment",
+                "-c",
+                "FAIL_COMMENT",
+                "--no-status-change",
+            ]
             result = subprocess.run(
                 cmd, env=env_with_editor, capture_output=True, text=True, check=False
             )

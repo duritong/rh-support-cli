@@ -1260,21 +1260,19 @@ class CaseService:
             return details.case.id
         raise ReadError("Case internal ID could not be resolved.")
 
-    def get_case_status(self, case_number: str) -> str | None:
+    def get_case_status(self, case_number: str) -> str:
         """Resolves current case status from a remote probe or uncached details."""
         c_num = str(case_number).strip()
-        with contextlib.suppress(Exception):
-            probe = self.check_case_last_modified(c_num)
-            if probe and probe[2]:
-                return probe[2]
+        probe = self.check_case_last_modified(c_num)
+        if probe and probe[2]:
+            return probe[2]
 
-        with contextlib.suppress(Exception):
-            details = self.get_case_details(
-                c_num, first_comments=1, all_comments=False, use_cache=False
-            )
-            if details and details.case and details.case.status:
-                return details.case.status
-        return None
+        details = self.get_case_details(
+            c_num, first_comments=1, all_comments=False, use_cache=False
+        )
+        if details and details.case and details.case.status:
+            return details.case.status
+        raise ReadError("Current case status is unavailable.")
 
     def add_comment(
         self,
