@@ -249,14 +249,18 @@ bookmarks:
         self.assertEqual(determine_reply_status("Waiting on Customer"), "In Progress")
         self.assertEqual(
             determine_reply_status("Waiting on Red Hat"),
-            "Waiting on Customer Action Required",
+            "Waiting on Red Hat",
         )
         self.assertEqual(
             determine_reply_status("In Progress"),
-            "Waiting on Customer Action Required",
+            "In Progress",
+        )
+        self.assertEqual(
+            determine_reply_status("Waiting on Engineering"),
+            "Waiting on Engineering",
         )
         self.assertEqual(determine_reply_status("Closed"), "Closed")
-        self.assertEqual(determine_reply_status(None), "In Progress")
+        self.assertIsNone(determine_reply_status(None))
 
         # Choices for standard case
         choices = get_status_choices_for_case("Waiting on Red Hat")

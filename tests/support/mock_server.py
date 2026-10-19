@@ -33,6 +33,7 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
     latest_mock_comment_id = "comment_2"
     latest_mock_comment_date = "2023-01-03T10:00:00Z"
     mock_storage: ClassVar[dict] = {}
+    mock_case_statuses: ClassVar[dict[str, str]] = {}
 
     def log_message(self, format, *args):
         # Silence server logs to keep test output clean
@@ -410,7 +411,10 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                                                                 )
                                                             },
                                                             "Status": {
-                                                                "value": "Waiting on Red Hat"
+                                                                "value": MockRedHatHandler.mock_case_statuses.get(
+                                                                    case_num,
+                                                                    "Waiting on Red Hat",
+                                                                )
                                                             },
                                                             "CaseComments__r": {
                                                                 "edges": [
@@ -566,7 +570,11 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                     "Id": f"500{case_num}",
                     "CaseNumber__c": {"value": str(case_num)},
                     "Subject": {"value": "Test Case Details"},
-                    "Status": {"value": "Waiting on Red Hat"},
+                    "Status": {
+                        "value": MockRedHatHandler.mock_case_statuses.get(
+                            case_num, "Waiting on Red Hat"
+                        )
+                    },
                     "Priority": {"value": "High"},
                     "Type": {"value": "Standard"},
                     "Description": {"value": "This is a detailed description."},

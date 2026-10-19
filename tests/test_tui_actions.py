@@ -449,7 +449,7 @@ class TuiActionTests(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause()
             for status, expected in (
                 ("Closed", "Closed"),
-                ("Waiting on Red Hat", "Waiting on Customer Action Required"),
+                ("Waiting on Red Hat", "Waiting on Red Hat"),
                 ("Waiting on Customer Action Required", "In Progress"),
             ):
                 with self.subTest(status=status):
@@ -459,6 +459,53 @@ class TuiActionTests(unittest.IsolatedAsyncioTestCase):
                     await pilot.pause()
                     self.assertEqual(self.app.query_one(Select).value, expected)
                     self.app.action_exit_commenting()
+
+    async def test_tui_comment_submission_status_transitions(self):
+        """Verify TUI execute_comment_submission only applies status when transitioning or explicitly changed."""
+        async with self.app.run_test() as pilot:
+            self.app.cases = [details("1").case]
+            await pilot.pause()
+
+            # 1. Case is Waiting on Red Hat, target status matches -> status=None passed to add_comment
+            self.app.selected_case_id = "1"
+            self.app.render_case_details(details("1", status="Waiting on Red Hat"), [])
+            await pilot.pause()
+            with patch.object(self.app.case_service, "add_comment") as mock_add:
+                self.app.execute_comment_submission(
+                    "1",
+                    "comment body",
+                    "Waiting on Red Hat",
+                    self.app._comment_generation,
+                )
+                mock_add.assert_called_once_with(
+                    "1", "comment body", is_public=True, status=None
+                )
+
+            # 2. Case is Waiting on Customer, target status is In Progress -> status="In Progress"
+            self.app.selected_case_id = "1"
+            self.app.render_case_details(
+                details("1", status="Waiting on Customer Action Required"), []
+            )
+            await pilot.pause()
+            with patch.object(self.app.case_service, "add_comment") as mock_add:
+                self.app.execute_comment_submission(
+                    "1", "reply body", "In Progress", self.app._comment_generation
+                )
+                mock_add.assert_called_once_with(
+                    "1", "reply body", is_public=True, status="In Progress"
+                )
+
+            # 3. Case is Waiting on Red Hat, user explicitly chose Closed -> status="Closed"
+            self.app.selected_case_id = "1"
+            self.app.render_case_details(details("1", status="Waiting on Red Hat"), [])
+            await pilot.pause()
+            with patch.object(self.app.case_service, "add_comment") as mock_add:
+                self.app.execute_comment_submission(
+                    "1", "close body", "Closed", self.app._comment_generation
+                )
+                mock_add.assert_called_once_with(
+                    "1", "close body", is_public=True, status="Closed"
+                )
 
     async def test_case_search_modal_filters_table_and_escape_clears(self):
         from rh_support_lib.tui.app import CaseSearchModal

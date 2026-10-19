@@ -156,6 +156,90 @@ class TestCliComments(MockServerTestCase):
             if os.path.exists("status_none_comment.txt"):
                 os.remove("status_none_comment.txt")
 
+    def test_comment_default_does_not_switch_status_on_waiting_on_red_hat(self):
+        """Verify default comment submission does NOT mutate status when case is Waiting on Red Hat."""
+        test_file = "redhat_status_comment.txt"
+        with open(test_file, "w") as f:
+            f.write("Informational update on case already waiting on Red Hat.")
+
+        try:
+            MockRedHatHandler.last_update_payload = None
+            MockRedHatHandler.mock_case_statuses["01234567"] = "Waiting on Red Hat"
+            result = self.run_cli(["comment", "-c", "01234567", "-f", test_file])
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Success: Comment added.", result.stdout)
+            self.assertNotIn("Case status updated to", result.stdout)
+            self.assertIsNone(MockRedHatHandler.last_update_payload)
+        finally:
+            MockRedHatHandler.mock_case_statuses.pop("01234567", None)
+            if os.path.exists(test_file):
+                os.remove(test_file)
+
+    def test_comment_default_switches_status_when_waiting_on_customer(self):
+        """Verify default comment submission transitions to In Progress when case is Waiting on Customer."""
+        test_file = "customer_reply_comment.txt"
+        with open(test_file, "w") as f:
+            f.write("Customer replying with requested diagnostic info.")
+
+        try:
+            MockRedHatHandler.last_update_payload = None
+            MockRedHatHandler.mock_case_statuses["01234567"] = (
+                "Waiting on Customer Action Required"
+            )
+            result = self.run_cli(["comment", "-c", "01234567", "-f", test_file])
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Success: Comment added.", result.stdout)
+            self.assertIn(
+                "Success: Case status updated to 'In Progress'.", result.stdout
+            )
+            self.assertIsNotNone(MockRedHatHandler.last_update_payload)
+            patch = MockRedHatHandler.last_update_payload.get("RedHatSupportCase", {})
+            self.assertEqual(patch.get("Status"), "In Progress")
+        finally:
+            MockRedHatHandler.mock_case_statuses.pop("01234567", None)
+            if os.path.exists(test_file):
+                os.remove(test_file)
+
+    def test_comment_default_does_not_switch_status_on_waiting_on_engineering(
+        self,
+    ):
+        """Verify default comment submission does NOT mutate status when case is Waiting on Engineering."""
+        test_file = "engineering_comment.txt"
+        with open(test_file, "w") as f:
+            f.write("Customer following up on engineering case.")
+
+        try:
+            MockRedHatHandler.last_update_payload = None
+            MockRedHatHandler.mock_case_statuses["01234567"] = "Waiting on Engineering"
+            result = self.run_cli(["comment", "-c", "01234567", "-f", test_file])
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Success: Comment added.", result.stdout)
+            self.assertNotIn("Case status updated to", result.stdout)
+            self.assertIsNone(MockRedHatHandler.last_update_payload)
+        finally:
+            MockRedHatHandler.mock_case_statuses.pop("01234567", None)
+            if os.path.exists(test_file):
+                os.remove(test_file)
+
+    def test_comment_default_does_not_switch_status_on_closed(self):
+        """Verify default comment submission does NOT mutate status when case is Closed."""
+        test_file = "closed_comment.txt"
+        with open(test_file, "w") as f:
+            f.write("Customer adding follow-up note on closed case.")
+
+        try:
+            MockRedHatHandler.last_update_payload = None
+            MockRedHatHandler.mock_case_statuses["01234567"] = "Closed"
+            result = self.run_cli(["comment", "-c", "01234567", "-f", test_file])
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Success: Comment added.", result.stdout)
+            self.assertNotIn("Case status updated to", result.stdout)
+            self.assertIsNone(MockRedHatHandler.last_update_payload)
+        finally:
+            MockRedHatHandler.mock_case_statuses.pop("01234567", None)
+            if os.path.exists(test_file):
+                os.remove(test_file)
+
     def test_close_case_command(self):
         """Test close subcommand: posts closing comment and sets status to Closed"""
         with open("close_comment.txt", "w") as f:

@@ -143,7 +143,7 @@ class ConfigurationTests(unittest.IsolatedAsyncioTestCase):
 
     def test_comment_and_close_render_custom_templates(self):
         for command, status in (
-            (cmd_comment, "In Progress"),
+            (cmd_comment, None),
             (cmd_close, "Closed"),
         ):
             with self.subTest(command=command.__name__):

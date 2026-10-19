@@ -45,6 +45,7 @@ from rh_support_lib.services.attachments import AttachmentService
 from rh_support_lib.services.cases import CaseService
 from rh_support_lib.services.search import SearchService
 from rh_support_lib.statuses import (
+    STATUS_MAP,
     determine_reply_status,
     get_status_choices_for_case,
 )
@@ -2185,7 +2186,7 @@ class SupportApp(App):
                         status_choices,
                         id="tui-comment-status-select",
                         prompt="Select Status",
-                        value=target_status,
+                        value=target_status if target_status else Select.BLANK,
                     ),
                     id="comment-pane-header-row",
                 ),
@@ -2209,20 +2210,41 @@ class SupportApp(App):
         with contextlib.suppress(Exception):
             select = self.query_one("#tui-comment-status-select", Select)
             valid_values = [val for _, val in select._options]
-            if target_status not in valid_values:
+            if target_status and target_status not in valid_values:
                 select.set_options(get_status_choices_for_case(target_status))
-            select.value = target_status
+            select.value = target_status if target_status else Select.BLANK
 
     def execute_comment_submission(
-        self, case_id: str, raw_body: str, target_status: str, generation: int
+        self, case_id: str, raw_body: str, target_status: str | None, generation: int
     ) -> None:
+        case = None
+        if self.current_details and self.current_details.case:
+            c = self.current_details.case
+            if str(case_id) in (str(c.case_number), str(c.id)):
+                case = c
+        elif self._displayed_case_selected():
+            case = self.current_details.case
+
+        current_status = case.status if case else None
+
+        status_to_apply = None
+        if target_status and target_status != Select.BLANK:
+            norm_target = STATUS_MAP.get(str(target_status).lower(), str(target_status))
+            norm_current = (
+                STATUS_MAP.get(str(current_status).lower(), str(current_status))
+                if current_status
+                else None
+            )
+            if norm_target != norm_current:
+                status_to_apply = str(target_status)
+
         with self.track_job(f"Posting comment on #{case_id}..."):
             try:
                 self.case_service.add_comment(
                     case_id,
                     raw_body.strip(),
                     is_public=True,
-                    status=target_status if target_status else None,
+                    status=status_to_apply,
                 )
             except Exception as e:  # noqa: BLE001
                 self._safe_call(

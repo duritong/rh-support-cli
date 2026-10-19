@@ -50,6 +50,7 @@ from rh_support_lib.statuses import (
     determine_reply_status,
     get_status_choices_for_case,
     get_status_color,
+    is_waiting_on_customer,
 )
 
 __all__ = [
@@ -73,4 +74,5 @@ __all__ = [
     "determine_reply_status",
     "get_status_choices_for_case",
     "get_status_color",
+    "is_waiting_on_customer",
 ]

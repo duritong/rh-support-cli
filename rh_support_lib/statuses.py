@@ -69,29 +69,26 @@ def get_status_choices_for_case(
     return choices
 
 
-def determine_reply_status(current_status: str | None) -> str:
-    """
-    Central business logic for determining the target status when drafting or posting a reply:
-    - Customer responding to Red Hat -> transitions to Waiting on Red Hat.
-    - Red Hat replying -> transitions to Waiting on Customer Action Required.
-    - Closed cases stay Closed.
-    - Default fallback -> Waiting on Red Hat.
-    """
-    if not current_status:
-        return STATUS_IN_PROGRESS
-
-    s_lower = current_status.strip().lower()
-    if s_lower in (
+def is_waiting_on_customer(status: str | None) -> bool:
+    """Returns True if the given case status indicates action is required by the customer."""
+    if not status:
+        return False
+    return status.strip().lower() in (
         "waiting on customer",
         "waiting on customer action required",
-    ):
-        return STATUS_IN_PROGRESS
-    if s_lower in ("waiting on red hat", "in progress"):
-        return STATUS_WAITING_ON_CUSTOMER
-    if s_lower == "closed":
-        return STATUS_CLOSED
+    )
 
-    return STATUS_IN_PROGRESS
+
+def determine_reply_status(current_status: str | None) -> str | None:
+    """
+    Central business logic for determining the target status when drafting or posting a reply:
+    - Customer responding to Red Hat (Waiting on Customer) -> transitions to In Progress.
+    - All other statuses (Waiting on Red Hat, Engineering, Closed, etc.) -> remain unchanged.
+    """
+    if is_waiting_on_customer(current_status):
+        return STATUS_IN_PROGRESS
+
+    return current_status
 
 
 def get_status_color(stat_str: str | None) -> str | None:

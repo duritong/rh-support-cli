@@ -6,6 +6,7 @@ from rh_support_lib.api import AuthenticationError
 from rh_support_lib.constants import STATUS_MAP
 from rh_support_lib.errors import CommentOutcomeUnknownError, PartialCommentError
 from rh_support_lib.services.cases import CaseService
+from rh_support_lib.statuses import STATUS_IN_PROGRESS, is_waiting_on_customer
 from rh_support_lib.utils import (
     EditorError,
     draft_body,
@@ -77,18 +78,16 @@ def _cmd_comment(args, api_client, config, output, draft_stack):
                 "Template Error: Rendered comment is empty. No comment or status change submitted."
             )
 
+    case_service = CaseService(api_client, config=config)
+
     # Determine status label
     no_status_change = getattr(args, "no_status_change", False) or getattr(
         args, "keep_status", False
     )
     if no_status_change:
         final_status = None
-    else:
-        status_key = (
-            args.status
-            if args.status
-            else (template_status if template_status else "redhat")
-        )
+    elif getattr(args, "status", None):
+        status_key = args.status
         if str(status_key).lower() in (
             "none",
             "keep",
@@ -99,7 +98,25 @@ def _cmd_comment(args, api_client, config, output, draft_stack):
             final_status = None
         else:
             final_status = STATUS_MAP.get(str(status_key).lower(), status_key)
-
+    elif template_status:
+        status_key = template_status
+        if str(status_key).lower() in (
+            "none",
+            "keep",
+            "unchanged",
+            "no_change",
+            "no-change",
+        ):
+            final_status = None
+        else:
+            final_status = STATUS_MAP.get(str(status_key).lower(), status_key)
+    else:
+        # Default behavior: status only switches if the case status is waiting on customer
+        current_status = case_service.get_case_status(args.case)
+        if is_waiting_on_customer(current_status):
+            final_status = STATUS_IN_PROGRESS
+        else:
+            final_status = None
     # Get Content
     comment_body = ""
     temp_file_path = None
@@ -128,7 +145,6 @@ def _cmd_comment(args, api_client, config, output, draft_stack):
             sys.exit("Error: Unable to read comment file. No changes submitted.")
         if not file_content:
             sys.exit("Error: Empty comment file. No changes submitted.")
-    case_service = CaseService(api_client, config=config)
 
     if args.edit or (not args.file and not getattr(args, "template", None)):
         # Prepare context if needed
