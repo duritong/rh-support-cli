@@ -412,3 +412,31 @@ class StateTransactionTests(unittest.TestCase):
         # 1002 was only 'followed' so it should be completely removed
         self.assertNotIn("1002", tracked_after)
         self.assertFalse(self.service.is_following("1002", "user"))
+
+    def test_batch_removal_deduplicates_ids_and_preserves_owned_checkpoint(self):
+        self.service.register_owned_case("user", "1001", status="In Progress")
+        self.service.add_tracked_case("user", "1001", relationship="followed")
+        self.service.add_tracked_case("user", "1002")
+        before = self.service.load_state()["users"]["user"]["tracked_cases"]["1001"]
+
+        removed = self.service.remove_followed_cases_batch(
+            ["1001", " 1001 ", "1002", "1002", ""], "user"
+        )
+        tracked = self.service.load_state()["users"]["user"]["tracked_cases"]
+        self.assertIn("1001", tracked)
+        self.assertEqual(tracked["1001"], {**before, "relationship": "owned"})
+        self.assertNotIn("1002", tracked)
+        self.assertEqual(removed, ["1001", "1002"])
+
+    def test_batch_removal_leaves_owned_only_records_unchanged(self):
+        self.service.register_owned_case("user", "1001", status="In Progress")
+        before = self.service.load_state()
+        with patch.object(
+            self.service, "save_state", wraps=self.service.save_state
+        ) as save:
+            removed = self.service.remove_followed_cases_batch(
+                ["1001", " 1001 "], "user"
+            )
+        self.assertEqual(self.service.load_state(), before)
+        self.assertEqual(removed, [])
+        save.assert_not_called()

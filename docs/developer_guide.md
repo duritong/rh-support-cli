@@ -240,6 +240,7 @@ Per-case `follow`/`unfollow --dry-run` render the deduplicated requested case nu
 * **Incomplete Tracking Metadata**: Account unfollow correlates records missing an account number with `CacheService.get_case_details(ttl=0)`, unpacking its details tuple. Expired cache entries remain usable for this local-only selection; absent entries are skipped, and cached account/status filters still apply. No remote reads are issued to fill missing metadata.
 * **Library Decoupling**: Both operations live in `CaseService` and return structured dictionaries, allowing headless library consumption alongside CLI presentation.
 * **Bookmark Scope**: Account presenters merge account/status/severity/user bookmarks before applying explicit CLI overrides, even when an explicit account was supplied. Unsupported bookmark fields fail before discovery or mutation. `unfollow_account(severity=...)` applies the same severity filter to tracked metadata and cache-correlated cases.
+* **Batch Removal Safety**: `remove_followed_cases_batch()` normalizes and deduplicates case identifiers, ignores empty identifiers, and returns each removed follow once. A `both` record becomes `owned` without changing its checkpoint or latest-known data; owned-only records remain intact, including on repeated removal.
 ---
 
 ## 7. Thread-Safe Local Caching & SWR Layer

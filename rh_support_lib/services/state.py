@@ -542,9 +542,13 @@ class StateService:
         following_legacy = user_state.get("following", {})
         modified = False
         removed = []
+        seen = set()
 
         for c_num in case_numbers:
             c_str = str(c_num).strip()
+            if not c_str or c_str in seen:
+                continue
+            seen.add(c_str)
             case_removed = False
             if c_str in tracked_dict:
                 cur_rel = tracked_dict[c_str].get("relationship", "followed")
@@ -552,7 +556,7 @@ class StateService:
                     tracked_dict[c_str]["relationship"] = "owned"
                     case_removed = True
                     modified = True
-                else:
+                elif cur_rel == "followed":
                     del tracked_dict[c_str]
                     case_removed = True
                     modified = True
