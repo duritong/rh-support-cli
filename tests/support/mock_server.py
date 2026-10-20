@@ -34,6 +34,7 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
     latest_mock_comment_date = "2023-01-03T10:00:00Z"
     mock_storage: ClassVar[dict] = {}
     mock_case_statuses: ClassVar[dict[str, str]] = {}
+    mock_account_cases: ClassVar[dict[str, list[dict]]] = {}
 
     def log_message(self, format, *args):
         # Silence server logs to keep test output clean
@@ -690,7 +691,53 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
                 self.send_header("Content-type", "application/json")
                 self.end_headers()
                 after_val = variables.get("after")
-                if "ACC=PAGINATE" in summary_str:
+                account_eq = (
+                    where_clause.get("RedHatSupportAccount", {})
+                    .get("AccountNumber", {})
+                    .get("eq")
+                )
+                if account_eq and account_eq in MockRedHatHandler.mock_account_cases:
+                    raw_cases = MockRedHatHandler.mock_account_cases[account_eq]
+                    stat_filter = where_clause.get("Status")
+                    allowed_stats = None
+                    if isinstance(stat_filter, dict):
+                        if "in" in stat_filter:
+                            allowed_stats = set(stat_filter["in"])
+                        elif "eq" in stat_filter:
+                            allowed_stats = {stat_filter["eq"]}
+                    edges = []
+                    for c_dict in raw_cases:
+                        c_stat = c_dict.get("status", "Waiting on Red Hat")
+                        if allowed_stats and c_stat not in allowed_stats:
+                            continue
+                        c_num_val = str(c_dict.get("case_number", "1001"))
+                        edges.append(
+                            {
+                                "node": {
+                                    "Id": f"500{c_num_val}",
+                                    "CaseNumber__c": {"value": c_num_val},
+                                    "Subject": {
+                                        "value": c_dict.get(
+                                            "summary", f"Case {c_num_val}"
+                                        )
+                                    },
+                                    "Status": {"value": c_stat},
+                                    "Priority": {
+                                        "value": c_dict.get("severity", "2 (High)")
+                                    },
+                                    "CreatedDate": {"value": "2026-07-10T14:30:00Z"},
+                                    "LastModifiedDate": {
+                                        "value": "2026-07-11T09:15:00Z"
+                                    },
+                                    "RedHatSupportAccount": {
+                                        "AccountNumber": {"value": str(account_eq)}
+                                    },
+                                },
+                                "cursor": f"cursor_{c_num_val}",
+                            }
+                        )
+                    page_info = {"hasNextPage": False, "endCursor": None}
+                elif "ACC=PAGINATE" in summary_str:
                     if after_val == "case_page1_cursor":
                         edges = [
                             {

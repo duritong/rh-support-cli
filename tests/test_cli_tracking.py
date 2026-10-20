@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import tempfile
@@ -527,3 +528,132 @@ class TestCliTracking(MockServerTestCase):
             )
         finally:
             shutil.rmtree(temp_dir)
+
+    def test_follow_account_command(self):
+        """Test follow-account command: default open cases, --all, --status, and --dry-run."""
+        MockRedHatHandler.mock_account_cases["ACCT123"] = [
+            {
+                "case_number": "2001",
+                "summary": "First open issue",
+                "status": "Waiting on Red Hat",
+                "severity": "2 (High)",
+            },
+            {
+                "case_number": "2002",
+                "summary": "Second open issue",
+                "status": "Waiting on Customer Action Required",
+                "severity": "3 (Normal)",
+            },
+            {
+                "case_number": "2003",
+                "summary": "Resolved issue",
+                "status": "Closed",
+                "severity": "4 (Low)",
+            },
+        ]
+        try:
+            # 1. Dry run on account
+            res_dry = self.run_cli(["follow-account", "ACCT123", "--dry-run"])
+            self.assertEqual(res_dry.returncode, 0)
+            self.assertIn("[Dry-run] Would follow 2 case(s)", res_dry.stdout)
+            self.assertIn("Case #2001", res_dry.stdout)
+            self.assertIn("Case #2002", res_dry.stdout)
+            self.assertNotIn("Case #2003", res_dry.stdout)
+
+            # Verify nothing tracked yet
+            res_following0 = self.run_cli(["following"])
+            self.assertNotIn("2001", res_following0.stdout)
+
+            # 2. Default follow-account (open cases only)
+            res_follow = self.run_cli(["follow-account", "ACCT123"])
+            self.assertEqual(res_follow.returncode, 0)
+            self.assertIn(
+                "Success: Followed 2 case(s) for account ACCT123", res_follow.stdout
+            )
+            self.assertIn("Followed Case #2001", res_follow.stdout)
+            self.assertIn("Followed Case #2002", res_follow.stdout)
+
+            # Verify both are now followed, but not 2003
+            res_following1 = self.run_cli(["following"])
+            self.assertIn("2001", res_following1.stdout)
+            self.assertIn("2002", res_following1.stdout)
+            self.assertNotIn("2003", res_following1.stdout)
+
+            # 3. Running again reports already followed
+            res_follow_repeat = self.run_cli(["follow-account", "ACCT123"])
+            self.assertEqual(res_follow_repeat.returncode, 0)
+            self.assertIn(
+                "0 case(s) for account ACCT123 (2 already followed)",
+                res_follow_repeat.stdout,
+            )
+            self.assertIn("Already following Case #2001", res_follow_repeat.stdout)
+
+            # 4. Follow with --all includes closed cases
+            res_all = self.run_cli(["follow-account", "ACCT123", "--all"])
+            self.assertEqual(res_all.returncode, 0)
+            self.assertIn("Followed Case #2003", res_all.stdout)
+            self.assertIn(
+                "Success: Followed 1 case(s) for account ACCT123 (2 already followed)",
+                res_all.stdout,
+            )
+
+            # 5. Test JSON output format
+            res_json = self.run_cli(["follow-account", "ACCT123", "--all", "--json"])
+            self.assertEqual(res_json.returncode, 0)
+            data = json.loads(res_json.stdout)
+            self.assertEqual(data["account"], "ACCT123")
+            self.assertTrue(data["success"])
+            self.assertIn("2001", data["already_followed"])
+            self.assertIn("2003", data["already_followed"])
+
+            # 6. Test unfollow-account with --status closed
+            res_unfollow_closed = self.run_cli(
+                ["unfollow-account", "ACCT123", "--status", "closed"]
+            )
+            self.assertEqual(res_unfollow_closed.returncode, 0)
+            self.assertIn("Success: Unfollowed 1 case(s)", res_unfollow_closed.stdout)
+            self.assertIn("Unfollowed Case #2003", res_unfollow_closed.stdout)
+
+            # Verify 2001 and 2002 are still followed, 2003 is gone
+            res_following2 = self.run_cli(["following"])
+            self.assertIn("2001", res_following2.stdout)
+            self.assertIn("2002", res_following2.stdout)
+            self.assertNotIn("2003", res_following2.stdout)
+
+            # 7. Test unfollow-account dry run
+            res_unfollow_dry = self.run_cli(
+                ["unfollow-account", "ACCT123", "--dry-run"]
+            )
+            self.assertEqual(res_unfollow_dry.returncode, 0)
+            self.assertIn("[Dry-run] Would unfollow 2 case(s)", res_unfollow_dry.stdout)
+
+            # 8. Unfollow all remaining cases for account
+            res_unfollow_all = self.run_cli(["unfollow-account", "ACCT123"])
+            self.assertEqual(res_unfollow_all.returncode, 0)
+            self.assertIn("Success: Unfollowed 2 case(s)", res_unfollow_all.stdout)
+
+            res_following3 = self.run_cli(["following"])
+            self.assertNotIn("2001", res_following3.stdout)
+            self.assertNotIn("2002", res_following3.stdout)
+
+            # 9. Test delegation from follow --account and unfollow --account
+            res_del_follow = self.run_cli(["follow", "--account", "ACCT123"])
+            self.assertEqual(res_del_follow.returncode, 0)
+            self.assertIn("Followed 2 case(s)", res_del_follow.stdout)
+
+            res_del_unfollow = self.run_cli(["unfollow", "--account", "ACCT123"])
+            self.assertEqual(res_del_unfollow.returncode, 0)
+            self.assertIn("Unfollowed 2 case(s)", res_del_unfollow.stdout)
+        finally:
+            MockRedHatHandler.mock_account_cases.pop("ACCT123", None)
+
+    def test_case_service_follow_and_unfollow_account_validation(self):
+        from unittest.mock import Mock
+
+        from rh_support_lib.services.cases import CaseService
+
+        service = CaseService(Mock())
+        with self.assertRaises(ValueError):
+            service.follow_account(account="")
+        with self.assertRaises(ValueError):
+            service.unfollow_account(account="")

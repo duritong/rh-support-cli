@@ -38,6 +38,8 @@ class ParserTests(unittest.TestCase):
             (["list-attachments", "123"], "cmd_attachment"),
             (["list-templates"], "cmd_list_templates"),
             (["list-template"], "cmd_list_templates"),
+            (["follow-account", "123"], "cmd_follow_account"),
+            (["unfollow-account", "123"], "cmd_unfollow_account"),
         ]
         for command, handler in commands:
             for flags, fmt in [
@@ -102,6 +104,8 @@ class ParserTests(unittest.TestCase):
             (["create"], "cmd_create"),
             (["comment", "-c", "123"], "cmd_comment"),
             (["close", "-c", "123"], "cmd_close"),
+            (["follow-account", "123"], "cmd_follow_account"),
+            (["unfollow-account", "123"], "cmd_unfollow_account"),
         ]:
             for flags in ([], ["--no-cache"], ["--simple-output"]):
                 for argv in (flags + command, command + flags):

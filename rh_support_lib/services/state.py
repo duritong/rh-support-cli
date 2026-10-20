@@ -342,6 +342,108 @@ class StateService:
             }
         self.save_state(data)
 
+    @_locked
+    def add_tracked_cases_batch(
+        self,
+        user: str,
+        cases_data: list[dict[str, Any]],
+        relationship: str = "followed",
+        source: str = "cli",
+    ) -> list[str]:
+        """Adds or updates multiple tracked case records in state.yaml in a single transaction."""
+        if not cases_data:
+            return []
+
+        data = self.load_state()
+        user_state = self._get_user_state(data, user)
+        tracked_dict = user_state.setdefault("tracked_cases", {})
+        following_legacy = user_state.setdefault("following", {})
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        added = []
+        for cd in cases_data:
+            c_num = str(cd.get("case_number", "")).strip()
+            if not c_num:
+                continue
+
+            existing = tracked_dict.get(c_num)
+            if not existing and isinstance(following_legacy.get(c_num), dict):
+                existing = following_legacy.get(c_num)
+
+            rel = cd.get("relationship", relationship)
+            final_rel = rel
+            if existing and isinstance(existing, dict):
+                cur_rel = existing.get("relationship", "followed")
+                if (
+                    cur_rel != rel
+                    and cur_rel in ("owned", "followed")
+                    or cur_rel == "both"
+                ):
+                    final_rel = "both"
+
+            existing_cp = (
+                existing.get("read_checkpoint", {})
+                if isinstance(existing, dict)
+                else {}
+            )
+            existing_lk = (
+                existing.get("latest_known", {}) if isinstance(existing, dict) else {}
+            )
+            entry = {
+                "relationship": final_rel,
+                "followed_at": (
+                    existing.get("followed_at") or now_str
+                    if isinstance(existing, dict)
+                    else now_str
+                ),
+                "summary": cd.get("summary", "")
+                or (existing.get("summary", "") if isinstance(existing, dict) else ""),
+                "account_number": str(cd.get("account_number", ""))
+                if cd.get("account_number")
+                else (
+                    str(existing.get("account_number", ""))
+                    if isinstance(existing, dict)
+                    else ""
+                ),
+                "source": cd.get("source", source)
+                or (
+                    existing.get("source", source)
+                    if isinstance(existing, dict)
+                    else source
+                ),
+                "read_checkpoint": existing_cp
+                or {
+                    "status": cd.get("status", ""),
+                    "severity": cd.get("severity", ""),
+                    "last_read_comment_id": cd.get("last_comment_id", ""),
+                    "last_read_comment_date": cd.get("last_comment_date", ""),
+                    "marked_read_at": now_str,
+                },
+                "latest_known": existing_lk
+                or {
+                    "status": cd.get("status", ""),
+                    "severity": cd.get("severity", ""),
+                    "last_modified_date": cd.get("last_modified_date", "") or now_str,
+                    "latest_comment_id": cd.get("last_comment_id", ""),
+                    "latest_comment_date": cd.get("last_comment_date", ""),
+                    "unread_comment_count": 0,
+                    "status_changed": False,
+                },
+            }
+            tracked_dict[c_num] = entry
+            if final_rel in ("followed", "both"):
+                following_legacy[c_num] = {
+                    "added_at": entry["followed_at"],
+                    "source": entry["source"],
+                    "summary": entry["summary"],
+                    "account_number": entry["account_number"],
+                }
+            added.append(c_num)
+
+        if added:
+            self.save_state(data)
+        return added
+
     def add_followed_case(
         self,
         case_number: str,
@@ -425,6 +527,62 @@ class StateService:
         if modified:
             self.save_state(data)
         return modified
+
+    @_locked
+    def remove_followed_cases_batch(
+        self, case_numbers: list[str], user: str
+    ) -> list[str]:
+        """Removes multiple cases from following in a single transaction."""
+        if not case_numbers:
+            return []
+
+        data = self.load_state()
+        user_state = self._get_user_state(data, user)
+        tracked_dict = user_state.get("tracked_cases", {})
+        following_legacy = user_state.get("following", {})
+        modified = False
+        removed = []
+
+        for c_num in case_numbers:
+            c_str = str(c_num).strip()
+            case_removed = False
+            if c_str in tracked_dict:
+                cur_rel = tracked_dict[c_str].get("relationship", "followed")
+                if cur_rel == "both":
+                    tracked_dict[c_str]["relationship"] = "owned"
+                    case_removed = True
+                    modified = True
+                else:
+                    del tracked_dict[c_str]
+                    case_removed = True
+                    modified = True
+
+            if isinstance(following_legacy, dict) and c_str in following_legacy:
+                del following_legacy[c_str]
+                case_removed = True
+                modified = True
+            elif isinstance(following_legacy, list):
+                new_list = [
+                    x
+                    for x in following_legacy
+                    if (
+                        x != c_str
+                        if isinstance(x, str)
+                        else x.get("case_number") != c_str
+                    )
+                ]
+                if len(new_list) != len(following_legacy):
+                    user_state["following"] = new_list
+                    following_legacy = new_list
+                    case_removed = True
+                    modified = True
+
+            if case_removed:
+                removed.append(c_str)
+
+        if modified:
+            self.save_state(data)
+        return removed
 
     @_locked
     def toggle_follow(self, user: str, case_number: str) -> bool:

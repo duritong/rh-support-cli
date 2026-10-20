@@ -13,6 +13,7 @@ from rh_support_lib.constants import (
     GRAPHQL_URL,
     SEVERITY_MAP,
     STATUS_MAP,
+    expand_status_filter,
 )
 from rh_support_lib.errors import (
     CommentOutcomeUnknownError,
@@ -1804,6 +1805,131 @@ class CaseService:
             if self.state_service.remove_followed_case(c_str, user):
                 unfollowed.append(c_str)
         return unfollowed
+
+    def follow_account(
+        self,
+        account: str,
+        status: list[str] | str | None = "open",
+        severity: list[str] | str | None = None,
+        username: str | None = None,
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Tracks all matching cases for an account (by default: open cases)."""
+        acc_str = str(account).strip()
+        if not acc_str:
+            raise ValueError("Account number is required.")
+
+        user = username or self.get_current_user()
+        mapped_statuses = expand_status_filter(status)
+
+        cases = self.list_cases(
+            account=acc_str,
+            status=mapped_statuses,
+            severity=severity,
+            all_pages=True,
+            use_cache=False,
+        )
+
+        currently_following = set(self.state_service.get_followed_cases(user).keys())
+        new_cases_data = []
+        already_followed = []
+        for c in cases:
+            c_num = str(c.case_number).strip()
+            if not c_num:
+                continue
+            if c_num in currently_following:
+                already_followed.append(c_num)
+            else:
+                new_cases_data.append(
+                    {
+                        "case_number": c_num,
+                        "summary": c.summary or "",
+                        "account_number": acc_str,
+                        "status": c.status or "",
+                        "severity": c.severity or "",
+                        "last_modified_date": c.last_modified_date or "",
+                        "relationship": "followed",
+                        "source": "cli",
+                    }
+                )
+
+        followed_numbers = [cd["case_number"] for cd in new_cases_data]
+        if not dry_run and new_cases_data:
+            self.state_service.add_tracked_cases_batch(
+                user, new_cases_data, relationship="followed", source="cli"
+            )
+
+        return {
+            "account": acc_str,
+            "user": user,
+            "status_filter": status,
+            "matching_cases": cases,
+            "followed": followed_numbers,
+            "already_followed": already_followed,
+            "count": len(followed_numbers),
+            "total_matching": len(cases),
+            "dry_run": dry_run,
+            "success": True,
+        }
+
+    def unfollow_account(
+        self,
+        account: str,
+        status: list[str] | str | None = None,
+        username: str | None = None,
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Unfollows cases belonging to an account, optionally filtered by status."""
+        acc_str = str(account).strip()
+        if not acc_str:
+            raise ValueError("Account number is required.")
+
+        user = username or self.get_current_user()
+        mapped_statuses = expand_status_filter(status) if status else None
+
+        matching_followed = self.list_followed_cases(
+            username=user,
+            account=acc_str,
+            status=mapped_statuses,
+            fetch_live=False,
+        )
+        case_numbers = [c.case_number for c in matching_followed]
+
+        # Check for any followed cases that had empty account_number in state
+        all_followed = self.state_service.get_followed_cases(user)
+        for c_num, tc in all_followed.items():
+            if c_num not in case_numbers and not tc.account_number:
+                cached = self.cache_service.get_case(c_num)
+                if (
+                    cached
+                    and cached.case
+                    and str(cached.case.account_number).strip() == acc_str
+                ):
+                    if mapped_statuses:
+                        if self._matches_case_filters(
+                            cached.case, status=mapped_statuses
+                        ):
+                            case_numbers.append(c_num)
+                    else:
+                        case_numbers.append(c_num)
+
+        if not dry_run and case_numbers:
+            unfollowed = self.state_service.remove_followed_cases_batch(
+                case_numbers, user
+            )
+        else:
+            unfollowed = case_numbers
+
+        return {
+            "account": acc_str,
+            "user": user,
+            "status_filter": status,
+            "matching_cases": matching_followed,
+            "unfollowed": unfollowed,
+            "count": len(unfollowed),
+            "dry_run": dry_run,
+            "success": True,
+        }
 
     def sync_tracked_cases(
         self, username: str | None = None, account: str | None = None

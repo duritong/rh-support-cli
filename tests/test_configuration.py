@@ -107,6 +107,8 @@ class ConfigurationTests(unittest.IsolatedAsyncioTestCase):
             ["close", "-c", "123", "-t", "incident"],
             ["follow", "123"],
             ["unfollow", "123"],
+            ["follow-account", "123"],
+            ["unfollow-account", "123"],
             ["following"],
             ["sync"],
             ["updates"],

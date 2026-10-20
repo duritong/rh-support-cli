@@ -244,7 +244,11 @@ class StateTransactionTests(unittest.TestCase):
     def test_all_mutations_hold_lock_until_save(self):
         operations = {
             "add": lambda s: s.add_tracked_case("user", "123"),
+            "add_batch": lambda s: s.add_tracked_cases_batch(
+                "user", [{"case_number": "123"}]
+            ),
             "remove": lambda s: s.remove_followed_case("123", "user"),
+            "remove_batch": lambda s: s.remove_followed_cases_batch(["123"], "user"),
             "batch": lambda s: s.batch_update_latest_known(
                 "user", [{"case_number": "123", "status": "Closed"}]
             ),
@@ -366,3 +370,45 @@ class StateTransactionTests(unittest.TestCase):
         self.assertFalse(
             os.path.exists(os.path.join(state, "rh-support-cli", "state.yaml"))
         )
+
+    def test_batch_add_and_remove_tracked_cases(self):
+        cases_data = [
+            {
+                "case_number": "1001",
+                "summary": "First case",
+                "account_number": "99999",
+                "status": "In Progress",
+                "severity": "High",
+            },
+            {
+                "case_number": "1002",
+                "summary": "Second case",
+                "account_number": "99999",
+                "status": "Waiting on Customer",
+                "severity": "Normal",
+            },
+        ]
+        # Pre-register 1001 as owned to test 'both' relationship
+        self.service.register_owned_case("user", "1001")
+
+        # Batch add
+        added = self.service.add_tracked_cases_batch("user", cases_data)
+        self.assertEqual(added, ["1001", "1002"])
+
+        tracked = self.service.get_tracked_cases("user")
+        self.assertEqual(tracked["1001"].relationship, "both")
+        self.assertEqual(tracked["1001"].account_number, "99999")
+        self.assertEqual(tracked["1002"].relationship, "followed")
+        self.assertEqual(tracked["1002"].account_number, "99999")
+
+        # Batch remove
+        removed = self.service.remove_followed_cases_batch(["1001", "1002"], "user")
+        self.assertEqual(removed, ["1001", "1002"])
+
+        tracked_after = self.service.get_tracked_cases("user")
+        # 1001 was 'both' so it should now be retained as 'owned'
+        self.assertIn("1001", tracked_after)
+        self.assertEqual(tracked_after["1001"].relationship, "owned")
+        # 1002 was only 'followed' so it should be completely removed
+        self.assertNotIn("1002", tracked_after)
+        self.assertFalse(self.service.is_following("1002", "user"))

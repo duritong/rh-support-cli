@@ -59,6 +59,37 @@ STATUS_FILTER_MAP: dict[str, str] = {
 }
 
 
+def expand_status_filter(
+    status: list[str] | tuple[str, ...] | str | None,
+) -> list[str] | None:
+    """Expands shorthand status filter values (e.g. 'open', 'customer') to backend status strings.
+
+    Returns None if status is None or 'all', meaning no status filtering is applied.
+    """
+    if not status:
+        return None
+
+    if isinstance(status, (list, tuple)):
+        raw_items = list(status)
+    else:
+        raw_items = [status]
+
+    # Check if 'all' is explicitly requested
+    for item in raw_items:
+        if str(item).strip().lower() == "all":
+            return None
+
+    mapped: list[str] = []
+    for s in raw_items:
+        val = STATUS_FILTER_MAP.get(str(s).strip().lower(), str(s).strip())
+        for v in val.split(","):
+            clean = v.strip()
+            if clean and clean not in mapped:
+                mapped.append(clean)
+
+    return mapped if mapped else None
+
+
 def get_status_choices_for_case(
     case_status: str | None = None,
 ) -> list[tuple[str, str]]:

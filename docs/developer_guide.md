@@ -43,7 +43,7 @@ rh-support-cli/
     │   ├── show_case.py        # show subcommand (Rich Panels and Markdown paging)
     │   ├── systemd.py          # systemd and install-systemd unit installation/management
     │   ├── tracking.py         # sync and updates subcommands
-    │   └── watchers.py         # follow, unfollow, following subcommands
+    │   └── watchers.py         # follow, follow-account, unfollow, unfollow-account, following subcommands
     │   ├── attachments.py      # AttachmentService (v3 presigned upload, multipart, download)
     │   ├── cache.py            # CacheService (Atomic XDG disk cache, SWR, TTL management)
     │   ├── cases.py            # CaseService (GraphQL queries, mutations, case lookups)
@@ -229,6 +229,12 @@ When `sync_tracked_cases` checks multiple cases in parallel using `ThreadPoolExe
 * Worker threads collect update dictionaries in memory without touching `state.yaml` concurrently.
 * The main thread commits all case updates in a single atomic `batch_update_latest_known` operation, eliminating multi-threaded file contention.
 
+
+### Account-Level Tracking & Batch Mutations
+`follow-account` and `unfollow-account` operate across an entire account while maintaining atomic, thread-safe state mutations:
+* **Account Follow (`CaseService.follow_account`)**: Queries remote account cases via `list_cases(all_pages=True)` matching the status filter (defaulting to `"open"` via `expand_status_filter()`). Non-redundant cases are committed in a single atomic transaction via `StateService.add_tracked_cases_batch()`, capturing case metadata and initializing checkpoints without issuing separate N-case comment queries.
+* **Account Unfollow (`CaseService.unfollow_account`)**: Discovers followed cases matching the account number and optional status filter locally via `list_followed_cases(fetch_live=False)` and cache correlation, then removes them in a single transaction via `StateService.remove_followed_cases_batch()`.
+* **Library Decoupling**: Both operations live in `CaseService` and return structured dictionaries, allowing headless library consumption alongside CLI presentation.
 ---
 
 ## 7. Thread-Safe Local Caching & SWR Layer

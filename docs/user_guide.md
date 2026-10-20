@@ -391,13 +391,30 @@ Files exceeding 5 GB are **automatically transferred via multipart uploads**.
 * **Live Progress Bar**: Displays real-time transfer speed (MB/s), remaining time, and upload percentage.
 * **Automatic Abort on Failure**: If an upload is cancelled (`Ctrl+C`) or interrupted, the CLI aborts the session cleanly to release storage resources.
 
-### 5.9 Following & Tracking Cases Locally (`follow` / `unfollow` / `following`)
+### 5.9 Following & Tracking Cases Locally (`follow` / `follow-account` / `unfollow` / `unfollow-account` / `following`)
 Track cases locally in `~/.local/state/rh-support-cli/state.yaml` to monitor tickets across CLI and TUI sessions:
 
 ```bash
-# Follow one or more cases:
+# Follow one or more specific cases:
 rh-support-cli follow 12345678
 rh-support-cli follow 12345678 23456789
+
+# Follow all open cases for an account (default status: open):
+rh-support-cli follow-account 123456
+# or using the --account flag:
+rh-support-cli follow-account --account 123456
+rh-support-cli follow --account 123456
+
+# Follow all cases for an account (both open and closed):
+rh-support-cli follow-account 123456 --all
+rh-support-cli follow-account 123456 --status all
+
+# Follow cases matching a specific status:
+rh-support-cli follow-account 123456 --status customer
+rh-support-cli follow-account 123456 --status "Waiting on Red Hat"
+
+# Preview which cases would be followed without modifying local state:
+rh-support-cli follow-account 123456 --dry-run
 
 # List followed cases:
 rh-support-cli following
@@ -409,8 +426,21 @@ rh-support-cli following -u colleague_sso
 # Sync latest status from account before listing followed cases:
 rh-support-cli following --sync
 
-# Unfollow cases:
+# Unfollow specific cases:
 rh-support-cli unfollow 12345678
+rh-support-cli unfollow 12345678 23456789
+
+# Unfollow all followed cases of an account:
+rh-support-cli unfollow-account 123456
+# or using the --account flag on unfollow:
+rh-support-cli unfollow --account 123456
+
+# Unfollow only closed cases of an account:
+rh-support-cli unfollow-account 123456 --status closed
+
+# Preview cases that would be unfollowed:
+rh-support-cli unfollow-account 123456 --dry-run
+```
 
 ### 5.10 Synchronizing Tracked Cases & Systemd Timer (`sync` / `install-systemd` / `systemd`)
 Polls Red Hat's backend across all followed and owned cases in parallel to detect remote updates:

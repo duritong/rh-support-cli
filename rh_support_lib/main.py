@@ -24,8 +24,10 @@ from rh_support_lib.commands.show_case import cmd_show
 from rh_support_lib.commands.tracking import cmd_sync, cmd_updates
 from rh_support_lib.commands.watchers import (
     cmd_follow,
+    cmd_follow_account,
     cmd_following,
     cmd_unfollow,
+    cmd_unfollow_account,
 )
 from rh_support_lib.config import ConfigError, load_config, resolve_bookmarks
 from rh_support_lib.tui.app import cmd_tui
@@ -529,6 +531,74 @@ Authentication:
         help="Sync followed cases from account before following",
     )
     parser_follow.add_argument("--account", help="Account number to sync from")
+    parser_follow.add_argument(
+        "-s",
+        "--status",
+        help="Filter cases by status when following an account (defaults to 'open')",
+    )
+    parser_follow.add_argument(
+        "--all",
+        action="store_true",
+        help="Follow all cases for the account regardless of status",
+    )
+    parser_follow.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show which cases would be followed without modifying local tracking state",
+    )
+
+    # Follow-Account Subcommand
+    parser_follow_acc = subparsers.add_parser(
+        "follow-account",
+        help="Follow all (open by default) support cases of an account",
+    )
+    parser_follow_acc.add_argument(
+        "account_pos",
+        nargs="?",
+        default=None,
+        metavar="ACCOUNT",
+        help="Account number to follow cases from",
+    )
+    parser_follow_acc.add_argument(
+        "-a",
+        "--account",
+        help="Account number to follow cases from",
+    )
+    parser_follow_acc.add_argument(
+        "-s",
+        "--status",
+        help="Filter cases by status (defaults to 'open'; e.g. open, closed, all, customer, redhat)",
+    )
+    parser_follow_acc.add_argument(
+        "--all",
+        action="store_true",
+        help="Follow all cases for the account regardless of status (both open and closed)",
+    )
+    parser_follow_acc.add_argument(
+        "--severity",
+        help="Filter cases by severity (e.g. urgent, high, normal, low)",
+    )
+    parser_follow_acc.add_argument(
+        "-u",
+        "--user",
+        help="SSO username (defaults to myself/current authenticated user)",
+    )
+    parser_follow_acc.add_argument(
+        "-b",
+        "--bookmark",
+        action="append",
+        help="Use a filter bookmark from config (can be used multiple times)",
+    )
+    parser_follow_acc.add_argument(
+        "--no-default-bookmark",
+        action="store_true",
+        help="Ignore default bookmark from config",
+    )
+    parser_follow_acc.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show which cases would be followed without modifying local tracking state",
+    )
 
     # Following Subcommand
     parser_following = subparsers.add_parser(
@@ -574,6 +644,65 @@ Authentication:
         "-u",
         "--user",
         help="SSO username (defaults to myself/current authenticated user)",
+    )
+    parser_unfollow.add_argument(
+        "-a",
+        "--account",
+        help="Account number to unfollow cases from",
+    )
+    parser_unfollow.add_argument(
+        "-s",
+        "--status",
+        help="Filter followed cases to unfollow by status (e.g. closed, open)",
+    )
+    parser_unfollow.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show which cases would be unfollowed without modifying local tracking state",
+    )
+
+    # Unfollow-Account Subcommand
+    parser_unfollow_acc = subparsers.add_parser(
+        "unfollow-account",
+        help="Unfollow cases of an account",
+    )
+    parser_unfollow_acc.add_argument(
+        "account_pos",
+        nargs="?",
+        default=None,
+        metavar="ACCOUNT",
+        help="Account number to unfollow cases from",
+    )
+    parser_unfollow_acc.add_argument(
+        "-a",
+        "--account",
+        help="Account number to unfollow cases from",
+    )
+    parser_unfollow_acc.add_argument(
+        "-s",
+        "--status",
+        help="Filter followed cases to unfollow by status (e.g. closed, open)",
+    )
+    parser_unfollow_acc.add_argument(
+        "-u",
+        "--user",
+        help="SSO username (defaults to myself/current authenticated user)",
+    )
+    parser_unfollow_acc.add_argument(
+        "-b",
+        "--bookmark",
+        action="append",
+        help="Use a filter bookmark from config (can be used multiple times)",
+    )
+    parser_unfollow_acc.add_argument(
+        "--no-default-bookmark",
+        action="store_true",
+        help="Ignore default bookmark from config",
+    )
+    parser_unfollow_acc.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show which cases would be unfollowed without modifying local tracking state",
     )
 
     # Sync Subcommand
@@ -917,7 +1046,14 @@ Authentication:
         sys.exit(cmd_doctor(args))
 
     config = load_config(args.config_file)
-    if args.command in ("list", "following", "search", "tui"):
+    if args.command in (
+        "list",
+        "following",
+        "search",
+        "tui",
+        "follow-account",
+        "unfollow-account",
+    ):
         selected = getattr(args, "bookmark", None)
         resolve_bookmarks(
             config,
@@ -1012,10 +1148,14 @@ Authentication:
         cmd_apply(args, api_client, config)
     elif args.command == "follow":
         cmd_follow(args, api_client, config)
+    elif args.command == "follow-account":
+        cmd_follow_account(args, api_client, config)
     elif args.command == "following":
         cmd_following(args, api_client, config)
     elif args.command == "unfollow":
         cmd_unfollow(args, api_client, config)
+    elif args.command == "unfollow-account":
+        cmd_unfollow_account(args, api_client, config)
     elif args.command == "sync":
         cmd_sync(args, api_client, config)
     elif args.command == "updates":
