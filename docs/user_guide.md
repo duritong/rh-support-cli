@@ -448,6 +448,8 @@ rh-support-cli unfollow-account 123456 --dry-run
 
 Account follow previews still fetch matching remote cases, but leave all local tracking records and read checkpoints unchanged, including cases you own.
 
+Account unfollow selects cases using local tracking data. If a tracked case has no account number, locally cached case details are used when available; cases whose account cannot be identified locally are left followed. Status filters use this local information, which may be older than the portal.
+
 ### 5.10 Synchronizing Tracked Cases & Systemd Timer (`sync` / `install-systemd` / `systemd`)
 Polls Red Hat's backend across all followed and owned cases in parallel to detect remote updates:
 

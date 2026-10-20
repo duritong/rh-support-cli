@@ -8,7 +8,7 @@ from unittest.mock import Mock, patch
 
 from rh_support_lib.api import RedHatAPIClient
 from rh_support_lib.commands.watchers import cmd_follow, cmd_unfollow
-from rh_support_lib.models import Case
+from rh_support_lib.models import Case, CaseDetails
 from rh_support_lib.services.cache import CacheService
 from rh_support_lib.services.cases import CaseService
 from rh_support_lib.services.state import StateService
@@ -88,3 +88,45 @@ class AccountTrackingTests(unittest.TestCase):
                 receipt = self.service.follow_account("A", username=user, dry_run=True)
                 self.assertEqual(self.state.load_state(), before)
                 self.assertEqual(receipt["total_matching"], 2)
+
+    def test_unfollow_account_correlates_incomplete_state_with_local_cache(self):
+        for number, account, status in (
+            ("closed", "A", "Closed"),
+            ("open", "A", "In Progress"),
+            ("other", "B", "Closed"),
+        ):
+            self.state.add_tracked_case("user", number)
+            with patch("rh_support_lib.services.cache.time.time", return_value=1):
+                self.cache.set_case_details(
+                    number,
+                    CaseDetails(
+                        case=Case(
+                            case_number=number,
+                            summary=number,
+                            status=status,
+                            severity="High",
+                            account_number=account,
+                        ),
+                        description="",
+                    ),
+                )
+        self.state.add_tracked_case("user", "uncached")
+        before = self.state.load_state()
+        for status, expected in (
+            (None, {"closed", "open"}),
+            ("closed", {"closed"}),
+            ("open", {"open"}),
+        ):
+            with self.subTest(status=status):
+                receipt = self.service.unfollow_account(
+                    "A", status=status, username="user", dry_run=True
+                )
+                self.assertEqual(set(receipt["unfollowed"]), expected)
+                self.assertEqual(self.state.load_state(), before)
+
+        receipt = self.service.unfollow_account("A", status="closed", username="user")
+        self.assertEqual(receipt["unfollowed"], ["closed"])
+        self.assertEqual(
+            set(self.state.get_followed_cases("user")), {"open", "other", "uncached"}
+        )
+        self.client.execute_graphql.assert_not_called()

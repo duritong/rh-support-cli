@@ -1904,15 +1904,12 @@ class CaseService:
         all_followed = self.state_service.get_followed_cases(user)
         for c_num, tc in all_followed.items():
             if c_num not in case_numbers and not tc.account_number:
-                cached = self.cache_service.get_case(c_num)
-                if (
-                    cached
-                    and cached.case
-                    and str(cached.case.account_number).strip() == acc_str
-                ):
+                cached = self.cache_service.get_case_details(c_num, ttl=0)
+                cached_case = cached[0].case if cached else None
+                if cached_case and str(cached_case.account_number).strip() == acc_str:
                     if mapped_statuses:
                         if self._matches_case_filters(
-                            cached.case, status=mapped_statuses
+                            cached_case, status=mapped_statuses
                         ):
                             case_numbers.append(c_num)
                     else:
