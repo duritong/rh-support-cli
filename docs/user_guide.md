@@ -399,6 +399,10 @@ Track cases locally in `~/.local/state/rh-support-cli/state.yaml` to monitor tic
 rh-support-cli follow 12345678
 rh-support-cli follow 12345678 23456789
 
+# Preview per-case follow/unfollow without changing tracking state:
+rh-support-cli follow 12345678 --dry-run
+rh-support-cli unfollow 12345678 --dry-run
+
 # Follow all open cases for an account (default status: open):
 rh-support-cli follow-account 123456
 # or using the --account flag:

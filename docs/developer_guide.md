@@ -231,6 +231,8 @@ When `sync_tracked_cases` checks multiple cases in parallel using `ThreadPoolExe
 
 
 ### Account-Level Tracking & Batch Mutations
+Per-case `follow`/`unfollow --dry-run` render the deduplicated requested case numbers without fetching case details or invoking tracking mutations.
+
 `follow-account` and `unfollow-account` operate across an entire account while maintaining atomic, thread-safe state mutations:
 * **Account Follow (`CaseService.follow_account`)**: Queries remote account cases via `list_cases(all_pages=True)` matching the status filter (defaulting to `"open"` via `expand_status_filter()`). Non-redundant cases are committed in a single atomic transaction via `StateService.add_tracked_cases_batch()`, capturing case metadata and initializing checkpoints without issuing separate N-case comment queries.
 * **Account Unfollow (`CaseService.unfollow_account`)**: Discovers followed cases matching the account number and optional status filter locally via `list_followed_cases(fetch_live=False)` and cache correlation, then removes them in a single transaction via `StateService.remove_followed_cases_batch()`.

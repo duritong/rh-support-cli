@@ -72,6 +72,10 @@ def cmd_follow(args, api_client, config=None):
 
     case_service = CaseService(api_client, config=config)
     user = getattr(args, "user", None) or case_service.get_current_user()
+    if getattr(args, "dry_run", False):
+        for c_num in case_numbers:
+            print(f"[Dry-run] Would follow Case #{c_num} for '{user}'.")
+        return
     print(f"Adding '{user}' as watcher on {len(case_numbers)} case(s)...")
     has_error = False
     for c_num in case_numbers:
@@ -108,6 +112,10 @@ def cmd_unfollow(args, api_client, config=None):
     case_service = CaseService(api_client, config=config)
     user = getattr(args, "user", None) or case_service.get_current_user()
 
+    if getattr(args, "dry_run", False):
+        for c_num in case_numbers:
+            print(f"[Dry-run] Would unfollow Case #{c_num} for '{user}'.")
+        return
     print(f"Removing '{user}' from watchers on {len(case_numbers)} case(s)...")
     has_error = False
     for c_num in case_numbers:
