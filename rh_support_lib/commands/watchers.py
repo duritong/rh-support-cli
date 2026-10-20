@@ -31,21 +31,39 @@ def _gather_cases(args) -> list[str]:
     return result
 
 
-def _resolve_account(args, config) -> str | None:
-    """Resolves account number from positional arg, --account, or bookmarks."""
+def _resolve_account_filters(args, config) -> dict:
+    """Merges supported bookmark filters with explicit account command options."""
     from rh_support_lib.config import resolve_bookmarks
 
-    acc = getattr(args, "account", None) or getattr(args, "account_pos", None)
-    if acc:
-        return str(acc).strip()
-
     filters = resolve_bookmarks(
-        config,
+        config or {},
         getattr(args, "bookmark", None),
         getattr(args, "no_default_bookmark", False),
     )
-    res = filters.get("account") or filters.get("accountNumber")
-    return str(res).strip() if res else None
+    unsupported = set(filters) - {
+        "account",
+        "accountNumber",
+        "status",
+        "severity",
+        "user",
+    }
+    if unsupported:
+        sys.exit(
+            "Error: Unsupported account-tracking bookmark filters: "
+            + ", ".join(sorted(unsupported))
+        )
+    acc = (
+        getattr(args, "account", None)
+        or getattr(args, "account_pos", None)
+        or filters.get("account")
+        or filters.get("accountNumber")
+    )
+    filters["account"] = str(acc).strip() if acc else None
+    for field in ("status", "severity", "user"):
+        value = getattr(args, field, None)
+        if value is not None:
+            filters[field] = value
+    return filters
 
 
 def cmd_follow(args, api_client, config=None):
@@ -132,17 +150,18 @@ def cmd_unfollow(args, api_client, config=None):
 
 def cmd_follow_account(args, api_client, config=None):
     """Follows all matching cases for an account (by default: open cases)."""
-    acc = _resolve_account(args, config)
+    filters = _resolve_account_filters(args, config)
+    acc = filters["account"]
     if not acc:
         sys.exit(
             "Error: Please specify an account number (e.g. follow-account 123456 or -a 123456) or configure an account in bookmarks."
         )
 
     case_service = CaseService(api_client, config=config)
-    user = getattr(args, "user", None) or case_service.get_current_user()
+    user = filters.get("user") or case_service.get_current_user()
     is_all = bool(getattr(args, "all", False))
-    raw_status = "all" if is_all else (getattr(args, "status", None) or "open")
-    severity = getattr(args, "severity", None)
+    raw_status = "all" if is_all else (filters.get("status") or "open")
+    severity = filters.get("severity")
     dry_run = bool(getattr(args, "dry_run", False))
     fmt = "json" if getattr(args, "json", False) else getattr(args, "format", "text")
 
@@ -208,15 +227,17 @@ def cmd_follow_account(args, api_client, config=None):
 
 def cmd_unfollow_account(args, api_client, config=None):
     """Unfollows cases belonging to an account, optionally filtered by status."""
-    acc = _resolve_account(args, config)
+    filters = _resolve_account_filters(args, config)
+    acc = filters["account"]
     if not acc:
         sys.exit(
             "Error: Please specify an account number (e.g. unfollow-account 123456 or -a 123456) or configure an account in bookmarks."
         )
 
     case_service = CaseService(api_client, config=config)
-    user = getattr(args, "user", None) or case_service.get_current_user()
-    status = getattr(args, "status", None)
+    user = filters.get("user") or case_service.get_current_user()
+    status = filters.get("status")
+    severity = filters.get("severity")
     dry_run = bool(getattr(args, "dry_run", False))
     fmt = "json" if getattr(args, "json", False) else getattr(args, "format", "text")
 
@@ -224,6 +245,7 @@ def cmd_unfollow_account(args, api_client, config=None):
         receipt = case_service.unfollow_account(
             account=acc,
             status=status,
+            severity=severity,
             username=user,
             dry_run=dry_run,
         )

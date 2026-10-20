@@ -450,6 +450,8 @@ Account follow previews still fetch matching remote cases, but leave all local t
 
 Account unfollow selects cases using local tracking data. If a tracked case has no account number, locally cached case details are used when available; cases whose account cannot be identified locally are left followed. Status filters use this local information, which may be older than the portal.
 
+Account commands support bookmark fields `account` (or `accountNumber`), `status`, `severity`, and `user`. Default and explicitly selected bookmarks are merged in order; explicit account, status, severity, and user options override their bookmark values. `follow-account --all` overrides the bookmark status. Unsupported bookmark fields are rejected rather than silently widening the operation. For example, `unfollow-account -b closed --dry-run` preserves the bookmark's status and severity filters; `--severity high` overrides its severity.
+
 ### 5.10 Synchronizing Tracked Cases & Systemd Timer (`sync` / `install-systemd` / `systemd`)
 Polls Red Hat's backend across all followed and owned cases in parallel to detect remote updates:
 

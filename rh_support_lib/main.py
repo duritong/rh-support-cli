@@ -684,6 +684,10 @@ Authentication:
         help="Filter followed cases to unfollow by status (e.g. closed, open)",
     )
     parser_unfollow_acc.add_argument(
+        "--severity",
+        help="Filter followed cases to unfollow by severity (e.g. high, normal)",
+    )
+    parser_unfollow_acc.add_argument(
         "-u",
         "--user",
         help="SSO username (defaults to myself/current authenticated user)",

@@ -1883,6 +1883,7 @@ class CaseService:
         status: list[str] | str | None = None,
         username: str | None = None,
         dry_run: bool = False,
+        severity: list[str] | str | None = None,
     ) -> dict[str, Any]:
         """Unfollows cases belonging to an account, optionally filtered by status."""
         acc_str = str(account).strip()
@@ -1896,6 +1897,7 @@ class CaseService:
             username=user,
             account=acc_str,
             status=mapped_statuses,
+            severity=severity,
             fetch_live=False,
         )
         case_numbers = [c.case_number for c in matching_followed]
@@ -1906,14 +1908,13 @@ class CaseService:
             if c_num not in case_numbers and not tc.account_number:
                 cached = self.cache_service.get_case_details(c_num, ttl=0)
                 cached_case = cached[0].case if cached else None
-                if cached_case and str(cached_case.account_number).strip() == acc_str:
-                    if mapped_statuses:
-                        if self._matches_case_filters(
-                            cached_case, status=mapped_statuses
-                        ):
-                            case_numbers.append(c_num)
-                    else:
-                        case_numbers.append(c_num)
+                if cached_case and self._matches_case_filters(
+                    cached_case,
+                    account=acc_str,
+                    status=mapped_statuses,
+                    severity=severity,
+                ):
+                    case_numbers.append(c_num)
 
         if not dry_run and case_numbers:
             unfollowed = self.state_service.remove_followed_cases_batch(
