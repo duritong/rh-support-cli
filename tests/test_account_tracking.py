@@ -8,6 +8,7 @@ from unittest.mock import Mock, patch
 
 from rh_support_lib.api import RedHatAPIClient
 from rh_support_lib.commands.watchers import cmd_follow, cmd_unfollow
+from rh_support_lib.models import Case
 from rh_support_lib.services.cache import CacheService
 from rh_support_lib.services.cases import CaseService
 from rh_support_lib.services.state import StateService
@@ -53,3 +54,37 @@ class AccountTrackingTests(unittest.TestCase):
                 self.assertIn("[Dry-run]", output.getvalue())
                 self.assertIn(number, output.getvalue())
         self.client.execute_graphql.assert_not_called()
+
+    def test_account_dry_run_does_not_register_owned_cases(self):
+        self.state.add_tracked_case("user", "followed")
+        before = self.state.load_state()
+        cases = [
+            Case(
+                case_number=number,
+                summary="Owned case",
+                status="In Progress",
+                severity="High",
+                account_number="A",
+                owner="user",
+            )
+            for number in ("new", "followed")
+        ]
+        self.client.execute_graphql.return_value = {
+            "redhat_support_uiapi": {
+                "query": {
+                    "RedHatSupportCase": {
+                        "edges": [{"node": {"Id": c.case_number}} for c in cases],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                    }
+                }
+            }
+        }
+        for user in ("user", "other-user"):
+            with (
+                self.subTest(user=user),
+                patch.object(self.service, "_normalize_case_node", side_effect=cases),
+            ):
+                self.state.save_state(before)
+                receipt = self.service.follow_account("A", username=user, dry_run=True)
+                self.assertEqual(self.state.load_state(), before)
+                self.assertEqual(receipt["total_matching"], 2)

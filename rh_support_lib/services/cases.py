@@ -691,6 +691,7 @@ class CaseService:
         limit: int | None = None,
         use_cache: bool = True,
         provenance: dict | None = None,
+        track_owned: bool = True,
     ) -> list[Case]:
         """Return cases, optionally recording this request's source in a caller-owned dict."""
         if provenance is not None:
@@ -731,6 +732,7 @@ class CaseService:
             after=after,
             all_pages=all_pages,
             limit=limit,
+            track_owned=track_owned,
         )
         if (
             use_cache
@@ -756,6 +758,7 @@ class CaseService:
         after: str | None = None,
         all_pages: bool = False,
         limit: int | None = None,
+        track_owned: bool = True,
     ) -> list[Case]:
         if first <= 0 or (limit is not None and limit < 0):
             raise ValueError("Case page size must be positive and limit nonnegative.")
@@ -828,8 +831,9 @@ class CaseService:
             for c in page:
                 if c:
                     # Auto-track owned cases (Option B)
-                    if (c.contact_sso and c.contact_sso.lower() == user.lower()) or (
-                        c.owner and c.owner.lower() == user.lower()
+                    if track_owned and (
+                        (c.contact_sso and c.contact_sso.lower() == user.lower())
+                        or (c.owner and c.owner.lower() == user.lower())
                     ):
                         self.state_service.register_owned_case(
                             user=user,
@@ -1828,6 +1832,7 @@ class CaseService:
             severity=severity,
             all_pages=True,
             use_cache=False,
+            track_owned=not dry_run,
         )
 
         currently_following = set(self.state_service.get_followed_cases(user).keys())
