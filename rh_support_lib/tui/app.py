@@ -1687,7 +1687,11 @@ class SupportApp(App):
                     update(self._read_warning, f"Case {case_id} not found.")
                     return
 
-                attachments = self.attachment_service.list_attachments(case_id)
+                attachments = []
+                try:
+                    attachments = self.attachment_service.list_attachments(case_id)
+                except Exception as e:  # noqa: BLE001
+                    self.notify(f"Attachments unavailable: {e}", severity="warning")
 
                 update(self.render_case_details, details, attachments)
             except Exception as e:  # noqa: BLE001

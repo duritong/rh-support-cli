@@ -42,6 +42,8 @@ The CLI resolves tokens in the following order of precedence:
    ```
 4. **Interactive Prompt**: Prompts securely on the terminal if no credential source is found.
 
+*Note: If attachment access reports a missing `api.graphql` scope, generate a **new offline token** at <https://access.redhat.com/management/api>. Older offline-token grants may lack this scope; refreshing existing access tokens or clearing cache cannot upgrade an older token grant.*
+
 ---
 
 ## 3. Configuration & Bookmarks
@@ -372,6 +374,7 @@ rh-support-cli attachment -c 12345678 delete -a <attachment-uuid>
 * **Source Stability**: Keep upload source files unchanged during transfer; modifying source files mid-flight causes transfer verification errors.
 * **Download Publication**: Downloads stream to a private temporary file and publish via hard link, refusing existing destination files (including symlinks or files created during transfer) to prevent overwriting local files. Specify a new output path (`-o`) if the file already exists.
 * **Multipart Streaming (> 5 GB up to 5 TB)**: Files larger than 5 GiB stream in 5 GiB chunks using bounded 8 MiB transfer blocks to prevent local memory exhaustion. Interrupted uploads (`Ctrl+C`) trigger an automated session abort on Red Hat's storage backend.
+* **Missing `api.graphql` Scope**: If attachment operations report a missing scope error, generate a new offline token at <https://access.redhat.com/management/api>. Older offline tokens lack this scope, and access-token refreshes cannot escalate an older grant.
 
 ### 5.9 Following & Tracking Cases Locally (`follow` / `follow-account` / `unfollow` / `unfollow-account` / `following`)
 

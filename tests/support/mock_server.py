@@ -1006,6 +1006,14 @@ class MockRedHatHandler(http.server.BaseHTTPRequestHandler):
         # Attachment List Endpoint: GET /v3/cases/{caseNumber}/attachments
         match_list_att = re.search(r"/cases/([^/]+)/attachments(?:\?.*)?$", self.path)
         if match_list_att:
+            if getattr(MockRedHatHandler, "fail_attachments", False):
+                self.send_response(401)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                self.wfile.write(
+                    b'{"error": "Required scope api.graphql not found in JWT token", "status": "401"}'
+                )
+                return
             case_num = match_list_att.group(1)
             host = self.headers.get("Host", "localhost")
             self.send_response(200)

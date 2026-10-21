@@ -210,6 +210,61 @@ class AuthConcurrencyTests(unittest.TestCase):
         self.assertEqual(headers, {"Accept": "custom"})
         self.assertIsNot(request.call_args.kwargs["headers"], headers)
 
+    def test_missing_graphql_scope_explains_offline_token_regeneration(self):
+        client = api.RedHatAPIClient()
+        client._token = "old-token"
+        denied = Mock(status_code=401)
+        denied.json.return_value = {
+            "error": "Required scope api.graphql not found in JWT token",
+            "private_detail": "secret-token secret-user@example.test",
+        }
+        with (
+            patch.object(api, "get_access_token", return_value="new-token") as acquire,
+            patch.object(
+                api.requests, "request", side_effect=[Mock(status_code=401), denied]
+            ) as request,
+            self.assertRaises(api.AuthenticationError) as caught,
+        ):
+            client.get("https://invalid/attachments")
+        message = str(caught.exception)
+        self.assertIn("api.graphql", message)
+        self.assertIn("Generate a new", message)
+        self.assertIn("offline token", message)
+        self.assertIn("REDHAT_SUPPORT_OFFLINE_TOKEN", message)
+        self.assertNotIn("secret", message)
+        self.assertEqual(request.call_count, 2)
+        acquire.assert_called_once()
+        denied.close.assert_called_once()
+
+    def test_other_authorization_failures_do_not_suggest_regeneration(self):
+        for payload in (
+            {"error": "Token expired"},
+            {"error": "Required scope another.scope not found in JWT token"},
+            {"error": ["api.graphql"]},
+            None,
+        ):
+            client = api.RedHatAPIClient()
+            client._token = "old-token"
+            denied = Mock(status_code=401)
+            denied.json.return_value = payload
+            with (
+                self.subTest(payload=payload),
+                patch.object(api, "get_access_token", return_value="new-token"),
+                patch.object(api.requests, "request", return_value=denied),
+            ):
+                self.assertIs(client.get("https://invalid/attachments"), denied)
+
+    def test_non_json_unauthorized_response_keeps_normal_error_handling(self):
+        client = api.RedHatAPIClient()
+        client._token = "old-token"
+        denied = Mock(status_code=401)
+        denied.json.side_effect = ValueError("private response")
+        with (
+            patch.object(api, "get_access_token", return_value="new-token"),
+            patch.object(api.requests, "request", return_value=denied),
+        ):
+            self.assertIs(client.get("https://invalid/attachments"), denied)
+
     def test_request_exception_still_propagates_without_retry(self):
         client = api.RedHatAPIClient()
         failure = api.requests.exceptions.ConnectionError("offline")
@@ -255,9 +310,10 @@ class AtomicTokenCacheTests(unittest.TestCase):
         return hashlib.sha256(
             json.dumps(
                 {
-                    "offline_token": credential,
-                    "sso_url": api.SSO_URL,
                     "client_id": "rhsm-api",
+                    "offline_token": credential,
+                    "scope": api.SSO_SCOPE,
+                    "sso_url": api.SSO_URL,
                 },
                 sort_keys=True,
             ).encode("utf-8")
@@ -353,3 +409,14 @@ class AtomicTokenCacheTests(unittest.TestCase):
         self.assertEqual(output.getvalue(), "")
         self.assertEqual(str(caught.exception), "Failed to authenticate with SSO.")
         self.assertTrue(caught.exception.__suppress_context__)
+
+    def test_token_exchange_requests_api_graphql_scope(self):
+        token = api.get_access_token(offline_token="my-offline-token")
+        self.assertEqual(token, "my-offline-token.access.jwt")
+        self.post.assert_called_once()
+        _url, kwargs = self.post.call_args
+        payload = kwargs.get("data", {})
+        self.assertEqual(payload.get("scope"), "api.graphql")
+        self.assertEqual(payload.get("client_id"), "rhsm-api")
+        self.assertEqual(payload.get("grant_type"), "refresh_token")
+        self.assertEqual(payload.get("refresh_token"), "my-offline-token")

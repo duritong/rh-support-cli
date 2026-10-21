@@ -70,6 +70,32 @@ class TestCliCases(MockServerTestCase):
         # Check for ANSI escape codes (colors)
         self.assertIn("\033[", result.stdout)
 
+    def test_show_case_renders_details_when_attachments_fail_in_text_mode(self):
+        """Test that show renders case details with a warning when attachments fail in text mode."""
+        MockRedHatHandler.fail_attachments = True
+        try:
+            # Text mode renders case details and warns on stderr
+            result = self.run_cli(["show", "-c", "12345", "--no-pager"])
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("CASE: 12345", result.stdout)
+            self.assertIn("Test Case Details", result.stdout)
+            self.assertIn("ATTACHMENTS", result.stdout)
+            self.assertIn("unavailable", result.stdout)
+            self.assertIn(
+                "Warning: Attachments for case 12345 are unavailable",
+                result.stderr,
+            )
+            self.assertIn("Generate a new Red Hat offline token", result.stderr)
+            self.assertIn("api.graphql", result.stderr)
+
+            # JSON mode fails closed to prevent emitting incomplete structured data
+            result_json = self.run_cli(["show", "-c", "12345", "--format", "json"])
+            self.assertNotEqual(result_json.returncode, 0)
+            self.assertEqual(result_json.stdout, "")
+            self.assertIn("Generate a new Red Hat offline token", result_json.stderr)
+        finally:
+            MockRedHatHandler.fail_attachments = False
+
     def test_show_case_incident_export(self):
         """Test incident shift-handoff export in markdown, slack, and json formats."""
 

@@ -13,6 +13,10 @@ SSO_URL = os.environ.get(
     "RH_SSO_URL",
     "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token",
 )
+DEFAULT_SSO_CLIENT_ID = "rhsm-api"
+SSO_CLIENT_ID = os.environ.get("RH_SSO_CLIENT_ID", DEFAULT_SSO_CLIENT_ID)
+DEFAULT_SSO_SCOPE = "api.graphql"
+SSO_SCOPE = os.environ.get("RH_SSO_SCOPE", DEFAULT_SSO_SCOPE)
 
 SEVERITY_MAP = {
     "1": "1 (Urgent)",
@@ -62,9 +66,13 @@ __all__ = [
     "DEFAULT_ATTACHMENT_URL",
     "DEFAULT_GRAPHQL_URL",
     "DEFAULT_KCS_SEARCH_URL",
+    "DEFAULT_SSO_CLIENT_ID",
+    "DEFAULT_SSO_SCOPE",
     "GRAPHQL_URL",
     "KCS_SEARCH_URL",
     "SEVERITY_MAP",
+    "SSO_CLIENT_ID",
+    "SSO_SCOPE",
     "SSO_URL",
     "STATUS_CLOSED",
     "STATUS_FILTER_MAP",

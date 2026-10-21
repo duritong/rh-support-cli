@@ -107,6 +107,10 @@ class AttachmentService:
 
         try:
             resp = self.api_client.get(url, params=params)
+            if resp.status_code == 401:
+                raise AuthenticationError(
+                    "Attachment listing failed: unauthorized request (check token permissions or scopes)."
+                )
             resp.raise_for_status()
             raw_list = resp.json()
         except AuthenticationError:

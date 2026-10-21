@@ -75,10 +75,11 @@ rh-support-cli/
 
 ### OIDC Authentication & Token Lifecycle
 
+
 `RedHatAPIClient` (`api.py`) manages authentication via Red Hat SSO:
 1. **Offline Token Exchange**: Exchanges an offline token for a short-lived access token (`POST /auth/token`).
 2. **Token Caching & Fingerprinting**: Access tokens are cached under `$XDG_CACHE_HOME/rh-support-cli/tokens/` bound to an opaque SHA-256 fingerprint of the resolved credential, endpoint, and client ID.
-3. **Transparent 401 Retries**: Intercepts `401 Unauthorized` responses, invalidates the cached access token, performs an in-process refresh, and retries the target request once.
+3. **Transparent 401 Retries & Scope Detection**: Intercepts `401 Unauthorized` responses, invalidates the cached access token, performs an in-process refresh, and retries the request once. If the retried response explicitly reports `Required scope api.graphql not found in JWT token`, `RedHatAPIClient.request()` raises an `AuthenticationError` explaining that a new offline token must be generated at `https://access.redhat.com/management/api`. Other 401 responses propagate normally.
 4. **Stream Rewinding**: Before sending requests with seekable payloads, stream offsets are captured so 401 retries can rewind and replay the body without buffering entire streams into memory. Non-seekable bodies raise `RequestReplayError` rather than retrying empty content.
 
 ### GraphQL CRM Protocol

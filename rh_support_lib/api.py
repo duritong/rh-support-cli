@@ -16,7 +16,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 import requests
 import requests.sessions
 
-from rh_support_lib.constants import SSO_URL
+from rh_support_lib.constants import SSO_CLIENT_ID, SSO_SCOPE, SSO_URL
 
 
 def _redact_debug_value(value):
@@ -92,9 +92,9 @@ def enable_debug_logging(log_file=None):
         logger.debug("Request Headers: %s", _redact_debug_value(dict(headers)))
 
         # Log Body
-        if "json" in kwargs:
+        if "json" in kwargs and kwargs["json"] is not None:
             logger.debug("Request Body (JSON): %s", _redact_debug_value(kwargs["json"]))
-        elif "data" in kwargs:
+        elif "data" in kwargs and kwargs["data"] is not None:
             logger.debug(
                 "Request Body (Data): %s",
                 _redact_debug_value(kwargs["data"])
@@ -214,9 +214,10 @@ def get_access_token(token_file_arg=None, offline_token=None):
     credential_context = hashlib.sha256(
         json.dumps(
             {
+                "client_id": SSO_CLIENT_ID,
                 "offline_token": offline_token,
+                "scope": SSO_SCOPE,
                 "sso_url": SSO_URL,
-                "client_id": "rhsm-api",
             },
             sort_keys=True,
         ).encode("utf-8")
@@ -258,9 +259,11 @@ def get_access_token(token_file_arg=None, offline_token=None):
 
     payload = {
         "grant_type": "refresh_token",
-        "client_id": "rhsm-api",
+        "client_id": SSO_CLIENT_ID,
         "refresh_token": offline_token,
     }
+    if SSO_SCOPE:
+        payload["scope"] = SSO_SCOPE
 
     try:
         response = requests.post(SSO_URL, data=payload, timeout=30)
@@ -486,6 +489,21 @@ class RedHatAPIClient:
                 )
             headers["Authorization"] = f"Bearer {token}"
             resp = requests.request(method, url, **kwargs)
+            try:
+                denied = resp.json() if resp.status_code == 401 else None
+            except ValueError:
+                denied = None
+            if isinstance(denied, dict) and denied.get("error") == (
+                "Required scope api.graphql not found in JWT token"
+            ):
+                resp.close()
+                raise AuthenticationError(
+                    "The API requires the 'api.graphql' scope, which older offline "
+                    "tokens may lack. Generate a new Red Hat offline token at "
+                    "https://access.redhat.com/management/api and replace the token "
+                    "in your selected token file or REDHAT_SUPPORT_OFFLINE_TOKEN. "
+                    "Refreshing the access token alone is not sufficient."
+                ) from None
         return resp
 
     def get(self, url, **kwargs):

@@ -156,13 +156,28 @@ def cmd_show(args, api_client, config: dict | None = None):
 
     from rh_support_lib.services.attachments import AttachmentService
 
+    fmt = getattr(args, "format", "text")
+    attachments = []
+    attachments_unavailable = False
     try:
         attachments = AttachmentService(api_client).list_attachments(str(num))
-    except AuthenticationError:
-        raise
-    except Exception:  # noqa: BLE001 - never turn an unavailable list into empty success
-        sys.exit(
-            f"Error: Attachments for case {num} are unavailable; no complete case view returned."
+    except AuthenticationError as e:
+        if fmt in ("json", "yaml"):
+            raise
+        attachments_unavailable = True
+        print(
+            f"Warning: Attachments for case {num} are unavailable ({e}).",
+            file=sys.stderr,
+        )
+    except Exception as e:  # noqa: BLE001
+        if fmt in ("json", "yaml"):
+            sys.exit(
+                f"Error: Attachments for case {num} are unavailable; no complete case view returned."
+            )
+        attachments_unavailable = True
+        print(
+            f"Warning: Attachments for case {num} are unavailable ({e}).",
+            file=sys.stderr,
         )
     user = service.get_current_user()
     tc = service.state_service.get_tracked_cases(user).get(str(num))
@@ -292,6 +307,11 @@ def cmd_show(args, api_client, config: dict | None = None):
                     f"{a.uuid:<36}  {a.file_name:<30}  {size_str:<10}  {a.created_by or 'Unknown':<20}  {a.upload_status}"
                 )
             lines.append("\n" + "-" * 80)
+        elif attachments_unavailable:
+            lines.append(
+                "ATTACHMENTS: (unavailable - check token permissions or scopes)\n"
+            )
+            lines.append("-" * 80)
         lines.append("DESCRIPTION:\n")
         lines.append(description)
         lines.append("\n" + "=" * 80 + "\n")
@@ -412,7 +432,10 @@ def cmd_show(args, api_client, config: dict | None = None):
                         a.upload_status,
                     )
                 con.print(att_table)
-
+            elif attachments_unavailable:
+                con.print(
+                    "\n[dim yellow]ATTACHMENTS: (unavailable - check token permissions or scopes)[/]\n"
+                )
             con.print("\n[bold magenta]DESCRIPTION:[/]\n")
             con.print(Markdown(description))
             con.print()
