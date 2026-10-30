@@ -62,6 +62,69 @@ def _validate_filters(filters, field):
             raise ConfigError(f"{field}.{key}: invalid filter type")
 
 
+def _validate_auto_follow_accounts(value, field):
+    if isinstance(value, bool):
+        raise ConfigError(f"{field}: expected a string, integer, list, or mapping")
+    if isinstance(value, (str, int)):
+        if not str(value).strip():
+            raise ConfigError(
+                f"{field}: expected a non-empty account number or bookmark name"
+            )
+        return
+    if isinstance(value, list):
+        for idx, item in enumerate(value):
+            if isinstance(item, bool):
+                raise ConfigError(
+                    f"{field}[{idx}]: expected a string, integer, or mapping"
+                )
+            if isinstance(item, (str, int)):
+                if not str(item).strip():
+                    raise ConfigError(
+                        f"{field}[{idx}]: expected a non-empty account number or bookmark name"
+                    )
+            elif isinstance(item, Mapping):
+                acc = item.get("account") or item.get("accountNumber")
+                if not acc or not str(acc).strip():
+                    raise ConfigError(
+                        f"{field}[{idx}]: missing required 'account' field"
+                    )
+                if "status" in item:
+                    statuses = (
+                        item["status"]
+                        if isinstance(item["status"], list)
+                        else [item["status"]]
+                    )
+                    if not all(isinstance(s, str) for s in statuses):
+                        raise ConfigError(
+                            f"{field}[{idx}].status: expected string or list of strings"
+                        )
+                if "severity" in item:
+                    sevs = (
+                        item["severity"]
+                        if isinstance(item["severity"], list)
+                        else [item["severity"]]
+                    )
+                    if not all(type(s) in (str, int) for s in sevs):
+                        raise ConfigError(
+                            f"{field}[{idx}].severity: expected string, integer, or list"
+                        )
+            else:
+                raise ConfigError(
+                    f"{field}[{idx}]: expected a string, integer, or mapping"
+                )
+        return
+    if isinstance(value, Mapping):
+        for acc_key, item in value.items():
+            if not str(acc_key).strip():
+                raise ConfigError(f"{field}: expected non-empty account keys")
+            if item is not None and not isinstance(item, Mapping):
+                raise ConfigError(
+                    f"{field}.{acc_key}: expected a mapping of filter options or null"
+                )
+        return
+    raise ConfigError(f"{field}: expected a string, integer, list, or mapping")
+
+
 def resolve_bookmarks(config, explicit=None, no_default=False, clear=False):
     """Merge selected bookmarks in order (last wins), without I/O or mutation.
 
@@ -150,6 +213,9 @@ def _validate_config(config):
         if not isinstance(name, str):
             raise ConfigError("bookmarks: expected string names")
         _validate_filters(filters, f"bookmarks.{name}")
+    for key in ("auto_follow_accounts", "auto_follow_account"):
+        if key in config:
+            _validate_auto_follow_accounts(config[key], key)
     if "default_bookmark" in config:
         resolve_bookmarks(config)
     return config

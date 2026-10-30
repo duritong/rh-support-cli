@@ -530,7 +530,11 @@ Authentication:
         action="store_true",
         help="Sync followed cases from account before following",
     )
-    parser_follow.add_argument("--account", help="Account number to sync from")
+    parser_follow.add_argument(
+        "-a",
+        "--account",
+        help="Account number to sync from or follow cases from",
+    )
     parser_follow.add_argument(
         "-s",
         "--status",
@@ -540,6 +544,21 @@ Authentication:
         "--all",
         action="store_true",
         help="Follow all cases for the account regardless of status",
+    )
+    parser_follow.add_argument(
+        "--severity",
+        help="Filter cases by severity when following an account (e.g. urgent, high, normal, low)",
+    )
+    parser_follow.add_argument(
+        "-b",
+        "--bookmark",
+        action="append",
+        help="Merge filters from bookmark (can be specified multiple times)",
+    )
+    parser_follow.add_argument(
+        "--no-default-bookmark",
+        action="store_true",
+        help="Ignore default bookmark from config",
     )
     parser_follow.add_argument(
         "--dry-run",
@@ -656,6 +675,21 @@ Authentication:
         help="Filter followed cases to unfollow by status (e.g. closed, open)",
     )
     parser_unfollow.add_argument(
+        "--severity",
+        help="Filter followed cases to unfollow by severity (e.g. high, normal)",
+    )
+    parser_unfollow.add_argument(
+        "-b",
+        "--bookmark",
+        action="append",
+        help="Merge filters from bookmark (can be specified multiple times)",
+    )
+    parser_unfollow.add_argument(
+        "--no-default-bookmark",
+        action="store_true",
+        help="Ignore default bookmark from config",
+    )
+    parser_unfollow.add_argument(
         "--dry-run",
         action="store_true",
         help="Show which cases would be unfollowed without modifying local tracking state",
@@ -734,6 +768,11 @@ Authentication:
     )
     parser_sync.add_argument(
         "--simple-output", action="store_true", help="Disable colored output"
+    )
+    parser_sync.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show sync results and auto-followed cases without modifying local tracking state",
     )
 
     # Updates Subcommand
@@ -1057,6 +1096,8 @@ Authentication:
         "tui",
         "follow-account",
         "unfollow-account",
+        "follow",
+        "unfollow",
     ):
         selected = getattr(args, "bookmark", None)
         resolve_bookmarks(

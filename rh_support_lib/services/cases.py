@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from typing import Any
@@ -396,6 +397,7 @@ class CaseService:
         config: dict | None = None,
     ):
         self.api_client = api_client
+        self.config = config or {}
         self._resolved_username = None
         self.graphql_url = (
             graphql_url or os.environ.get("RH_GRAPHQL_URL") or GRAPHQL_URL
@@ -1934,15 +1936,132 @@ class CaseService:
             "success": True,
         }
 
+    def get_auto_follow_accounts(self) -> list[dict[str, Any]]:
+        """Resolves configured auto-follow accounts from config, expanding bookmarks if referenced."""
+        if not self.config:
+            return []
+        raw = self.config.get("auto_follow_accounts")
+        if raw is None:
+            raw = self.config.get("auto_follow_account")
+        if raw is None:
+            return []
+
+        entries: list[Any] = []
+        if isinstance(raw, (str, int)):
+            entries = [str(raw).strip()]
+        elif isinstance(raw, list):
+            entries = list(raw)
+        elif isinstance(raw, Mapping):
+            entries = [{"account": str(k).strip(), **(v or {})} for k, v in raw.items()]
+
+        bookmarks = (
+            self.config.get("bookmarks", {})
+            if isinstance(self.config.get("bookmarks"), Mapping)
+            else {}
+        )
+
+        results: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for item in entries:
+            if isinstance(item, (str, int)):
+                val = str(item).strip()
+                if not val:
+                    continue
+                if val in bookmarks and isinstance(bookmarks[val], Mapping):
+                    bm = bookmarks[val]
+                    acc = bm.get("account") or bm.get("accountNumber")
+                    if acc:
+                        acc_str = str(acc).strip()
+                        if acc_str and acc_str not in seen:
+                            seen.add(acc_str)
+                            results.append(
+                                {
+                                    "account": acc_str,
+                                    "status": bm.get("status", "open"),
+                                    "severity": bm.get("severity"),
+                                }
+                            )
+                        continue
+                if val not in seen:
+                    seen.add(val)
+                    results.append({"account": val, "status": "open", "severity": None})
+            elif isinstance(item, Mapping):
+                acc = str(
+                    item.get("account") or item.get("accountNumber") or ""
+                ).strip()
+                if acc and acc not in seen:
+                    seen.add(acc)
+                    results.append(
+                        {
+                            "account": acc,
+                            "status": item.get("status", "open"),
+                            "severity": item.get("severity"),
+                        }
+                    )
+        return results
+
     def sync_tracked_cases(
-        self, username: str | None = None, account: str | None = None
+        self,
+        username: str | None = None,
+        account: str | None = None,
+        dry_run: bool = False,
     ) -> dict[str, Any]:
         """Syncs all tracked cases (owned + followed) against the remote GraphQL API,
-        detecting status changes and new comments since last checkpoints."""
+        detecting status changes and new comments since last checkpoints.
+        Also discovers and automatically follows new cases for configured auto-follow accounts."""
         user = username or self.get_current_user()
+
+        # 1. Auto-follow new cases for configured accounts (or explicit account filter)
+        newly_followed: list[str] = []
+        if account:
+            acc_str = str(account).strip()
+            matched = next(
+                (t for t in self.get_auto_follow_accounts() if t["account"] == acc_str),
+                None,
+            )
+            auto_targets = [
+                matched or {"account": acc_str, "status": "open", "severity": None}
+            ]
+        else:
+            auto_targets = self.get_auto_follow_accounts()
+
+        for target in auto_targets:
+            acc_num = target.get("account")
+            if not acc_num:
+                continue
+            try:
+                receipt = self.follow_account(
+                    account=acc_num,
+                    status=target.get("status", "open"),
+                    severity=target.get("severity"),
+                    username=user,
+                    dry_run=dry_run,
+                )
+                if receipt.get("followed"):
+                    newly_followed.extend(receipt["followed"])
+            except AuthenticationError:
+                raise
+            except Exception:  # noqa: BLE001, S110
+                pass
+
         tracked = self.state_service.get_tracked_cases(user)
+        if account:
+            acc_str = str(account).strip()
+            tracked = {
+                c_num: tc
+                for c_num, tc in tracked.items()
+                if tc.account_number == acc_str
+            }
+
         if not tracked:
-            return {"synced_count": 0, "updated_cases": [], "new_comments": 0}
+            return {
+                "synced_count": 0,
+                "updated_cases": [],
+                "new_comments": 0,
+                "newly_followed": newly_followed,
+                "newly_followed_count": len(newly_followed),
+                "dry_run": dry_run,
+            }
 
         def sync_one(c_num: str) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
             tc = tracked[c_num]
@@ -2030,9 +2149,10 @@ class CaseService:
             results = list(executor.map(sync_one, list(tracked.keys())))
 
         case_updates = [r[0] for r in results if r and r[0]]
-        self.state_service.batch_update_latest_known(
-            user=user, case_updates=case_updates
-        )
+        if not dry_run:
+            self.state_service.batch_update_latest_known(
+                user=user, case_updates=case_updates
+            )
 
         updated = [r[1] for r in results if r and r[1]]
         total_new_comments = sum(r["new_comment_count"] for r in updated)
@@ -2040,6 +2160,9 @@ class CaseService:
             "synced_count": len(case_updates),
             "updated_cases": updated,
             "new_comments": total_new_comments,
+            "newly_followed": newly_followed,
+            "newly_followed_count": len(newly_followed),
+            "dry_run": dry_run,
         }
         failures = [c_num for c_num, result in zip(tracked, results) if not result[0]]
         if failures:
@@ -2051,7 +2174,9 @@ class CaseService:
     ) -> list[str]:
         """Compatibility wrapper that runs sync_tracked_cases and returns updated case numbers."""
         res = self.sync_tracked_cases(username=username, account=account)
-        return [u["case_number"] for u in res.get("updated_cases", [])]
+        updated = [u["case_number"] for u in res.get("updated_cases", [])]
+        new_cases = res.get("newly_followed", [])
+        return list(dict.fromkeys(updated + new_cases))
 
     def list_followed_cases(
         self,

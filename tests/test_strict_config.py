@@ -234,6 +234,41 @@ class StrictConfigTests(unittest.TestCase):
                 0,
             )
 
+    def test_auto_follow_accounts_validation(self):
+        # Valid shapes
+        for val in (
+            "1376996",
+            1376996,
+            ["1376996", "bit_open"],
+            [1376996],
+            [{"account": "1376996", "status": ["open"]}],
+            [{"accountNumber": 1376996, "severity": "High"}],
+            {"1376996": {"status": "open"}},
+            {"1376996": None},
+            [],
+        ):
+            with self.subTest(val=val):
+                cfg = load_config(self.write({"auto_follow_accounts": val}))
+                self.assertIn("auto_follow_accounts", cfg)
+
+        # Invalid shapes
+        invalid = (
+            True,
+            "",
+            [True],
+            [""],
+            [{}],
+            [{"status": "open"}],
+            [{"account": ""}],
+            [{"account": "1376996", "status": 123}],
+            [{"account": "1376996", "severity": True}],
+            {"": {"status": "open"}},
+            {"1376996": "invalid"},
+        )
+        for bad in invalid:
+            with self.subTest(bad=bad), self.assertRaises(ConfigError):
+                load_config(self.write({"auto_follow_accounts": bad}))
+
     def test_resolver_precedence_merge_empty_and_no_mutation(self):
         config = {
             "bookmarks": {

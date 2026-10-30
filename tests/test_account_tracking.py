@@ -246,3 +246,270 @@ class AccountTrackingTests(unittest.TestCase):
                 )
             follow.assert_not_called()
             unfollow.assert_not_called()
+
+    def test_account_commands_ignore_language_bookmark_filter(self):
+        config = {
+            "default_bookmark": "bit_open",
+            "bookmarks": {
+                "bit_open": {
+                    "account": "1376996",
+                    "status": ["open"],
+                    "language": "en",
+                }
+            },
+        }
+        # Test follow-account with language in bookmark
+        with (
+            patch(
+                "rh_support_lib.commands.watchers.CaseService",
+                return_value=self.service,
+            ),
+            patch.object(self.service, "list_cases", return_value=[]) as listing,
+            redirect_stdout(io.StringIO()),
+        ):
+            cmd_follow_account(
+                SimpleNamespace(account="1376996", json=True), self.client, config
+            )
+            self.assertEqual(listing.call_args.kwargs["account"], "1376996")
+
+        # Test follow delegating to follow-account with default bookmark containing language
+        with (
+            patch(
+                "rh_support_lib.commands.watchers.CaseService",
+                return_value=self.service,
+            ),
+            patch.object(self.service, "list_cases", return_value=[]) as listing,
+            redirect_stdout(io.StringIO()),
+        ):
+            cmd_follow(
+                SimpleNamespace(account="1376996", json=True), self.client, config
+            )
+            self.assertEqual(listing.call_args.kwargs["account"], "1376996")
+
+        dummy_receipt = {
+            "account": "1376996",
+            "user": "user",
+            "status_filter": None,
+            "unfollowed": [],
+            "count": 0,
+            "dry_run": False,
+        }
+        # Test unfollow-account with language in bookmark
+        with (
+            patch(
+                "rh_support_lib.commands.watchers.CaseService",
+                return_value=self.service,
+            ),
+            patch.object(
+                self.service, "unfollow_account", return_value=dummy_receipt
+            ) as unfollow,
+            redirect_stdout(io.StringIO()),
+        ):
+            cmd_unfollow_account(
+                SimpleNamespace(account="1376996", json=True), self.client, config
+            )
+            self.assertEqual(unfollow.call_args.kwargs["account"], "1376996")
+
+        # Test unfollow delegating to unfollow-account with default bookmark containing language
+        with (
+            patch(
+                "rh_support_lib.commands.watchers.CaseService",
+                return_value=self.service,
+            ),
+            patch.object(
+                self.service, "unfollow_account", return_value=dummy_receipt
+            ) as unfollow,
+            redirect_stdout(io.StringIO()),
+        ):
+            cmd_unfollow(
+                SimpleNamespace(account="1376996", json=True), self.client, config
+            )
+            self.assertEqual(unfollow.call_args.kwargs["account"], "1376996")
+
+    def test_follow_and_unfollow_subcommands_accept_account_tracking_flags(self):
+        from rh_support_lib.main import _main
+
+        for cmd_line in (
+            [
+                "follow",
+                "-a",
+                "1376996",
+                "--severity",
+                "high",
+                "-b",
+                "bit_open",
+                "--no-default-bookmark",
+            ],
+            [
+                "unfollow",
+                "-a",
+                "1376996",
+                "--severity",
+                "high",
+                "-b",
+                "bit_open",
+                "--no-default-bookmark",
+            ],
+        ):
+            with (
+                self.subTest(cmd_line=cmd_line),
+                patch("sys.argv", ["rh-support-cli", "--mock", *cmd_line]),
+                patch("rh_support_lib.main.argcomplete", None),
+                patch(
+                    "rh_support_lib.main.load_config",
+                    return_value={"bookmarks": {"bit_open": {"account": "1376996"}}},
+                ),
+                patch("rh_support_lib.main._start_mock"),
+                patch("rh_support_lib.api.RedHatAPIClient"),
+                patch(
+                    "rh_support_lib.commands.watchers.cmd_follow_account"
+                ) as follow_acc,
+                patch(
+                    "rh_support_lib.commands.watchers.cmd_unfollow_account"
+                ) as unfollow_acc,
+            ):
+                _main()
+                if cmd_line[0] == "follow":
+                    self.assertTrue(follow_acc.called)
+                else:
+                    self.assertTrue(unfollow_acc.called)
+
+    def test_get_auto_follow_accounts_resolution(self):
+        # 1. Scalar string and int
+        svc1 = CaseService(self.client, config={"auto_follow_accounts": "1376996"})
+        self.assertEqual(
+            svc1.get_auto_follow_accounts(),
+            [{"account": "1376996", "status": "open", "severity": None}],
+        )
+        svc2 = CaseService(self.client, config={"auto_follow_account": 1376996})
+        self.assertEqual(
+            svc2.get_auto_follow_accounts(),
+            [{"account": "1376996", "status": "open", "severity": None}],
+        )
+
+        # 2. List with bookmark expansion and deduplication
+        config = {
+            "bookmarks": {
+                "bit_open": {
+                    "account": "1376996",
+                    "status": ["open"],
+                    "severity": "High",
+                }
+            },
+            "auto_follow_accounts": ["bit_open", "1376996", "999999"],
+        }
+        svc3 = CaseService(self.client, config=config)
+        self.assertEqual(
+            svc3.get_auto_follow_accounts(),
+            [
+                {"account": "1376996", "status": ["open"], "severity": "High"},
+                {"account": "999999", "status": "open", "severity": None},
+            ],
+        )
+
+        # 3. List of dict mappings
+        config_dicts = {
+            "auto_follow_accounts": [
+                {"account": "12345", "status": "closed", "severity": "Urgent"}
+            ]
+        }
+        svc4 = CaseService(self.client, config=config_dicts)
+        self.assertEqual(
+            svc4.get_auto_follow_accounts(),
+            [{"account": "12345", "status": "closed", "severity": "Urgent"}],
+        )
+
+    def test_sync_auto_follows_new_account_cases(self):
+        config = {
+            "auto_follow_accounts": ["1376996"],
+        }
+        svc = CaseService(
+            self.client,
+            state_service=self.state,
+            cache_service=self.cache,
+            config=config,
+        )
+        svc.get_current_user = Mock(return_value="test_user")
+        # Initial mock cases returned for account 1376996
+        case1 = Case(
+            case_number="11111",
+            summary="Case 1",
+            status="Waiting on Red Hat",
+            severity="High",
+            account_number="1376996",
+        )
+        case2 = Case(
+            case_number="22222",
+            summary="Case 2",
+            status="Waiting on Red Hat",
+            severity="High",
+            account_number="1376996",
+        )
+
+        with (
+            patch.object(svc, "list_cases", return_value=[case1, case2]),
+            patch.object(
+                svc,
+                "get_case_details",
+                return_value=CaseDetails(case=case1, description="desc", comments=[]),
+            ),
+        ):
+            report = svc.sync_tracked_cases(username="test_user")
+            self.assertEqual(report["newly_followed_count"], 2)
+            self.assertEqual(set(report["newly_followed"]), {"11111", "22222"})
+            self.assertEqual(report["synced_count"], 2)
+            self.assertTrue(svc.state_service.is_following("11111", "test_user"))
+            self.assertTrue(svc.state_service.is_following("22222", "test_user"))
+
+            # Second sync: no new cases on account
+            report2 = svc.sync_tracked_cases(username="test_user")
+            self.assertEqual(report2["newly_followed_count"], 0)
+            self.assertEqual(report2["newly_followed"], [])
+            self.assertEqual(report2["synced_count"], 2)
+
+            # Third sync with a 3rd new case arriving on the account
+            case3 = Case(
+                case_number="33333",
+                summary="Case 3",
+                status="Waiting on Red Hat",
+                severity="High",
+                account_number="1376996",
+            )
+            with patch.object(svc, "list_cases", return_value=[case1, case2, case3]):
+                report3 = svc.sync_tracked_cases(username="test_user")
+                self.assertEqual(report3["newly_followed_count"], 1)
+                self.assertEqual(report3["newly_followed"], ["33333"])
+                self.assertEqual(report3["synced_count"], 3)
+                self.assertTrue(svc.state_service.is_following("33333", "test_user"))
+
+    def test_sync_cli_command_reports_auto_followed_cases(self):
+        from rh_support_lib.commands.tracking import cmd_sync
+
+        config = {"auto_follow_accounts": ["1376996"]}
+        args = SimpleNamespace(
+            user="test_user",
+            account=None,
+            format="text",
+            json=False,
+            notify=False,
+            install_systemd=False,
+            simple_output=True,
+            dry_run=False,
+        )
+        fake_report = {
+            "synced_count": 5,
+            "updated_cases": [],
+            "new_comments": 0,
+            "newly_followed": ["33333"],
+            "newly_followed_count": 1,
+        }
+        with (
+            patch("rh_support_lib.commands.tracking.CaseService") as mock_cs,
+            redirect_stdout(io.StringIO()) as output,
+        ):
+            instance = mock_cs.return_value
+            instance.sync_tracked_cases.return_value = fake_report
+            cmd_sync(args, self.client, config=config)
+            out = output.getvalue()
+            self.assertIn("1 new case(s) auto-followed", out)
+            self.assertIn("5 tracked case(s) checked", out)

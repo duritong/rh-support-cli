@@ -186,6 +186,8 @@ Operational state (followed cases, sync checkpoints, unread counts) is managed b
 
 * **`CaseService.follow_account`**: Queries remote account cases via `list_cases(all_pages=True)` matching the status filter (default: `"open"`). Non-redundant cases are committed in a single atomic batch via `StateService.add_tracked_cases_batch()`. Dry-run calls pass `track_owned=False` to suppress automatic owned-case registration side-effects.
 * **`CaseService.unfollow_account`**: Discovers followed cases matching the account number and optional status/severity filter locally via `list_followed_cases(fetch_live=False)`. Cases missing an account number in state are correlated using `CacheService.get_case_details(ttl=0)`. Expired cache entries remain usable for this local-only selection without remote network reads. Matching cases are removed in a single transaction via `StateService.remove_followed_cases_batch()`.
+* **Bookmark Scope**: Account presenters merge `account`, `status`, `severity`, and `user` bookmark filters before applying explicit CLI overrides. Non-case bookmark directives (such as `language` for KCS searches) are ignored. Unsupported case-scoping bookmark fields (such as `product` or `owner`) are rejected before discovery or mutation.
+* **Auto-Follow Sync Integration**: `CaseService.sync_tracked_cases()` resolves `auto_follow_accounts` from configuration (or explicit `--account`), discovering and registering any new matching remote cases via `follow_account()` before polling case update checkpoints. Newly auto-followed cases are added to `state.yaml` in an atomic transaction and included in the sync report.
 
 ---
 

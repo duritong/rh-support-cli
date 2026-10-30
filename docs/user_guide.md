@@ -68,6 +68,11 @@ comments_order: newest
 # Background HTTP debug logging (redacted requests/responses)
 debug_file: ~/.config/rh-support-cli/debug_log.txt
 
+# Accounts to automatically follow new cases from during sync
+auto_follow_accounts:
+  - "1376996"
+  # - bit_open                  # References a bookmark to inherit its account and status filters
+
 # Local Disk Cache & Polling Settings
 cache:
   enabled: true                 # Set to false to disable all disk caching
@@ -429,11 +434,24 @@ rh-support-cli unfollow-account 123456 --dry-run
 ```
 
 #### Account Tracking Scope & Bookmarks
-* **Supported Bookmark Fields**: Account commands (`follow-account`, `unfollow-account`) accept bookmark filters for `account` (or `accountNumber`), `status`, `severity`, and `user`.
-* **Unsupported Filter Rejection**: Other bookmark directives (such as `product` or `owner`) are rejected before execution with an error. If your default bookmark contains unsupported fields, pass `--no-default-bookmark`.
+* **Supported Bookmark Fields**: Account commands (`follow-account`, `unfollow-account`, and account-delegating `follow --account` / `unfollow --account`) accept bookmark filters for `account` (or `accountNumber`), `status`, `severity`, and `user`. Non-case bookmark directives such as `language` (used for KCS searches) are safely ignored.
+* **Unsupported Filter Rejection**: Other case-filtering bookmark directives (such as `product` or `owner`) are rejected before execution with an error. If your default bookmark contains unsupported case-filtering fields, pass `--no-default-bookmark`.
 * **CLI Precedence**: Explicit CLI options (`--account`, `--status`, `--severity`, `--user`) override corresponding bookmark values. Passing `--all` overrides bookmark status to include all cases.
 * **Account Follow Previews**: `follow-account --dry-run` queries matching remote cases and previews the operation while leaving all local tracking records and read checkpoints untouched, including cases you own.
 * **Local Unfollow Selection**: `unfollow-account` selects cases using local tracking data in `state.yaml`. If a tracked case is missing an account number in state, locally cached details are consulted; cases whose account cannot be identified locally remain followed. Filtered unfollow evaluates this local tracking data.
+
+#### Automatic Account Following (`auto_follow_accounts`)
+Running `follow-account <account>` or `follow --account <account>` follows all currently matching cases at that point in time. To continuously track an account so that newly opened cases are discovered and followed automatically during `sync` (including background systemd timers), configure `auto_follow_accounts` in `config.yaml`:
+
+```yaml
+auto_follow_accounts:
+  - "1376996"                  # Account number (tracks open cases by default)
+  - bit_open                  # Bookmark name (inherits account, status, and severity filters)
+  # - account: "2345678"      # Mapping with explicit filter overrides
+  #   status: ["open"]
+```
+
+Whenever `rh-support-cli sync` runs, it queries remote accounts for new cases, registers them in `state.yaml`, and syncs them alongside existing followed tickets.
 
 ### 5.10 Synchronizing Tracked Cases & Background Timer (`sync` / `install-systemd` / `systemd`)
 
@@ -446,9 +464,11 @@ rh-support-cli sync
 # Sync cases for a specific account or user:
 rh-support-cli sync --account 12345 -u myself@redhat.com
 
-# Sync with desktop notifications on new comments or status transitions:
+# Sync with desktop notifications on new comments, status transitions, or new cases:
 rh-support-cli sync --notify
-```
+
+# Preview sync and auto-follow results without modifying local state:
+rh-support-cli sync --dry-run
 
 #### Automating with Systemd User Timer
 

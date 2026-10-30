@@ -40,6 +40,10 @@ def _resolve_account_filters(args, config) -> dict:
         getattr(args, "bookmark", None),
         getattr(args, "no_default_bookmark", False),
     )
+    # Non-case filters (such as 'language', used for KCS searches) do not apply
+    # to account case tracking and are ignored rather than rejected.
+    filters.pop("language", None)
+    filters.pop("kcs_language", None)
     unsupported = set(filters) - {
         "account",
         "accountNumber",

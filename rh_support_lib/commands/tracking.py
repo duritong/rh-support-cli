@@ -31,10 +31,14 @@ def cmd_sync(args, api_client, config=None):
     fmt = getattr(args, "format", "text")
     is_structured = fmt in ("json", "yaml") or getattr(args, "json", False)
 
+    dry_run = bool(getattr(args, "dry_run", False))
+    prefix = "[Dry-run] " if dry_run else ""
     if not is_structured:
-        print(f"Syncing tracked cases for '{user}'...")
+        print(f"{prefix}Syncing tracked cases for '{user}'...")
     try:
-        res = case_service.sync_tracked_cases(username=user, account=acc)
+        res = case_service.sync_tracked_cases(
+            username=user, account=acc, dry_run=dry_run
+        )
     except PartialSyncError as error:
         sys.exit(
             f"{error} Successful updates were preserved; unavailable cases were not changed."
@@ -50,20 +54,37 @@ def cmd_sync(args, api_client, config=None):
     synced_count = res.get("synced_count", 0)
     updated = res.get("updated_cases", [])
     new_comments = res.get("new_comments", 0)
+    newly_followed = res.get("newly_followed", [])
 
     c_green = colorize(
         f"{len(updated)} updated", COLORS.GREEN, getattr(args, "simple_output", False)
     )
-    print(
-        f"Sync complete: {synced_count} tracked case(s) checked. "
-        f"{c_green} ({new_comments} new comment(s))."
-    )
+    status_parts = [
+        f"{synced_count} tracked case(s) checked",
+        f"{c_green} ({new_comments} new comment(s))",
+    ]
+    if newly_followed:
+        action_verb = "would be auto-followed" if dry_run else "auto-followed"
+        c_cyan = colorize(
+            f"{len(newly_followed)} new case(s) {action_verb}",
+            COLORS.CYAN,
+            getattr(args, "simple_output", False),
+        )
+        status_parts.append(c_cyan)
+    print(f"{prefix}Sync complete: {'. '.join(status_parts)}.")
 
     # Optional desktop notifications
-    if getattr(args, "notify", False) and updated:
+    if getattr(args, "notify", False) and (updated or newly_followed) and not dry_run:
+        msg_parts = []
+        if updated:
+            msg_parts.append(
+                f"{len(updated)} case(s) updated with {new_comments} new comment(s)"
+            )
+        if newly_followed:
+            msg_parts.append(f"{len(newly_followed)} new case(s) followed")
         send_desktop_notification(
             title="Red Hat Support CLI",
-            message=f"{len(updated)} case(s) updated with {new_comments} new comment(s).",
+            message=". ".join(msg_parts) + ".",
         )
 
 
