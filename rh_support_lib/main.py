@@ -220,6 +220,13 @@ Authentication:
     parser_show.add_argument(
         "--simple-output", action="store_true", help="Disable colored output"
     )
+    parser_show.add_argument(
+        "--links",
+        "--link-style",
+        choices=["footnotes", "inline", "hidden"],
+        default=None,
+        help="Rendering style for Markdown links (default: footnotes or from config)",
+    )
     # Link Subcommand
     parser_link = subparsers.add_parser("link", help="Get the browser URL for a case")
     parser_link.add_argument("-c", "--case", required=True, help="Case Number")
@@ -973,6 +980,13 @@ Authentication:
         action="store_true",
         dest="oldest_first",
         help="Display comments in chronological order (oldest first)",
+    )
+    parser_tui.add_argument(
+        "--links",
+        "--link-style",
+        choices=["footnotes", "inline", "hidden"],
+        default=None,
+        help="Rendering style for Markdown links (default: footnotes or from config)",
     )
     # Mock Portal Subcommand
     parser_mock_portal = subparsers.add_parser(

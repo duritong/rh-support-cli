@@ -11,7 +11,6 @@ from datetime import datetime, timezone
 from typing import Any, ClassVar, Optional
 
 from rich.box import ROUNDED
-from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
@@ -50,7 +49,11 @@ from rh_support_lib.statuses import (
     get_status_choices_for_case,
 )
 from rh_support_lib.templates import resolve_templates_dir
-from rh_support_lib.utils import is_comment_newer
+from rh_support_lib.utils import (
+    extract_markdown_links,
+    is_comment_newer,
+    render_markdown,
+)
 
 __all__ = [
     "API_URL",
@@ -589,6 +592,103 @@ class KCSSearchModal(ModalScreen[Optional[tuple[str, str, str]]]):
         self.dismiss(None)
 
 
+class LinkPickerModal(ModalScreen[Optional[tuple[str, str]]]):
+    """Modal screen for viewing, opening, and copying links from the active case."""
+
+    BINDINGS: ClassVar[list] = [
+        ("c", "copy_selected", "Copy URL"),
+        ("y", "copy_selected", "Copy URL"),
+        ("escape", "dismiss_modal", "Cancel"),
+    ]
+
+    def __init__(self, links: list[tuple[str, str]]):
+        super().__init__()
+        self.links = links
+
+    def compose(self) -> ComposeResult:
+        if not self.links:
+            yield Grid(
+                Label("Case Links", id="modal-title"),
+                Label("No links found in the current case description or comments."),
+                Horizontal(
+                    Button("Close", variant="primary", id="cancel-btn"),
+                    id="modal-buttons",
+                ),
+                id="template-modal-grid",
+            )
+            return
+
+        table = DataTable(id="link-results-table")
+        table.cursor_type = "row"
+        yield Grid(
+            Label("Case Links (Enter: Open, C: Copy, Esc: Cancel)", id="modal-title"),
+            table,
+            Horizontal(
+                Button("Open in Browser", variant="success", id="open-btn"),
+                Button("Copy URL", variant="primary", id="copy-btn"),
+                Button("Cancel", variant="error", id="cancel-btn"),
+                id="modal-buttons",
+            ),
+            id="kcs-modal-grid",
+        )
+
+    def on_mount(self) -> None:
+        if not self.links:
+            return
+        table = self.query_one("#link-results-table", DataTable)
+        table.add_columns("#", "SOURCE / LABEL", "URL")
+        for idx, (label, url) in enumerate(self.links, 1):
+            table.add_row(str(idx), label, url, key=str(idx - 1))
+        table.focus()
+
+    def _selected_link(self) -> str | None:
+        if not self.links:
+            return None
+        table = self.query_one("#link-results-table", DataTable)
+        with contextlib.suppress(Exception):
+            cell_key = table.coordinate_to_cell_key(table.cursor_coordinate)
+            if cell_key:
+                index = int(cell_key.row_key.value)
+                if 0 <= index < len(self.links):
+                    return self.links[index][1]
+        return None
+
+    @on(DataTable.RowSelected, "#link-results-table")
+    def on_table_selected(self, event: DataTable.RowSelected) -> None:
+        event.stop()
+        url = self._selected_link()
+        if url:
+            self.dismiss(("open", url))
+
+    def action_copy_selected(self) -> None:
+        url = self._selected_link()
+        if url:
+            self.dismiss(("copy", url))
+
+    def action_dismiss_modal(self) -> None:
+        self.dismiss(None)
+
+    @on(Button.Pressed, "#open-btn")
+    def do_open(self) -> None:
+        url = self._selected_link()
+        if url:
+            self.dismiss(("open", url))
+        else:
+            self.dismiss(None)
+
+    @on(Button.Pressed, "#copy-btn")
+    def do_copy(self) -> None:
+        url = self._selected_link()
+        if url:
+            self.dismiss(("copy", url))
+        else:
+            self.dismiss(None)
+
+    @on(Button.Pressed, "#cancel-btn")
+    def do_cancel(self) -> None:
+        self.dismiss(None)
+
+
 class FocusableContainer(VerticalScroll):
     """A scrollable container that can receive keyboard focus and handles keyboard scrolling."""
 
@@ -645,6 +745,8 @@ class SupportApp(App):
         Binding("?", "search_kcs", "KCS Search", show=False),
         ("v", "toggle_layout", "Split (H/V)"),
         Binding("l", "toggle_layout", "Toggle Layout", show=False),
+        ("u", "open_link", "Links"),
+        Binding("L", "open_link", "Links", show=False),
         Binding("ctrl+up", "focus_top", "Focus Top", priority=True),
         Binding("ctrl+down", "focus_bottom", "Focus Bottom", priority=True),
         Binding("ctrl+left", "focus_left", "Focus Left", priority=True),
@@ -832,7 +934,7 @@ class SupportApp(App):
         border: thick $primary 80%;
         background: $surface;
     }
-    KCSSearchModal {
+    KCSSearchModal, LinkPickerModal {
         layout: vertical;
         align: center middle;
     }
@@ -846,7 +948,7 @@ class SupportApp(App):
         border: thick $primary 80%;
         background: $surface;
     }
-    #kcs-results-table {
+    #kcs-results-table, #link-results-table {
         height: 1fr;
         min-height: 3;
         margin: 1 0;
@@ -940,6 +1042,15 @@ class SupportApp(App):
                 raise ValueError("Invalid poll interval")
         except (ValueError, TypeError):
             self.poll_interval = 60
+        self.markdown_links = (
+            (
+                (config.get("markdown_links") if config else None)
+                or (config.get("link_style") if config else None)
+                or "footnotes"
+            )
+            .lower()
+            .strip()
+        )
         # Resolve initial layout: explicit CLI arg > config > state.yaml > default ('vertical')
         user = ""
         with contextlib.suppress(Exception):
@@ -1828,7 +1939,7 @@ class SupportApp(App):
 
         # Description
         widgets.append(Static("\n[bold magenta]DESCRIPTION:[/]\n"))
-        widgets.append(Static(Markdown(description)))
+        widgets.append(Static(render_markdown(description, style=self.markdown_links)))
 
         # Determine comment ordering
         order = getattr(self, "comments_order", "oldest")
@@ -1900,7 +2011,7 @@ class SupportApp(App):
             widgets.append(
                 Static(
                     Panel(
-                        Markdown(c_body),
+                        render_markdown(c_body, style=self.markdown_links),
                         title=comment_header,
                         border_style=border_style,
                     )
@@ -2814,6 +2925,46 @@ class SupportApp(App):
         if self.current_details is not None:
             self.render_case_details(self.current_details, self.current_attachments)
 
+    def action_open_link(self) -> None:
+        """Opens link picker modal to view, open, or copy URLs from the active case."""
+        if not self.current_details or not self.current_details.case:
+            self.notify("No case currently selected.", severity="warning")
+            return
+
+        case = self.current_details.case
+        c_num = str(case.case_number or case.id or "").strip()
+        links: list[tuple[str, str]] = []
+        if c_num:
+            portal_url = case.url or f"https://access.redhat.com/support/cases/{c_num}"
+            links.append((f"Case #{c_num} Portal", portal_url))
+
+        if self.current_details.description:
+            for label, url in extract_markdown_links(self.current_details.description):
+                if not any(u == url for _, u in links):
+                    links.append((f"Description: {label}", url))
+
+        for idx, comm in enumerate(self.current_details.comments, 1):
+            if comm.body:
+                author = comm.created_by or f"Comment #{idx}"
+                for label, url in extract_markdown_links(comm.body):
+                    if not any(u == url for _, u in links):
+                        links.append((f"{author}: {label}", url))
+
+        def handle_link_choice(result: tuple[str, str] | None) -> None:
+            if not result:
+                return
+            action_type, url = result
+            if action_type == "open":
+                import webbrowser
+
+                webbrowser.open(url)
+                self.notify(f"Opened in browser: {url}")
+            elif action_type == "copy":
+                self.copy_to_clipboard(url)
+                self.notify(f"Copied to clipboard: {url}")
+
+        self.push_screen(LinkPickerModal(links), handle_link_choice)
+
 
 def cmd_tui(args, api_client, config):
     """Entry point to run the TUI."""
@@ -2833,4 +2984,6 @@ def cmd_tui(args, api_client, config):
         layout=layout,
         comments_order=comments_order,
     )
+    if getattr(args, "links", None):
+        app.markdown_links = args.links.lower().strip()
     app.run()

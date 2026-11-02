@@ -366,11 +366,22 @@ def cmd_show(args, api_client, config: dict | None = None):
     else:
         from rich.box import ROUNDED
         from rich.console import Console
-        from rich.markdown import Markdown
         from rich.panel import Panel
         from rich.table import Table
         from rich.text import Text
 
+        from rh_support_lib.utils import render_markdown
+
+        link_style = (
+            (
+                getattr(args, "links", None)
+                or (config.get("markdown_links") if config else None)
+                or (config.get("link_style") if config else None)
+                or "footnotes"
+            )
+            .lower()
+            .strip()
+        )
         console = Console(
             color_system="standard" if os.environ.get("FORCE_COLOR") == "1" else "auto",
             force_terminal=True if os.environ.get("FORCE_COLOR") == "1" else None,
@@ -437,7 +448,7 @@ def cmd_show(args, api_client, config: dict | None = None):
                     "\n[dim yellow]ATTACHMENTS: (unavailable - check token permissions or scopes)[/]\n"
                 )
             con.print("\n[bold magenta]DESCRIPTION:[/]\n")
-            con.print(Markdown(description))
+            con.print(render_markdown(description, style=link_style))
             con.print()
 
             order_label = "newest first" if order == "newest" else "oldest first"
@@ -487,7 +498,7 @@ def cmd_show(args, api_client, config: dict | None = None):
                 comment_header = f"{c_by} ({is_public}){badge} - {c_date}"
                 con.print(
                     Panel(
-                        Markdown(c_body),
+                        render_markdown(c_body, style=link_style),
                         title=comment_header,
                         border_style=border_style,
                     )

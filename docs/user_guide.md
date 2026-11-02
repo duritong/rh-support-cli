@@ -65,6 +65,9 @@ default_kcs_language: en
 # Default comment display order ('newest' or 'oldest', default: newest)
 comments_order: newest
 
+
+# Markdown link rendering style: 'footnotes' (default), 'inline', or 'hidden' (OSC 8 terminal hyperlinks)
+markdown_links: footnotes
 # Background HTTP debug logging (redacted requests/responses)
 debug_file: ~/.config/rh-support-cli/debug_log.txt
 
@@ -254,8 +257,12 @@ rh-support-cli show -c 12345678 --order oldest
 rh-support-cli show -c 12345678 --export
 rh-support-cli show -c 12345678 --export slack
 rh-support-cli show -c 12345678 --export json
-```
 
+# Select Markdown link rendering style (default: footnotes):
+rh-support-cli show -c 12345678 --links footnotes
+rh-support-cli show -c 12345678 --links inline
+rh-support-cli show -c 12345678 --links hidden
+```
 ### 5.3 Case Browser Link (`link`)
 
 Print the Red Hat Customer Portal URL for a ticket:
@@ -678,6 +685,7 @@ rh-support-cli tui
 * `--order <newest|oldest>`: Comment ordering on startup.
 * `--no-default-bookmark`: Launch unfiltered.
 * `--no-cache`: Bypass disk cache on startup.
+* `--links <footnotes|inline|hidden>`: Markdown link rendering style (default: footnotes).
 
 ### Keyboard Shortcuts:
 
@@ -692,6 +700,7 @@ rh-support-cli tui
 | **`g`** / **`:`** | Jump directly to case by number |
 | **`/`** / **`s`** | Search and filter displayed queue (Search Modal) |
 | **`K`** / **`?`** | Search Knowledgebase / KCS solutions (KCS Modal) |
+| **`u`** / **`L`** | Open link picker modal to browse, open in browser, or copy URLs |
 | **`a`** | Upload file attachment (Attach Modal) |
 | **`d`** | Download selected attachment |
 | **`t`** | Apply template to selected case (Template Modal) |
@@ -706,6 +715,7 @@ rh-support-cli tui
 ### Navigation & Modal Dialogs
 * **Search Modal (`/` or `s`)**: Filters the active table by keyword, summary, or case number. Press `Escape` to clear search and restore the regular case queue.
 * **Knowledgebase / KCS Modal (`K` or `?`)**: Opens KCS search pre-filled with the active ticket summary. Solutions can be opened in a browser or inserted directly into the comment composer.
+* **Link Picker Modal (`u` or `L`)**: Lists all links extracted from the active ticket description and comments, alongside the case portal URL. Press `Enter` to open in browser, `c` or `y` to copy the selected URL to clipboard, or `Escape` to close.
 * **Read Marking & Dwell**: Selecting a case marks it as read after a dwell time, or press `m` to mark it read immediately.
 * **Network & View Retention**: If a background refresh fails, the TUI displays a warning and retains the current view and any active comment draft.
 

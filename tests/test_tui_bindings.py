@@ -39,6 +39,8 @@ APP_BINDINGS = {
     "?": "search_kcs",
     "v": "toggle_layout",
     "l": "toggle_layout",
+    "u": "open_link",
+    "L": "open_link",
     "ctrl+up": "focus_top",
     "ctrl+down": "focus_bottom",
     "ctrl+left": "focus_left",

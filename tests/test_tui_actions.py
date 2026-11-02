@@ -590,6 +590,42 @@ class TuiActionTests(unittest.IsolatedAsyncioTestCase):
                 editor.text,
             )
 
+    async def test_link_picker_modal_open_and_copy(self):
+        from rh_support_lib.tui.app import LinkPickerModal
+
+        async with self.app.run_test() as pilot:
+            current = details()
+            current.description = (
+                "See [Red Hat Docs](https://docs.redhat.com) for details."
+            )
+            self.app.selected_case_id = "1"
+            self.app.render_case_details(current, [])
+            await pilot.pause()
+
+            # 1. Action opens LinkPickerModal
+            self.app.action_open_link()
+            await pilot.pause()
+            self.assertIsInstance(self.app.screen, LinkPickerModal)
+            self.assertTrue(len(self.app.screen.links) >= 2)
+            self.assertEqual(
+                self.app.screen.links[0][1], "https://access.redhat.com/support/cases/1"
+            )
+            self.assertEqual(self.app.screen.links[1][1], "https://docs.redhat.com")
+
+            # 2. Test dismiss with ("open", url)
+            with patch("webbrowser.open") as mock_open:
+                self.app.screen.dismiss(("open", "https://docs.redhat.com"))
+                await pilot.pause()
+                mock_open.assert_called_once_with("https://docs.redhat.com")
+
+            # 3. Test dismiss with ("copy", url)
+            self.app.action_open_link()
+            await pilot.pause()
+            with patch.object(self.app, "copy_to_clipboard") as mock_copy:
+                self.app.screen.dismiss(("copy", "https://docs.redhat.com"))
+                await pilot.pause()
+                mock_copy.assert_called_once_with("https://docs.redhat.com")
+
     async def test_real_list_cache_does_not_claim_remote_freshness(self):
         client = Mock(spec=RedHatAPIClient)
         client.get_cache_scope.return_value = "test-scope"

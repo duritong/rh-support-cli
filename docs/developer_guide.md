@@ -218,6 +218,10 @@ The interactive dashboard (`tui/app.py`) is built with the Textual framework:
   - The status dropdown preselects `determine_reply_status(current_status)`, defaulting to `"In Progress"` only if the case is waiting on customer action; otherwise it retains current status.
   - Submitting a comment checks whether the target status differs from current status; if unchanged, `status=None` is passed to avoid redundant API mutations.
 
+* **Markdown Link Rendering & Link Picker**:
+  - `render_markdown(text, style)` renders content according to configured link style (`footnotes` [default], `inline`, or `hidden`).
+  - In `footnotes` mode, links are converted to numbered references `[N]` with a `Links:` appendix, exposing target URLs without cluttering prose.
+  - `LinkPickerModal` (bound to `u` / `L`) extracts all case URLs (portal link, description, and comments) into a selectable table to open in browser via `webbrowser.open()` or copy to clipboard via `copy_to_clipboard()`.
 ### TUI Concurrency & Ownership Invariants
 
 * **Detail Generations & Target Case IDs**: Selection and refresh callbacks capture a monotonically increasing detail generation and case ID. Callbacks verify that the target case remains selected before updating the UI thread, preventing stale background responses from overwriting newer selections.

@@ -216,6 +216,17 @@ def _validate_config(config):
     for key in ("auto_follow_accounts", "auto_follow_account"):
         if key in config:
             _validate_auto_follow_accounts(config[key], key)
+    for key in ("markdown_links", "link_style"):
+        if key in config:
+            val = config[key]
+            if not isinstance(val, str) or val.lower().strip() not in (
+                "footnotes",
+                "inline",
+                "hidden",
+            ):
+                raise ConfigError(
+                    f"{key}: expected one of 'footnotes', 'inline', 'hidden'"
+                )
     if "default_bookmark" in config:
         resolve_bookmarks(config)
     return config

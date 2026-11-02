@@ -599,3 +599,129 @@ def format_body_for_portal(body: str | None, fmt: str = "markdown") -> str:
     md = MarkdownIt("gfm-like", {"breaks": True, "html": True})
     rendered = md.render(body_str).strip()
     return rendered
+
+
+def format_markdown_footnotes(markdown_text: str) -> str:
+    """Formats markdown links as numbered footnote references with a Links section appended."""
+    if not markdown_text:
+        return ""
+    link_pattern = re.compile(r"\[([^\]]+)\]\(((?:https?://|mailto:|/)[^\s\)]+)\)")
+    urls: list[str] = []
+    url_to_idx: dict[str, int] = {}
+
+    def replace_link(match: re.Match) -> str:
+        label = match.group(1).strip()
+        url = match.group(2).strip()
+        if label == url or label == f"<{url}>":
+            return url
+        if url not in url_to_idx:
+            url_to_idx[url] = len(urls) + 1
+            urls.append(url)
+        idx = url_to_idx[url]
+        return f"{label} [{idx}]"
+
+    parts = re.split(r"(```.*?```)", markdown_text, flags=re.DOTALL)
+    new_parts = []
+    for i, part in enumerate(parts):
+        if i % 2 == 1:
+            new_parts.append(part)
+        else:
+            inline_parts = re.split(r"(`[^`]+`)", part)
+            for j, ipart in enumerate(inline_parts):
+                if j % 2 == 1:
+                    new_parts.append(ipart)
+                else:
+                    new_parts.append(link_pattern.sub(replace_link, ipart))
+
+    result = "".join(new_parts)
+    if urls:
+        links_section = "\n\n**Links:**  \n" + "  \n".join(
+            f"[{idx}] {url}" for idx, url in enumerate(urls, 1)
+        )
+        result += links_section
+    return result
+
+
+def format_markdown_inline(markdown_text: str) -> str:
+    """Formats markdown links inline as 'label (url)'."""
+    if not markdown_text:
+        return ""
+    link_pattern = re.compile(r"\[([^\]]+)\]\(((?:https?://|mailto:|/)[^\s\)]+)\)")
+
+    def replace_link(match: re.Match) -> str:
+        label = match.group(1).strip()
+        url = match.group(2).strip()
+        if label == url or label == f"<{url}>":
+            return url
+        return f"{label} ({url})"
+
+    parts = re.split(r"(```.*?```)", markdown_text, flags=re.DOTALL)
+    new_parts = []
+    for i, part in enumerate(parts):
+        if i % 2 == 1:
+            new_parts.append(part)
+        else:
+            inline_parts = re.split(r"(`[^`]+`)", part)
+            for j, ipart in enumerate(inline_parts):
+                if j % 2 == 1:
+                    new_parts.append(ipart)
+                else:
+                    new_parts.append(link_pattern.sub(replace_link, ipart))
+    return "".join(new_parts)
+
+
+def format_markdown_for_links(
+    markdown_text: str, style: str = "footnotes"
+) -> tuple[str, bool]:
+    """Formats markdown links based on style ('footnotes', 'inline', 'hidden').
+
+    Returns (formatted_text, use_hyperlinks).
+    """
+    mode = (style or "footnotes").lower().strip()
+    if mode == "inline":
+        return format_markdown_inline(markdown_text), False
+    elif mode == "hidden":
+        return markdown_text, True
+    else:  # "footnotes" (default)
+        return format_markdown_footnotes(markdown_text), False
+
+
+def render_markdown(markdown_text: str, style: str = "footnotes"):
+    """Returns a Rich Markdown renderable formatted according to the link style."""
+    from rich.markdown import Markdown
+
+    formatted, use_hyperlinks = format_markdown_for_links(
+        markdown_text or "", style=style
+    )
+    return Markdown(formatted, hyperlinks=use_hyperlinks)
+
+
+def extract_markdown_links(markdown_text: str) -> list[tuple[str, str]]:
+    """Extracts all links (markdown links and bare URLs) from markdown text in order of appearance."""
+    if not markdown_text:
+        return []
+    link_pattern = re.compile(r"\[([^\]]+)\]\(((?:https?://|mailto:|/)[^\s\)]+)\)")
+    bare_url_pattern = re.compile(r"https?://[^\s<>\"'\)]+")
+
+    links: list[tuple[str, str]] = []
+    seen_urls: set[str] = set()
+
+    parts = re.split(r"(```.*?```)", markdown_text, flags=re.DOTALL)
+    for i, part in enumerate(parts):
+        if i % 2 == 1:
+            continue
+        for match in link_pattern.finditer(part):
+            label = match.group(1).strip()
+            url = match.group(2).strip()
+            if url and url not in seen_urls:
+                seen_urls.add(url)
+                links.append((label or url, url))
+
+        stripped = link_pattern.sub(" ", part)
+        for url in bare_url_pattern.findall(stripped):
+            url_clean = url.rstrip(".,;:!?")
+            if url_clean and url_clean not in seen_urls:
+                seen_urls.add(url_clean)
+                links.append((url_clean, url_clean))
+
+    return links
