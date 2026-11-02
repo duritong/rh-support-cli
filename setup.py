@@ -19,6 +19,15 @@ setup(
         "textual>=6.0.0",
         "markdown-it-py>=2.2.0",
     ],
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
+        "Programming Language :: Python :: 3.14",
+    ],
     package_data={
         "rh_support_lib": ["data/*.json"],
     },

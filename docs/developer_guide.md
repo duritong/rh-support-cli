@@ -326,3 +326,4 @@ The repository bundles an offline product catalog (`rh_support_lib/data/products
 * Dependencies declare **lower bounds only** (no artificial upper pins) to allow flexible downstream packaging.
 * Direct imports in code must always be declared in `setup.py`.
 * Upgrades are validated against the test suite across all supported Python runtimes (3.9–3.14).
+* **Automated Dependency & Actions Maintenance (Dependabot)**: `.github/dependabot.yml` monitors both `pip` package dependencies and `github-actions` workflows weekly, opening grouped pull requests. CI automatically validates all updates against the full Python version matrix (`3.9` through `3.14`).
