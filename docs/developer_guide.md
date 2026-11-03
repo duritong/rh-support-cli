@@ -293,6 +293,7 @@ python -m tests
 
 * **Type Annotation Rules**: Use `from __future__ import annotations`. Base class generic parameters (e.g. `ModalScreen[Optional[str]]`) and runtime expressions (`isinstance`) are evaluated at import time. On Python 3.9, PEP 604 union pipes (`|`) fail at runtime on generic aliases; use `typing.Optional` / `typing.Union` in base class subscripts.
 * **Argcomplete Exclusion**: `setup.py` declares `argcomplete>=3.0.0,!=3.7.1` because release 3.7.1 introduced a Python 3.9 import error in its global activation script.
+* **CI Runner Image**: In GitHub Actions (`.github/workflows/test.yml`), Python 3.9 runs on `ubuntu-24.04` because `ubuntu-latest` (Ubuntu 26.04) does not supply prebuilt binaries for end-of-life Python 3.9. Newer Python versions (3.10–3.14) run on `ubuntu-latest`.
 
 ### Verified Dependency Floors
 
