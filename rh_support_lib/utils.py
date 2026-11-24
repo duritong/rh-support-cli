@@ -8,6 +8,7 @@ import re
 import shlex
 import stat
 import subprocess
+import sys
 import tempfile
 from contextlib import ExitStack, contextmanager
 from dataclasses import asdict, is_dataclass
@@ -725,3 +726,42 @@ def extract_markdown_links(markdown_text: str) -> list[tuple[str, str]]:
                 links.append((url_clean, url_clean))
 
     return links
+
+
+def get_ansi_pager():
+    """Returns a Rich Pager instance that reliably handles ANSI SGR styling.
+
+    Python's pydoc.get_pager() checks ``os.system('(less) 2>/dev/null') == 0``.
+    In interactive terminals where stdin is a tty, newer versions of ``less``
+    exit with code 1 ('Missing filename') instead of 0, causing pydoc to fall
+    back to ``more``. Because ``more`` counts raw ANSI escape characters toward
+    column width, Rich panels and tables wrap prematurely. This pager resolves
+    ``less -R`` explicitly via shutil.which when no custom PAGER is set.
+    """
+    import pydoc
+    import shutil
+
+    from rich.pager import Pager
+
+    class AnsiSystemPager(Pager):
+        def show(self, content: str) -> None:
+            if not (hasattr(sys.stdin, "isatty") and sys.stdin.isatty()) or not (
+                hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
+            ):
+                sys.stdout.write(content)
+                sys.stdout.flush()
+                return
+            if os.environ.get("TERM") in ("dumb", "emacs"):
+                pydoc.plain_pager(content)
+                return
+            custom_pager = os.environ.get("MANPAGER") or os.environ.get("PAGER")
+            if custom_pager:
+                pydoc.pipe_pager(content, custom_pager)
+                return
+            less_bin = shutil.which("less")
+            if less_bin:
+                pydoc.pipe_pager(content, less_bin)
+                return
+            pydoc.pager(content)
+
+    return AnsiSystemPager()

@@ -222,6 +222,7 @@ The interactive dashboard (`tui/app.py`) is built with the Textual framework:
   - `render_markdown(text, style)` renders content according to configured link style (`footnotes` [default], `inline`, or `hidden`).
   - In `footnotes` mode, links are converted to numbered references `[N]` with a `Links:` appendix, exposing target URLs without cluttering prose.
   - `LinkPickerModal` (bound to `u` / `L`) extracts all case URLs (portal link, description, and comments) into a selectable table to open in browser via `webbrowser.open()` or copy to clipboard via `copy_to_clipboard()`.
+* **CLI ANSI Pager Resolution (`get_ansi_pager`)**: Python's `pydoc.get_pager()` probes `os.system('(less) 2>/dev/null') == 0`. On systems with newer `less` (e.g. `less >= 710`), running `less` with an interactive TTY stdin exits with status `1` ("Missing filename"), causing `pydoc` to silently fall back to `more`. Because `more` counts raw ANSI SGR bytes toward column width, Rich panels wrap prematurely. `get_ansi_pager()` locates `less` via `shutil.which("less")` directly (while honoring custom `MANPAGER`/`PAGER`) so `less -R` renders ANSI escapes at zero column width.
 ### TUI Concurrency & Ownership Invariants
 
 * **Detail Generations & Target Case IDs**: Selection and refresh callbacks capture a monotonically increasing detail generation and case ID. Callbacks verify that the target case remains selected before updating the UI thread, preventing stale background responses from overwriting newer selections.

@@ -1894,19 +1894,19 @@ class SupportApp(App):
         # Metadata grid
         meta_table = Table.grid(padding=(0, 2))
         meta_table.add_column(style="bold yellow", width=14)
-        meta_table.add_column(style="white")
+        meta_table.add_column(style="white", ratio=1)
         meta_table.add_column(style="bold yellow", width=14)
-        meta_table.add_column(style="white")
+        meta_table.add_column(style="white", ratio=1)
 
-        meta_table.add_row("Product:", f"{product} {version}", "Status:", status)
-        meta_table.add_row("Severity:", severity, "Type:", case_type)
+        meta_table.add_row("Status:", status, "Severity:", severity)
         meta_table.add_row(
-            "Account:",
-            str(account_num),
-            "Created By:",
-            f"{created_by} on {created_date}",
+            "Product:", f"{product} {version}".strip(), "Type:", case_type
         )
-        meta_table.add_row("Assignee:", owner, "", "")
+        meta_table.add_row("Account:", str(account_num), "Assignee:", owner)
+        created_str = (
+            f"{created_by} on {created_date}" if created_date else str(created_by)
+        )
+        meta_table.add_row("Created By:", created_str, "", "")
         widgets.append(
             Static(Panel(meta_table, title="Details", border_style="yellow"))
         )

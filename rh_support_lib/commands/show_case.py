@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import pydoc
 import sys
 
 from rh_support_lib.api import AuthenticationError
@@ -361,7 +360,9 @@ def cmd_show(args, api_client, config: dict | None = None):
         if args.no_pager:
             print(output)
         else:
-            pydoc.pager(output)
+            from rh_support_lib.utils import get_ansi_pager
+
+            get_ansi_pager().show(output)
 
     else:
         from rich.box import ROUNDED
@@ -370,7 +371,7 @@ def cmd_show(args, api_client, config: dict | None = None):
         from rich.table import Table
         from rich.text import Text
 
-        from rh_support_lib.utils import render_markdown
+        from rh_support_lib.utils import get_ansi_pager, render_markdown
 
         link_style = (
             (
@@ -399,21 +400,19 @@ def cmd_show(args, api_client, config: dict | None = None):
 
             meta_table = Table.grid(padding=(0, 2))
             meta_table.add_column(style="bold yellow", width=14)
-            meta_table.add_column(style="white")
+            meta_table.add_column(style="white", ratio=1)
             meta_table.add_column(style="bold yellow", width=14)
-            meta_table.add_column(style="white")
+            meta_table.add_column(style="white", ratio=1)
 
+            meta_table.add_row("Status:", status, "Severity:", severity)
             meta_table.add_row(
-                "Product:", f"{product} {version}".strip(), "Status:", status
+                "Product:", f"{product} {version}".strip(), "Type:", case_type
             )
-            meta_table.add_row("Severity:", severity, "Type:", case_type)
-            meta_table.add_row(
-                "Account:",
-                str(account_str),
-                "Created By:",
-                f"{created_by} on {created_date}" if created_date else str(created_by),
+            meta_table.add_row("Account:", str(account_str), "Assignee:", owner)
+            created_str = (
+                f"{created_by} on {created_date}" if created_date else str(created_by)
             )
-            meta_table.add_row("Assignee:", owner, "", "")
+            meta_table.add_row("Created By:", created_str, "", "")
             con.print(Panel(meta_table, title="Details", border_style="yellow"))
             if status_changed:
                 diff_banner = f"[bold yellow]⚡ Status Changed:[/] {old_status} ➔ [bold green]{status}[/]"
@@ -513,7 +512,7 @@ def cmd_show(args, api_client, config: dict | None = None):
         if args.no_pager:
             render_rich(console)
         else:
-            with console.pager(styles=True):
+            with console.pager(pager=get_ansi_pager(), styles=True):
                 render_rich(console)
 
     if getattr(args, "mark_read", False):

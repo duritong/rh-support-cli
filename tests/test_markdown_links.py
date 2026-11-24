@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -171,3 +172,30 @@ class MarkdownLinksTests(unittest.TestCase):
                 self.assertRaises(ConfigError),
             ):
                 load_config("dummy.yaml")
+
+    def test_get_ansi_pager_uses_less_directly_over_more_fallback(self):
+        from rh_support_lib.utils import get_ansi_pager
+
+        pager = get_ansi_pager()
+        with (
+            patch("sys.stdin.isatty", return_value=True),
+            patch("sys.stdout.isatty", return_value=True),
+            patch.dict(os.environ, {"TERM": "foot"}, clear=True),
+            patch("shutil.which", return_value="/usr/bin/less") as mock_which,
+            patch("pydoc.pipe_pager") as mock_pipe_pager,
+        ):
+            pager.show("styled content")
+            mock_which.assert_called_once_with("less")
+            mock_pipe_pager.assert_called_once_with("styled content", "/usr/bin/less")
+
+        # Respects explicit PAGER environment variable
+        with (
+            patch("sys.stdin.isatty", return_value=True),
+            patch("sys.stdout.isatty", return_value=True),
+            patch.dict(
+                os.environ, {"TERM": "foot", "PAGER": "custom-pager"}, clear=True
+            ),
+            patch("pydoc.pipe_pager") as mock_pipe_pager,
+        ):
+            pager.show("styled content")
+            mock_pipe_pager.assert_called_once_with("styled content", "custom-pager")
