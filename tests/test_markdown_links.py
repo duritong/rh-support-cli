@@ -182,7 +182,7 @@ class MarkdownLinksTests(unittest.TestCase):
             patch("sys.stdout.isatty", return_value=True),
             patch.dict(os.environ, {"TERM": "foot"}, clear=True),
             patch("shutil.which", return_value="/usr/bin/less") as mock_which,
-            patch("pydoc.pipe_pager") as mock_pipe_pager,
+            patch("rh_support_lib.utils._pipe_pager") as mock_pipe_pager,
         ):
             pager.show("styled content")
             mock_which.assert_called_once_with("less")
@@ -195,7 +195,23 @@ class MarkdownLinksTests(unittest.TestCase):
             patch.dict(
                 os.environ, {"TERM": "foot", "PAGER": "custom-pager"}, clear=True
             ),
-            patch("pydoc.pipe_pager") as mock_pipe_pager,
+            patch("rh_support_lib.utils._pipe_pager") as mock_pipe_pager,
         ):
             pager.show("styled content")
             mock_pipe_pager.assert_called_once_with("styled content", "custom-pager")
+
+    def test_pipe_and_plain_pager_compatibility(self):
+        import pydoc
+
+        from rh_support_lib.utils import _pipe_pager, _plain_pager
+
+        # Test delegating to pipe_pager or pipepager across Python 3.9-3.14
+        target_pipe = "pipe_pager" if hasattr(pydoc, "pipe_pager") else "pipepager"
+        with patch.object(pydoc, target_pipe) as mock_pipe:
+            _pipe_pager("content", "less")
+            mock_pipe.assert_called_once_with("content", "less")
+
+        target_plain = "plain_pager" if hasattr(pydoc, "plain_pager") else "plainpager"
+        with patch.object(pydoc, target_plain) as mock_plain:
+            _plain_pager("content")
+            mock_plain.assert_called_once_with("content")

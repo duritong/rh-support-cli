@@ -728,6 +728,28 @@ def extract_markdown_links(markdown_text: str) -> list[tuple[str, str]]:
     return links
 
 
+def _pipe_pager(text: str, cmd: str) -> None:
+    """Invokes pipe pager across Python 3.9-3.14 (pydoc.pipe_pager or pydoc.pipepager)."""
+    import pydoc
+
+    pager_fn = getattr(pydoc, "pipe_pager", getattr(pydoc, "pipepager", None))
+    if pager_fn is not None:
+        pager_fn(text, cmd)
+    else:
+        pydoc.pager(text)
+
+
+def _plain_pager(text: str) -> None:
+    """Invokes plain pager across Python 3.9-3.14 (pydoc.plain_pager or pydoc.plainpager)."""
+    import pydoc
+
+    pager_fn = getattr(pydoc, "plain_pager", getattr(pydoc, "plainpager", None))
+    if pager_fn is not None:
+        pager_fn(text)
+    else:
+        pydoc.pager(text)
+
+
 def get_ansi_pager():
     """Returns a Rich Pager instance that reliably handles ANSI SGR styling.
 
@@ -752,15 +774,15 @@ def get_ansi_pager():
                 sys.stdout.flush()
                 return
             if os.environ.get("TERM") in ("dumb", "emacs"):
-                pydoc.plain_pager(content)
+                _plain_pager(content)
                 return
             custom_pager = os.environ.get("MANPAGER") or os.environ.get("PAGER")
             if custom_pager:
-                pydoc.pipe_pager(content, custom_pager)
+                _pipe_pager(content, custom_pager)
                 return
             less_bin = shutil.which("less")
             if less_bin:
-                pydoc.pipe_pager(content, less_bin)
+                _pipe_pager(content, less_bin)
                 return
             pydoc.pager(content)
 
